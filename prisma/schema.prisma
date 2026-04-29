@@ -1,0 +1,155 @@
+// 멀티 테넌트 출퇴근 증빙 — 모든 주요 엔티티에 companyId(또는 상위를 통한 격리) 적용
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  HR_MANAGER
+  APPROVER
+  EMPLOYEE
+}
+
+enum AttendanceType {
+  CHECK_IN
+  CHECK_OUT
+}
+
+enum AttendanceStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+enum ExceptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  /// IANA 타임존 (지각/조퇴 판별)
+  timezone  String   @default("Asia/Seoul")
+  createdAt DateTime @default(now())
+
+  users                User[]
+  employees            Employee[]
+  sites                Site[]
+  attendanceRecords    AttendanceRecord[]
+  attendanceExceptions AttendanceException[]
+  approvalLogs         ApprovalLog[]
+}
+
+/// SUPER_ADMIN은 companyId 없음 가능
+model User {
+  id               String    @id @default(cuid())
+  companyId        String?
+  company          Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email            String    @unique
+  passwordHash     String
+  role             Role      @default(EMPLOYEE)
+  consentGivenAt   DateTime?
+  consentVersion   String?
+  createdAt        DateTime  @default(now())
+
+  employee       Employee?
+  approvalLogs   ApprovalLog[] @relation("ApproverUser")
+}
+
+model Employee {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+
+  attendanceRecords AttendanceRecord[]
+
+  @@index([companyId])
+}
+
+model Site {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String
+  latitude       Float
+  longitude      Float
+  allowedRadius  Float    /// 미터 단위
+  /// "HH:mm" 현지(회사 타임존) 기준, 없으면 지각/조퇴 미판별
+  expectedCheckIn  String?
+  expectedCheckOut String?
+  createdAt      DateTime @default(now())
+
+  attendanceRecords AttendanceRecord[]
+
+  @@index([companyId])
+}
+
+model AttendanceRecord {
+  id                 String            @id @default(cuid())
+  companyId          String
+  company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId         String
+  employee           Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  siteId             String
+  site               Site              @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  type               AttendanceType
+  timestamp          DateTime          @default(now())
+  latitude           Float
+  longitude          Float
+  accuracy           Float?
+  distanceFromSite   Float             /// 미터
+  status             AttendanceStatus  @default(APPROVED)
+  memo               String?
+  photoUrl           String?
+  deviceInfo         String?
+  isLate             Boolean  @default(false)
+  isEarlyLeave       Boolean  @default(false)
+
+  exception AttendanceException?
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([timestamp])
+}
+
+model AttendanceException {
+  id            String            @id @default(cuid())
+  companyId     String
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  attendanceId  String            @unique
+  attendance    AttendanceRecord  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  reason        String
+  status        ExceptionStatus   @default(PENDING)
+  createdAt     DateTime          @default(now())
+  resolvedAt    DateTime?
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model ApprovalLog {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  approverId  String
+  approver    User     @relation("ApproverUser", fields: [approverId], references: [id], onDelete: Cascade)
+  action      String
+  targetType  String?
+  targetId    String?
+  timestamp   DateTime @default(now())
+
+  @@index([companyId])
+}

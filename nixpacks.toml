@@ -1,0 +1,3 @@
+# Prisma 엔진용 OpenSSL (Railway Nixpacks)
+[phases.setup]
+nixPkgs = ["nodejs_20", "openssl"]
