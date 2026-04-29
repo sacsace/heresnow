@@ -1,9 +1,6 @@
-# Railway — https://docs.railway.com/reference/config-as-code
-# Postgres 플러그인으로 DATABASE_URL 연결, Variables에 AUTH_SECRET·AUTH_URL 설정
-
-[build]
-builder = "NIXPACKS"
+# Railway config-as-code — https://docs.railway.com/reference/config-as-code
+# Variables: DATABASE_URL(Postgres 플러그인), AUTH_SECRET, AUTH_URL(배포 URL과 동일)
 
 [deploy]
 startCommand = "npm run start"
-releaseCommand = "npx prisma migrate deploy"
+preDeployCommand = ["npx prisma migrate deploy"]
