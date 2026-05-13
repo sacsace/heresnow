@@ -7,10 +7,16 @@ export async function authorizeCredentials(credentials: Partial<Record<"email" |
   const password = credentials?.password as string | undefined;
   if (!email || !password) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase().trim() },
-    include: { employee: true },
-  });
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
+      include: { employee: true },
+    });
+  } catch (e) {
+    console.error("[auth] DB 연결 실패 — .env 의 DATABASE_URL(비밀번호·호스트)을 확인하세요.", e);
+    return null;
+  }
   if (!user) return null;
 
   const ok = await bcrypt.compare(password, user.passwordHash);

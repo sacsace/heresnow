@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     직원: r.employee.name,
     유형: r.type,
     시각: r.timestamp.toISOString(),
-    근무지: r.site.name,
+    근무지: r.site?.name ?? "",
     위도: r.latitude,
     경도: r.longitude,
     정확도_m: r.accuracy,

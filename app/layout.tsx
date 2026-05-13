@@ -13,10 +13,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0ea5e9",
+  themeColor: "#e0f2fe",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  /** 휴대폰·태블릿에서 화면 회전·노치 대응, 핀치 줌 허용 */
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -26,7 +27,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={`${inter.variable} min-h-dvh antialiased font-sans`}>
+      <body
+        className={`${inter.variable} min-h-dvh bg-[var(--background)] text-zinc-800 antialiased font-sans`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

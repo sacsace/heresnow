@@ -41,33 +41,33 @@ export default function AdminExceptionsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-slate-900">예외 승인 대기</h1>
+      <h1 className="text-lg font-semibold tracking-tight text-zinc-900">예외 승인 대기</h1>
       {loading ? (
-        <p className="mt-4 text-sm text-slate-500">불러오는 중…</p>
+        <p className="mt-4 text-sm text-zinc-500">불러오는 중…</p>
       ) : items.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">대기 중인 예외가 없습니다.</p>
+        <p className="mt-4 text-sm text-zinc-500">대기 중인 예외가 없습니다.</p>
       ) : (
         <ul className="mt-4 space-y-3">
           {items.map((x) => (
-            <li key={x.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-sm font-medium text-slate-900">
+            <li key={x.id} className="rounded-xl border border-zinc-200/80 bg-white p-4">
+              <p className="text-sm font-medium text-zinc-900">
                 {x.attendance.employee.name} · {x.attendance.type} · {x.attendance.site.name}
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-zinc-500">
                 {new Date(x.attendance.timestamp).toLocaleString("ko-KR")}
               </p>
-              <p className="mt-2 text-sm text-slate-700">사유: {x.reason}</p>
+              <p className="mt-2 text-sm text-zinc-700">사유: {x.reason}</p>
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700"
+                  className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm text-white hover:bg-emerald-600"
                   onClick={() => void resolve(x.id, "approve")}
                 >
                   승인
                 </button>
                 <button
                   type="button"
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-50"
+                  className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
                   onClick={() => void resolve(x.id, "reject")}
                 >
                   반려

@@ -3,7 +3,8 @@ import type { Role } from "@prisma/client";
 
 export const authConfig = {
   providers: [],
-  trustHost: true,
+  /** 프로덕션에서는 리버스 프록시 뒤일 때만 AUTH_TRUST_HOST=true 로 명시적으로 허용 */
+  trustHost: process.env.NODE_ENV === "development" || process.env.AUTH_TRUST_HOST === "true",
   pages: { signIn: "/login" },
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   callbacks: {

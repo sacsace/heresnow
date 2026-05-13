@@ -15,7 +15,7 @@ type Row = {
   isEarlyLeave: boolean;
   memo: string | null;
   employee: { name: string };
-  site: { name: string };
+  site: { name: string } | null;
 };
 
 export default function AdminAttendancePage() {
@@ -47,10 +47,10 @@ export default function AdminAttendancePage() {
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-xl font-semibold text-slate-900">출퇴근 기록</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-900">출퇴근 기록</h1>
         <div className="flex gap-2">
           <select
-            className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
+            className="rounded-lg border border-zinc-300 px-2 py-1 text-sm"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
@@ -61,24 +61,23 @@ export default function AdminAttendancePage() {
           </select>
           <a
             href="/api/admin/export"
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800"
+            className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm text-white hover:bg-sky-600"
           >
             Excel
           </a>
         </div>
       </div>
       {loading ? (
-        <p className="mt-4 text-sm text-slate-500">불러오는 중…</p>
+        <p className="mt-4 text-sm text-zinc-500">불러오는 중…</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-zinc-200 bg-white">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="bg-zinc-50/80 text-xs uppercase text-zinc-500">
               <tr>
                 <th className="px-3 py-2">시각</th>
                 <th className="px-3 py-2">직원</th>
                 <th className="px-3 py-2">유형</th>
-                <th className="px-3 py-2">근무지</th>
-                <th className="px-3 py-2">거리</th>
+                <th className="px-3 py-2">위치</th>
                 <th className="px-3 py-2">상태</th>
                 <th className="px-3 py-2">지각/조퇴</th>
                 <th className="px-3 py-2">지도</th>
@@ -86,18 +85,29 @@ export default function AdminAttendancePage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-t border-slate-100">
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                <tr key={r.id} className="border-t border-zinc-100">
+                  <td className="whitespace-nowrap px-3 py-2 text-zinc-700">
                     {new Date(r.timestamp).toLocaleString("ko-KR")}
                   </td>
                   <td className="px-3 py-2">{r.employee.name}</td>
                   <td className="px-3 py-2">{r.type}</td>
-                  <td className="px-3 py-2">{r.site.name}</td>
-                  <td className="px-3 py-2">{Math.round(r.distanceFromSite)}m</td>
+                  <td className="px-3 py-2 text-xs text-zinc-600">
+                    {r.site?.name ? (
+                      <>
+                        {r.site.name}
+                        <span className="block text-zinc-400">약 {Math.round(r.distanceFromSite)}m</span>
+                      </>
+                    ) : (
+                      <>
+                        {r.latitude.toFixed(5)}, {r.longitude.toFixed(5)}
+                        <span className="block text-zinc-400">GPS</span>
+                      </>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${badge(r.status)}`}>{r.status}</span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-slate-600">
+                  <td className="px-3 py-2 text-xs text-zinc-600">
                     {r.isLate ? "지각 " : ""}
                     {r.isEarlyLeave ? "조퇴" : ""}
                     {!r.isLate && !r.isEarlyLeave ? "—" : ""}

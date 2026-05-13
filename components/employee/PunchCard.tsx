@@ -1,15 +1,8 @@
 "use client";
 
+import { StaticMap } from "@/components/admin/StaticMap";
 import type { AttendanceType } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
-
-type Site = {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  allowedRadius: number;
-};
 
 type RecordRow = {
   id: string;
@@ -17,32 +10,23 @@ type RecordRow = {
   timestamp: string;
   status: string;
   distanceFromSite: number;
+  latitude: number;
+  longitude: number;
   memo: string | null;
   isLate: boolean;
   isEarlyLeave: boolean;
-  site: { name: string };
+  site: { name: string } | null;
   exception: { status: string } | null;
 };
 
 export function PunchCard() {
-  const [sites, setSites] = useState<Site[]>([]);
-  const [siteId, setSiteId] = useState("");
   const [memo, setMemo] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [coords, setCoords] = useState<{ lat: number; lng: number; acc?: number } | null>(null);
-  const [geoError, setGeoError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mapBusy, setMapBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [previewCoords, setPreviewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [records, setRecords] = useState<RecordRow[]>([]);
-
-  const loadSites = useCallback(async () => {
-    const r = await fetch("/api/sites");
-    const j = await r.json();
-    if (r.ok && j.sites?.length) {
-      setSites(j.sites);
-      setSiteId((id) => id || j.sites[0].id);
-    }
-  }, []);
 
   const loadRecords = useCallback(async () => {
     const r = await fetch("/api/attendance/me?limit=20");
@@ -51,9 +35,8 @@ export function PunchCard() {
   }, []);
 
   useEffect(() => {
-    void loadSites();
     void loadRecords();
-  }, [loadSites, loadRecords]);
+  }, [loadRecords]);
 
   function readPositionOnce(): Promise<GeolocationPosition> {
     return new Promise((resolve, reject) => {
@@ -69,25 +52,6 @@ export function PunchCard() {
     });
   }
 
-  async function captureLocationPreview() {
-    setGeoError(null);
-    setMsg(null);
-    try {
-      const pos = await readPositionOnce();
-      setCoords({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        acc: pos.coords.accuracy,
-      });
-    } catch (e: unknown) {
-      if (e && typeof e === "object" && "message" in e) {
-        setGeoError(String((e as { message?: string }).message));
-      } else {
-        setGeoError("위치를 가져오지 못했습니다.");
-      }
-    }
-  }
-
   async function fileToDataUrl(f: File): Promise<string | null> {
     if (f.size > 900_000) {
       setMsg("사진은 약 900KB 이하로 올려 주세요.");
@@ -101,20 +65,32 @@ export function PunchCard() {
     });
   }
 
+  async function loadMapPreview() {
+    setMapBusy(true);
+    setMsg(null);
+    try {
+      const pos = await readPositionOnce();
+      setPreviewCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    } catch (e: unknown) {
+      if (e && typeof e === "object" && "message" in e) {
+        setMsg(String((e as { message?: string }).message));
+      } else {
+        setMsg("위치를 가져오지 못했습니다.");
+      }
+    }
+    setMapBusy(false);
+  }
+
   async function submit(type: AttendanceType) {
     setMsg(null);
     setBusy(true);
     try {
-      let lat = coords?.lat;
-      let lng = coords?.lng;
-      let acc = coords?.acc;
-      if (lat == null || lng == null) {
-        const pos = await readPositionOnce();
-        lat = pos.coords.latitude;
-        lng = pos.coords.longitude;
-        acc = pos.coords.accuracy;
-        setCoords({ lat, lng, acc });
-      }
+      const pos = await readPositionOnce();
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
+      setPreviewCoords({ lat, lng });
+
       let photoUrl: string | null = null;
       if (photoFile) {
         photoUrl = await fileToDataUrl(photoFile);
@@ -128,7 +104,6 @@ export function PunchCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
-          siteId,
           latitude: lat,
           longitude: lng,
           accuracy: acc,
@@ -146,46 +121,33 @@ export function PunchCard() {
       setMemo("");
       setPhotoFile(null);
       await loadRecords();
-    } catch {
-      setMsg("네트워크 오류가 발생했습니다.");
+    } catch (e: unknown) {
+      if (e && typeof e === "object" && "message" in e) {
+        setMsg(String((e as { message?: string }).message));
+      } else {
+        setMsg("위치를 가져오지 못했거나 네트워크 오류가 발생했습니다.");
+      }
     }
     setBusy(false);
   }
 
-  const selected = sites.find((s) => s.id === siteId);
-
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="block text-sm font-medium text-slate-700">근무지 / 출장지</label>
-        <select
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900"
-          value={siteId}
-          onChange={(e) => setSiteId(e.target.value)}
-        >
-          {sites.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        {selected && (
-          <p className="mt-2 text-xs text-slate-500">
-            허용 반경 약 {Math.round(selected.allowedRadius)}m · 기준 좌표{" "}
-            {selected.latitude.toFixed(5)}, {selected.longitude.toFixed(5)}
-          </p>
-        )}
+    <div className="min-w-0 space-y-6">
+      <section className="rounded-xl border border-zinc-200/80 bg-white p-3 sm:p-4 md:p-5">
+        <p className="text-xs text-zinc-500">
+          출근·퇴근 버튼을 누르는 순간의 위치만 사용합니다. 백그라운드 추적은 없습니다.
+        </p>
 
-        <label className="mt-4 block text-sm font-medium text-slate-700">메모 (예외 사유 등)</label>
+        <label className="mt-4 block text-sm font-medium text-zinc-600">메모 (예외 사유 등)</label>
         <textarea
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+          className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
           rows={2}
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
           placeholder="선택 입력"
         />
 
-        <label className="mt-4 block text-sm font-medium text-slate-700">사진 인증 (선택)</label>
+        <label className="mt-4 block text-sm font-medium text-zinc-600">사진 인증 (선택)</label>
         <input
           type="file"
           accept="image/*"
@@ -194,56 +156,66 @@ export function PunchCard() {
           onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
         />
 
-        <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
-          <p className="font-medium text-slate-900">위치 미리보기 (선택)</p>
-          <p className="text-xs text-slate-500">
-            버튼을 누를 때마다 그 순간만 위치를 읽습니다. 백그라운드 추적 없음.
+        <div className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50/80 p-2 sm:p-3">
+          <p className="text-sm font-medium text-zinc-900">위치 지도</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            출근·퇴근 시 저장되는 좌표와 동일하게, 버튼을 누를 때만 위치를 읽습니다.
           </p>
           <button
             type="button"
-            className="mt-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
-            onClick={() => void captureLocationPreview()}
+            disabled={busy || mapBusy}
+            onClick={() => void loadMapPreview()}
+            className="mt-2 touch-manipulation rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
           >
-            지금 위치만 가져오기
+            {mapBusy ? "위치 읽는 중…" : "현재 위치를 지도에 표시"}
           </button>
-          {coords && (
-            <p className="mt-2 text-xs">
-              {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
-              {coords.acc != null ? ` · 정확도 ~${Math.round(coords.acc)}m` : ""}
-            </p>
+          {previewCoords && (
+            <div className="mt-3">
+              <StaticMap
+                lat={previewCoords.lat}
+                lng={previewCoords.lng}
+                label="현재 위치"
+                noKeyFallback="embed"
+              />
+              <p className="mt-1 break-all text-[11px] text-zinc-400">
+                {previewCoords.lat.toFixed(6)}, {previewCoords.lng.toFixed(6)}
+              </p>
+            </div>
           )}
-          {geoError && <p className="mt-1 text-xs text-amber-700">{geoError}</p>}
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-6 grid min-w-0 grid-cols-2 gap-2 sm:gap-3">
           <button
             type="button"
-            disabled={busy || !siteId}
+            disabled={busy}
             onClick={() => void submit("CHECK_IN")}
-            className="rounded-2xl bg-emerald-600 py-5 text-lg font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50"
+            className="min-h-[3rem] touch-manipulation rounded-xl bg-emerald-500 py-3 text-base font-semibold text-white hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-50 sm:min-h-[3.25rem] sm:py-4"
           >
             출근
           </button>
           <button
             type="button"
-            disabled={busy || !siteId}
+            disabled={busy}
             onClick={() => void submit("CHECK_OUT")}
-            className="rounded-2xl bg-slate-800 py-5 text-lg font-semibold text-white shadow hover:bg-slate-900 disabled:opacity-50"
+            className="min-h-[3rem] touch-manipulation rounded-xl bg-sky-500 py-3 text-base font-semibold text-white hover:bg-sky-600 active:bg-sky-700 disabled:opacity-50 sm:min-h-[3.25rem] sm:py-4"
           >
             퇴근
           </button>
         </div>
-        {msg && <p className="mt-3 text-center text-sm text-slate-700">{msg}</p>}
+        {msg && (
+          <p className="mt-3 break-words text-center text-sm text-zinc-600">{msg}</p>
+        )}
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-slate-800">최근 기록</h2>
+        <h2 className="text-sm font-semibold text-zinc-800">최근 기록</h2>
         <ul className="mt-2 space-y-2">
           {records.map((r) => (
-            <li key={r.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
+            <li key={r.id} className="rounded-xl border border-zinc-200/80 bg-white p-3 text-sm">
               <div className="flex justify-between gap-2">
-                <span className="font-medium text-slate-900">
-                  {r.type === "CHECK_IN" ? "출근" : "퇴근"} · {r.site.name}
+                <span className="font-medium text-zinc-900">
+                  {r.type === "CHECK_IN" ? "출근" : "퇴근"}
+                  {r.site?.name ? ` · ${r.site.name}` : ""}
                 </span>
                 <span
                   className={
@@ -257,8 +229,11 @@ export function PunchCard() {
                   {r.status}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">
-                {new Date(r.timestamp).toLocaleString("ko-KR")} · 거리 약 {Math.round(r.distanceFromSite)}m
+              <p className="break-words text-xs text-zinc-500">
+                {new Date(r.timestamp).toLocaleString("ko-KR")}
+                {r.site && r.distanceFromSite > 0
+                  ? ` · 거리 약 ${Math.round(r.distanceFromSite)}m`
+                  : ` · ${r.latitude.toFixed(5)}, ${r.longitude.toFixed(5)}`}
               </p>
               {(r.isLate || r.isEarlyLeave) && (
                 <p className="text-xs text-amber-800">
@@ -266,9 +241,7 @@ export function PunchCard() {
                   {r.isEarlyLeave ? "조퇴" : ""}
                 </p>
               )}
-              {r.exception && (
-                <p className="text-xs text-slate-600">예외: {r.exception.status}</p>
-              )}
+              {r.exception && <p className="text-xs text-zinc-600">예외: {r.exception.status}</p>}
             </li>
           ))}
         </ul>

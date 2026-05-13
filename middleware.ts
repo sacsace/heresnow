@@ -7,12 +7,21 @@ export default auth((req) => {
   const role = req.auth?.user?.role;
 
   const isAuthPage = pathname.startsWith("/login");
+  const isDevHealth =
+    process.env.NODE_ENV === "development" && pathname === "/api/dev/health";
+
   const isPublicApi =
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/public") ||
     pathname === "/manifest.webmanifest" ||
-    pathname === "/icons/icon-192.png";
+    pathname === "/icons/icon-192.png" ||
+    isDevHealth;
 
   if (isPublicApi) return NextResponse.next();
+
+  if (pathname.startsWith("/api/") && !loggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   if (!loggedIn && pathname === "/consent") {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -24,7 +33,7 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  if (loggedIn && isAuthPage) {
+  if (loggedIn && (isAuthPage || pathname === "/signup")) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 

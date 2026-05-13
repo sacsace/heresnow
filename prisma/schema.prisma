@@ -34,6 +34,50 @@ enum ExceptionStatus {
   REJECTED
 }
 
+enum BillingRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// 연간 좌석 구간 요금 (슈퍼관리자가 금액·구간 수정 가능)
+model PricingTier {
+  id           String   @id @default(cuid())
+  minSeats     Int
+  maxSeats     Int
+  pricePerYear Int /// INR 등 정수 금액 (연)
+  currency     String   @default("INR")
+  label        String?
+  /// 가입 시 구독 만료를 `now + trialDays`로 설정. null이면 1년 연장 로직(유료)
+  trialDays    Int?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  companiesAsCurrent    Company[]        @relation("CompanyPricingTier")
+  billingRequestsTarget BillingRequest[] @relation("BillingTargetTier")
+
+  @@unique([minSeats, maxSeats])
+}
+
+model BillingRequest {
+  id             String               @id @default(cuid())
+  companyId      String
+  company        Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  targetTierId   String
+  targetTier     PricingTier          @relation("BillingTargetTier", fields: [targetTierId], references: [id], onDelete: Restrict)
+  amountDue      Int /// 요청 시점 연간 요금 스냅샷 (Rs)
+  status         BillingRequestStatus @default(PENDING)
+  note           String?
+  createdAt      DateTime             @default(now())
+  resolvedAt     DateTime?
+  resolverUserId String?
+  resolver       User?                @relation("BillingResolver", fields: [resolverUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([status])
+}
+
 model Company {
   id        String   @id @default(cuid())
   name      String
@@ -41,12 +85,19 @@ model Company {
   timezone  String   @default("Asia/Seoul")
   createdAt DateTime @default(now())
 
+  pricingTierId      String?
+  pricingTier          PricingTier? @relation("CompanyPricingTier", fields: [pricingTierId], references: [id], onDelete: SetNull)
+  /// 직원(Employee) 최대 수 — 요금제에 따라 상한
+  seatLimit            Int          @default(20)
+  subscriptionEndsAt   DateTime?
+
   users                User[]
   employees            Employee[]
   sites                Site[]
   attendanceRecords    AttendanceRecord[]
   attendanceExceptions AttendanceException[]
   approvalLogs         ApprovalLog[]
+  billingRequests      BillingRequest[]
 }
 
 /// SUPER_ADMIN은 companyId 없음 가능
@@ -63,6 +114,7 @@ model User {
 
   employee       Employee?
   approvalLogs   ApprovalLog[] @relation("ApproverUser")
+  resolvedBillingRequests BillingRequest[] @relation("BillingResolver")
 }
 
 model Employee {
@@ -103,14 +155,16 @@ model AttendanceRecord {
   company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employeeId         String
   employee           Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  siteId             String
-  site               Site              @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  /// 레거시·참고용. 위치만으로 출퇴근할 때는 null
+  siteId             String?
+  site               Site?             @relation(fields: [siteId], references: [id], onDelete: SetNull)
   type               AttendanceType
   timestamp          DateTime          @default(now())
   latitude           Float
   longitude          Float
   accuracy           Float?
-  distanceFromSite   Float             /// 미터
+  /// 근무지 대비 거리(m). 근무지 없음이면 0
+  distanceFromSite   Float
   status             AttendanceStatus  @default(APPROVED)
   memo               String?
   photoUrl           String?

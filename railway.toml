@@ -1,5 +1,5 @@
 # Railway config-as-code — https://docs.railway.com/reference/config-as-code
-# Variables: DATABASE_URL(Postgres 플러그인), AUTH_SECRET, AUTH_URL(배포 URL과 동일)
+# Variables: DATABASE_URL, AUTH_SECRET, AUTH_URL(배포 URL과 동일), AUTH_TRUST_HOST=true
 
 [deploy]
 startCommand = "npm run start"

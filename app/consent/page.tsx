@@ -1,9 +1,12 @@
 "use client";
 
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useI18n } from "@/components/LanguageProvider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function ConsentPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -14,7 +17,7 @@ export default function ConsentPage() {
     const res = await fetch("/api/user/consent", { method: "POST" });
     setLoading(false);
     if (!res.ok) {
-      setErr("동의 저장에 실패했습니다.");
+      setErr(t("consent.errorSave"));
       return;
     }
     router.replace("/");
@@ -23,44 +26,46 @@ export default function ConsentPage() {
 
   return (
     <main className="mx-auto max-w-lg px-4 py-10">
-      <h1 className="text-xl font-semibold text-slate-900">개인정보 수집·이용 동의</h1>
-      <p className="mt-2 text-sm text-slate-600">
-        HereNow는 <strong className="font-medium">실시간 위치 추적을 하지 않습니다.</strong> 출근/퇴근
-        버튼을 누른 순간의 좌표와 시간만 저장합니다.
+      <div className="fixed right-4 top-4 z-50 sm:right-6 sm:top-6">
+        <LanguageSwitcher />
+      </div>
+      <h1 className="text-lg font-semibold tracking-tight text-zinc-900">{t("consent.title")}</h1>
+      <p className="mt-2 text-sm text-zinc-500">
+        {t("consent.introLine1")}
+        <strong className="font-medium text-zinc-800">{t("consent.introBold")}</strong>
+        {t("consent.introLine2")}
       </p>
-      <section className="mt-6 space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+      <section className="mt-6 space-y-3 rounded-xl border border-zinc-200/80 bg-white p-4 text-sm text-zinc-600">
         <div>
-          <p className="font-medium text-slate-900">수집 항목</p>
+          <p className="font-medium text-zinc-900">{t("consent.sectionItems")}</p>
           <ul className="mt-1 list-inside list-disc">
-            <li>출퇴근 클릭 시점의 GPS 좌표(위도·경도)·정확도</li>
-            <li>시각</li>
-            <li>기기 정보(UA 등)</li>
-            <li>선택: 메모, 사진 URL</li>
+            <li>{t("consent.item1")}</li>
+            <li>{t("consent.item2")}</li>
+            <li>{t("consent.item3")}</li>
+            <li>{t("consent.item4")}</li>
           </ul>
         </div>
         <div>
-          <p className="font-medium text-slate-900">수집 목적</p>
-          <p>출장·현장 근무 등 출퇴근 사실 확인</p>
+          <p className="font-medium text-zinc-900">{t("consent.sectionPurpose")}</p>
+          <p>{t("consent.purposeText")}</p>
         </div>
         <div>
-          <p className="font-medium text-slate-900">수집하지 않는 항목</p>
+          <p className="font-medium text-zinc-900">{t("consent.sectionNotCollected")}</p>
           <ul className="mt-1 list-inside list-disc">
-            <li>실시간 위치, 이동 경로</li>
-            <li>근무시간 외 백그라운드 위치</li>
+            <li>{t("consent.not1")}</li>
+            <li>{t("consent.not2")}</li>
           </ul>
         </div>
-        <p className="text-xs text-slate-500">
-          동의를 거부하면 출퇴근 제출 기능이 제한될 수 있습니다. 보관 기간은 회사 정책에 따릅니다.
-        </p>
+        <p className="text-xs text-zinc-400">{t("consent.footer")}</p>
       </section>
       {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
       <button
         type="button"
-        onClick={agree}
+        onClick={() => void agree()}
         disabled={loading}
-        className="mt-6 w-full rounded-xl bg-emerald-600 py-3 font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+        className="mt-6 w-full rounded-lg bg-emerald-500 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
       >
-        {loading ? "처리 중…" : "동의하고 계속하기"}
+        {loading ? t("common.processing") : t("consent.agree")}
       </button>
     </main>
   );
