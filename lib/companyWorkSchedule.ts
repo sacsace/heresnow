@@ -59,7 +59,7 @@ export function evaluateAttendanceWorkFlags(
 ): AttendanceWorkFlags {
   const tz = timeZone.trim() || "UTC";
   const workDays = parseWorkDays(schedule.workDays);
-  const onWorkDay = isWorkDay(timestamp, tz);
+  const onWorkDay = isWorkDay(timestamp, tz, workDays);
   const nowMin = localMinutesFromDate(timestamp, tz);
   const startMin = parseHHmm(schedule.workStartTime ?? DEFAULT_WORK_START);
   const endMin = parseHHmm(schedule.workEndTime ?? DEFAULT_WORK_END);
@@ -67,7 +67,7 @@ export function evaluateAttendanceWorkFlags(
   let isLate = false;
   let isEarlyLeave = false;
   let isOvertime = false;
-  let isHolidayWork = !onWorkDay;
+  const isHolidayWork = !onWorkDay;
   let overtimeMinutes = 0;
 
   if (type === "CHECK_IN") {
