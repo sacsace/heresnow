@@ -18,7 +18,7 @@ export function AdminNavBar() {
 
   return (
     <header className="border-b border-zinc-100 bg-white/90 pt-[env(safe-area-inset-top,0px)] backdrop-blur-sm">
-      <div className="mx-auto flex min-w-0 max-w-6xl flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6">
+      <div className="mx-auto flex min-w-0 max-w-[86.4rem] flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 sm:gap-4">
           <span className="text-sm font-semibold tracking-tight text-zinc-800">{t("admin.brand")}</span>
           <nav className="flex flex-wrap items-center gap-1 text-sm">

@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "HereNow — 현장 출퇴근 증빙",
@@ -13,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#e0f2fe",
+  themeColor: "#f2f2f7",
   width: "device-width",
   initialScale: 1,
   /** 휴대폰·태블릿에서 화면 회전·노치 대응, 핀치 줌 허용 */
@@ -27,9 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body
-        className={`${inter.variable} min-h-dvh bg-[var(--background)] text-zinc-800 antialiased font-sans`}
-      >
+      <body className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

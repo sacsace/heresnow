@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminCompanySettings } from "@/components/admin/AdminCompanySettings";
+import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceOverview";
 import { useI18n } from "@/components/LanguageProvider";
 import Link from "next/link";
 
@@ -9,6 +11,11 @@ export default function AdminHomePage() {
     <div>
       <h1 className="text-lg font-semibold tracking-tight text-zinc-900">{t("admin.homeTitle")}</h1>
       <p className="mt-2 text-sm text-zinc-500">{t("admin.homeLead")}</p>
+
+      <AdminCompanySettings />
+
+      <MonthlyAttendanceOverview />
+
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         <Link
           href="/admin/attendance"

@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { aggregateAttendanceByDay } from "@/lib/adminAttendanceByDay";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -29,24 +30,32 @@ export async function GET(req: Request) {
 
   const employeeId = url.searchParams.get("employeeId") ?? undefined;
   const status = url.searchParams.get("status") ?? undefined;
-  const take = Math.min(Number(url.searchParams.get("limit") ?? "100") || 100, 500);
+  const limit = Math.min(Number(url.searchParams.get("limit") ?? "200") || 200, 500);
 
-  const rows = await prisma.attendanceRecord.findMany({
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true },
+  });
+  if (!company) {
+    return NextResponse.json({ error: "Company not found" }, { status: 404 });
+  }
+
+  const tz = company.timezone?.trim() || "Asia/Seoul";
+
+  const records = await prisma.attendanceRecord.findMany({
     where: {
       companyId,
       ...(employeeId ? { employeeId } : {}),
-      ...(status && ["APPROVED", "PENDING", "REJECTED"].includes(status)
-        ? { status: status as "APPROVED" | "PENDING" | "REJECTED" }
-        : {}),
     },
     orderBy: { timestamp: "desc" },
-    take,
+    take: 5000,
     include: {
       employee: { select: { name: true } },
-      site: { select: { name: true, latitude: true, longitude: true } },
-      exception: true,
+      site: { select: { name: true } },
     },
   });
 
-  return NextResponse.json({ records: rows });
+  const days = aggregateAttendanceByDay(records, tz, status || undefined).slice(0, limit);
+
+  return NextResponse.json({ timezone: tz, days });
 }

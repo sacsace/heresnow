@@ -40,6 +40,17 @@ enum BillingRequestStatus {
   REJECTED
 }
 
+/// 외부 HR/출퇴근 연동 (MVS 등)
+enum IntegrationProvider {
+  MVS
+}
+
+enum IntegrationOutboxStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
 /// 연간 좌석 구간 요금 (슈퍼관리자가 금액·구간 수정 가능)
 model PricingTier {
   id           String   @id @default(cuid())
@@ -83,6 +94,14 @@ model Company {
   name      String
   /// IANA 타임존 (지각/조퇴 판별)
   timezone  String   @default("Asia/Seoul")
+  /// false면 출근 시 안면 등록·인식 없이 GPS만으로 출근
+  faceRecognitionEnabled Boolean @default(true)
+  /// 회사 타임존 기준 정규 출근 "HH:mm"
+  workStartTime        String?  @default("09:00")
+  /// 회사 타임존 기준 정규 퇴근 "HH:mm"
+  workEndTime          String?  @default("18:00")
+  /// 근무 요일 (JS getDay: 0=일 … 6=토), 콤마 구분 예: "1,2,3,4,5"
+  workDays             String?  @default("1,2,3,4,5")
   createdAt DateTime @default(now())
 
   pricingTierId      String?
@@ -98,6 +117,8 @@ model Company {
   attendanceExceptions AttendanceException[]
   approvalLogs         ApprovalLog[]
   billingRequests      BillingRequest[]
+  integrations         CompanyIntegration[]
+  integrationOutbox    IntegrationOutbox[]
 }
 
 /// SUPER_ADMIN은 companyId 없음 가능
@@ -124,6 +145,11 @@ model Employee {
   userId    String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
+  /// MVS 등 외부 시스템 직원 ID
+  externalEmployeeId String?
+  /// 128차원 안면 임베딩(JSON 배열). 출근 시 본인 확인용
+  faceDescriptor Json?
+  faceEnrolledAt DateTime?
   createdAt DateTime @default(now())
 
   attendanceRecords AttendanceRecord[]
@@ -167,10 +193,22 @@ model AttendanceRecord {
   distanceFromSite   Float
   status             AttendanceStatus  @default(APPROVED)
   memo               String?
+  /// 출장 출근 여부
+  isBusinessTrip     Boolean  @default(false)
+  /// 출장 지역·도시 등 명칭
+  businessTripLocation String?
+  /// 출장 사유
+  businessTripReason String?
   photoUrl           String?
   deviceInfo         String?
   isLate             Boolean  @default(false)
   isEarlyLeave       Boolean  @default(false)
+  /// 정규 퇴근 이후 퇴근(근무일)
+  isOvertime         Boolean  @default(false)
+  /// 비근무일(휴일) 출퇴근
+  isHolidayWork      Boolean  @default(false)
+  /// 초과 근무 분(퇴근 시, 근무일만)
+  overtimeMinutes    Int      @default(0)
 
   exception AttendanceException?
 
@@ -206,4 +244,42 @@ model ApprovalLog {
   timestamp   DateTime @default(now())
 
   @@index([companyId])
+}
+
+/// 회사별 MVS(등) 연동 설정
+model CompanyIntegration {
+  id                String              @id @default(cuid())
+  companyId         String
+  company           Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider          IntegrationProvider
+  enabled           Boolean             @default(false)
+  /// MVS 쪽 회사/테넌트 식별자
+  externalCompanyId String?
+  /// 출퇴근 이벤트 POST 대상 (MVS가 제공 시)
+  webhookUrl        String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([companyId, provider])
+  @@index([companyId])
+}
+
+/// MVS로 전달할 출퇴근 이벤트 큐 (웹훅 푸시 또는 MVS 폴링)
+model IntegrationOutbox {
+  id          String                  @id @default(cuid())
+  companyId   String
+  company     Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider    IntegrationProvider
+  eventType   String
+  resourceId  String
+  payload     Json
+  status      IntegrationOutboxStatus @default(PENDING)
+  attempts    Int                     @default(0)
+  lastError   String?
+  createdAt   DateTime                @default(now())
+  deliveredAt DateTime?
+
+  @@unique([provider, resourceId, eventType])
+  @@index([status, createdAt])
+  @@index([companyId, provider])
 }

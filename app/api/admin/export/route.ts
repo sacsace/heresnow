@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { aggregateAttendanceByDay } from "@/lib/adminAttendanceByDay";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { NextResponse } from "next/server";
@@ -27,7 +28,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "No company" }, { status: 400 });
   }
 
-  const rows = await prisma.attendanceRecord.findMany({
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true },
+  });
+  const tz = company?.timezone?.trim() || "Asia/Seoul";
+
+  const records = await prisma.attendanceRecord.findMany({
     where: { companyId },
     orderBy: { timestamp: "desc" },
     take: 5000,
@@ -37,19 +44,29 @@ export async function GET(req: Request) {
     },
   });
 
-  const sheetData = rows.map((r) => ({
-    직원: r.employee.name,
-    유형: r.type,
-    시각: r.timestamp.toISOString(),
-    근무지: r.site?.name ?? "",
-    위도: r.latitude,
-    경도: r.longitude,
-    정확도_m: r.accuracy,
-    거리_m: Math.round(r.distanceFromSite),
-    상태: r.status,
-    지각: r.isLate ? "Y" : "",
-    조퇴: r.isEarlyLeave ? "Y" : "",
-    메모: r.memo ?? "",
+  const days = aggregateAttendanceByDay(records, tz);
+
+  const sheetData = days.map((d) => ({
+    날짜: d.date,
+    직원: d.employeeName,
+    출근시각: d.checkIn?.time ?? "",
+    퇴근시각: d.checkOut?.time ?? "",
+    출근위도: d.checkIn?.latitude ?? "",
+    출근경도: d.checkIn?.longitude ?? "",
+    퇴근위도: d.checkOut?.latitude ?? "",
+    퇴근경도: d.checkOut?.longitude ?? "",
+    미완료: d.incomplete ? "Y" : "",
+    상태: d.status,
+    지각: d.isLate ? "Y" : "",
+    조퇴: d.isEarlyLeave ? "Y" : "",
+    초과근무: d.isOvertime ? "Y" : "",
+    초과분: d.overtimeMinutes > 0 ? d.overtimeMinutes : "",
+    휴일근무: d.isHolidayWork ? "Y" : "",
+    출장: d.checkIn?.isBusinessTrip ? "Y" : "",
+    출장지역: d.checkIn?.businessTripLocation ?? "",
+    출장사유: d.checkIn?.businessTripReason ?? "",
+    출근메모: d.checkIn?.memo ?? "",
+    퇴근메모: d.checkOut?.memo ?? "",
   }));
 
   const wb = XLSX.utils.book_new();

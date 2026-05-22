@@ -13,6 +13,7 @@ export default auth((req) => {
   const isPublicApi =
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/public") ||
+    pathname.startsWith("/api/integrations/") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/icons/icon-192.png" ||
     isDevHealth;
