@@ -36,7 +36,56 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
   useEffect(() => {
     let cancelled = false;
 
+    function deriveErrorMessage(err: unknown): string {
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        return t("employee.faceInsecureContext");
+      }
+      if (
+        typeof navigator === "undefined" ||
+        !navigator.mediaDevices ||
+        typeof navigator.mediaDevices.getUserMedia !== "function"
+      ) {
+        return t("employee.faceUnsupportedBrowser");
+      }
+      if (err instanceof Error) {
+        if (err.message.startsWith("FACE_MODELS_FAILED")) {
+          return t("employee.faceModelLoadFail");
+        }
+        if (err.message === "FACE_BACKEND_UNAVAILABLE") {
+          return t("employee.faceBackendUnavailable");
+        }
+        switch (err.name) {
+          case "NotAllowedError":
+          case "SecurityError":
+            return t("employee.faceCameraDenied");
+          case "NotFoundError":
+          case "OverconstrainedError":
+            return t("employee.faceNoCamera");
+          case "NotReadableError":
+          case "AbortError":
+            return t("employee.faceCameraInUse");
+          case "TypeError":
+            return t("employee.faceUnsupportedBrowser");
+        }
+      }
+      return t("employee.faceCameraDenied");
+    }
+
     async function init() {
+      // 보안 컨텍스트(HTTPS/localhost) 사전 체크 — 그렇지 않으면 getUserMedia 호출 자체가 막힘
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        if (!cancelled) setCameraError(t("employee.faceInsecureContext"));
+        return;
+      }
+      if (
+        typeof navigator === "undefined" ||
+        !navigator.mediaDevices ||
+        typeof navigator.mediaDevices.getUserMedia !== "function"
+      ) {
+        if (!cancelled) setCameraError(t("employee.faceUnsupportedBrowser"));
+        return;
+      }
+
       try {
         await loadFaceModels();
         if (cancelled) return;
@@ -55,9 +104,10 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         }
         setReady(true);
         setCameraError(null);
-      } catch {
+      } catch (err) {
+        console.error("[face] init failed", err);
         if (!cancelled) {
-          setCameraError(t("employee.faceCameraDenied"));
+          setCameraError(deriveErrorMessage(err));
         }
       }
     }

@@ -15,16 +15,34 @@ export async function loadFaceModels(): Promise<void> {
   loadPromise = (async () => {
     const tf = await import("@tensorflow/tfjs-core");
     await import("@tensorflow/tfjs-backend-webgl");
-    await tf.setBackend("webgl");
-    await tf.ready();
+    try {
+      await tf.setBackend("webgl");
+      await tf.ready();
+    } catch (e) {
+      // 일부 모바일·구형 브라우저는 WebGL 가속이 없거나 차단됨 → CPU 폴백
+      console.warn("[face] WebGL backend unavailable, falling back to CPU", e);
+      try {
+        await tf.setBackend("cpu");
+        await tf.ready();
+      } catch (cpuErr) {
+        loadPromise = null;
+        throw new Error("FACE_BACKEND_UNAVAILABLE");
+      }
+    }
 
     faceApiMod = await import("@vladmandic/face-api");
     const modelPath = "/models";
-    await Promise.all([
-      faceApiMod.nets.tinyFaceDetector.loadFromUri(modelPath),
-      faceApiMod.nets.faceLandmark68TinyNet.loadFromUri(modelPath),
-      faceApiMod.nets.faceRecognitionNet.loadFromUri(modelPath),
-    ]);
+    try {
+      await Promise.all([
+        faceApiMod.nets.tinyFaceDetector.loadFromUri(modelPath),
+        faceApiMod.nets.faceLandmark68TinyNet.loadFromUri(modelPath),
+        faceApiMod.nets.faceRecognitionNet.loadFromUri(modelPath),
+      ]);
+    } catch (e) {
+      loadPromise = null;
+      const detail = e instanceof Error ? e.message : String(e);
+      throw new Error(`FACE_MODELS_FAILED:${detail}`);
+    }
     modelsReady = true;
   })();
 

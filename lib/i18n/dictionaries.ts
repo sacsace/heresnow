@@ -309,6 +309,17 @@ export const ko = {
     faceVerifyFail: "본인 확인에 실패했습니다.",
     faceNotDetected: "얼굴이 보이지 않습니다. 밝은 곳에서 정면을 맞춰 주세요.",
     faceCameraDenied: "카메라 권한이 필요합니다. 브라우저 설정에서 허용해 주세요.",
+    faceInsecureContext:
+      "보안 연결(HTTPS)에서만 카메라를 사용할 수 있습니다. https:// 주소로 접속해 주세요.",
+    faceUnsupportedBrowser:
+      "이 브라우저는 카메라를 지원하지 않습니다. Chrome 또는 Safari로 다시 열어 주세요. (인앱 브라우저는 외부 브라우저로 열기를 사용하세요.)",
+    faceNoCamera: "카메라를 찾을 수 없습니다. 기기에 카메라가 있는지 확인해 주세요.",
+    faceCameraInUse:
+      "다른 앱에서 카메라를 사용 중입니다. 다른 앱(영상 통화·줌 등)을 닫고 다시 시도해 주세요.",
+    faceModelLoadFail:
+      "안면 인식 모델을 불러오지 못했습니다. 잠시 후 다시 시도하거나 새로고침해 주세요.",
+    faceBackendUnavailable:
+      "이 기기는 안면 인식에 필요한 그래픽 가속을 지원하지 않습니다. 다른 기기로 시도해 주세요.",
     faceProcessing: "인식 중…",
     faceProcessFail: "안면 인식 중 오류가 발생했습니다.",
     checkInRequiresFace: "출근은 안면 인식 후에만 가능합니다.",
@@ -654,6 +665,17 @@ export const en = {
     faceVerifyFail: "Face verification failed.",
     faceNotDetected: "No face detected. Face the camera in good light.",
     faceCameraDenied: "Camera access is required. Allow it in your browser settings.",
+    faceInsecureContext:
+      "Camera works only over a secure connection (HTTPS). Please open the site via https://.",
+    faceUnsupportedBrowser:
+      "This browser does not support the camera API. Open the site in Chrome or Safari (use 'Open in browser' from in-app browsers).",
+    faceNoCamera: "No camera found on this device.",
+    faceCameraInUse:
+      "Another app is using the camera. Close other apps (video calls, etc.) and try again.",
+    faceModelLoadFail:
+      "Could not load the face recognition models. Please refresh and try again.",
+    faceBackendUnavailable:
+      "This device lacks the GPU acceleration required for face recognition. Try another device.",
     faceProcessing: "Processing…",
     faceProcessFail: "Face recognition error.",
     checkInRequiresFace: "Check-in requires face verification.",
