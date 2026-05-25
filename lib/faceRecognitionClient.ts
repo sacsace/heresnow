@@ -24,7 +24,7 @@ export async function loadFaceModels(): Promise<void> {
       try {
         await tf.setBackend("cpu");
         await tf.ready();
-      } catch (cpuErr) {
+      } catch {
         loadPromise = null;
         throw new Error("FACE_BACKEND_UNAVAILABLE");
       }
