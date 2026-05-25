@@ -17,6 +17,15 @@ let cached: z.infer<typeof serverEnvSchema> | null = null;
 
 export function assertServerEnv(): void {
   if (cached) return;
+  // Next.js 빌드(페이지 데이터 수집) 단계나 명시적 스킵 플래그가 설정된 경우 검증을 건너뜁니다.
+  // 실제 런타임에서는 다시 호출되어 검증이 수행됩니다.
+  if (
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.SKIP_ENV_VALIDATION === "1" ||
+    process.env.SKIP_ENV_VALIDATION === "true"
+  ) {
+    return;
+  }
   const parsed = serverEnvSchema.safeParse(process.env);
   if (!parsed.success) {
     const err = parsed.error.flatten().fieldErrors;
