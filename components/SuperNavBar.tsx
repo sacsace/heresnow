@@ -3,6 +3,7 @@
 import { AppHeaderActions } from "@/components/AppHeaderActions";
 import { AppLogo } from "@/components/AppLogo";
 import { useI18n } from "@/components/LanguageProvider";
+import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { navBar, navBarInnerSuper, navLink, navLinkActive, navLinkEqual, navLinkSuperMin, navLinksRow } from "@/lib/uiStyles";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -25,8 +26,9 @@ export function SuperNavBar() {
     <header className={`${navBar} pt-[env(safe-area-inset-top,0px)]`}>
       <div className={navBarInnerSuper}>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-4 sm:gap-6">
+          <MobileNavDrawer items={nav} />
           <AppLogo href="/super" title={t("login.title")} />
-          <nav className={navLinksRow}>
+          <nav className={`hidden sm:flex ${navLinksRow}`}>
             {nav.map((n) => (
               <Link
                 key={n.href}

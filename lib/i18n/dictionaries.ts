@@ -18,6 +18,9 @@ export const ko = {
     roleHrManager: "인사",
     roleApprover: "승인자",
     roleEmployee: "직원",
+    menu: "메뉴",
+    menuOpen: "메뉴 열기",
+    menuClose: "메뉴 닫기",
   },
   trust: {
     employeeTitle: "탭 한 번, 그 순간만 기록",
@@ -372,6 +375,9 @@ export const en = {
     roleHrManager: "HR manager",
     roleApprover: "Approver",
     roleEmployee: "Employee",
+    menu: "Menu",
+    menuOpen: "Open menu",
+    menuClose: "Close menu",
   },
   trust: {
     employeeTitle: "One tap, one moment",

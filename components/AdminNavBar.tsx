@@ -3,6 +3,7 @@
 import { AppHeaderActions } from "@/components/AppHeaderActions";
 import { AppLogo } from "@/components/AppLogo";
 import { useI18n } from "@/components/LanguageProvider";
+import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import {
   navBar,
   navBarInner,
@@ -38,8 +39,12 @@ export function AdminNavBar() {
     <header className={`${navBar} pt-[env(safe-area-inset-top,0px)]`}>
       <div className={`${navBarInner} max-w-[86.4rem]`}>
         <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+          <MobileNavDrawer items={links} />
           <AppLogo href="/admin" title={t("login.title")} />
-          <nav className={navSegmentedWrap} aria-label={t("admin.navDashboard")}>
+          <nav
+            className={`hidden sm:inline-flex ${navSegmentedWrap}`}
+            aria-label={t("admin.navDashboard")}
+          >
             {links.map((l) => (
               <Link
                 key={l.href}
