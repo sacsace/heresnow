@@ -1,20 +1,21 @@
 "use client";
 
+import { AppLogo } from "@/components/AppLogo";
 import { AuthShell } from "@/components/auth/AuthShell";
 import {
   authBannerSuccess,
   authBannerWarning,
   authButtonPrimary,
-  authCard,
+  authCardLogin,
+  authCopyright,
   authError,
   authFieldGroup,
   authFooter,
-  authForm,
+  authFormLogin,
   authInput,
   authLabel,
   authLink,
-  authSubtitle,
-  authTitle,
+  authSubtitleLogin,
 } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
 import { signIn } from "next-auth/react";
@@ -27,6 +28,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const registered = searchParams.get("registered") === "1";
+  const sessionInvalid = searchParams.get("session") === "invalid";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -74,18 +76,22 @@ function LoginForm() {
 
   return (
     <AuthShell
+      className="!w-[26rem] sm:!w-[27rem]"
       footer={
-        <p className="shrink-0 pb-6 pt-4 text-center text-[0.8125rem] text-[#3c3c43]/45">
+        <p className={authCopyright}>
           © 2026 Minsub Ventures Private Limited
         </p>
       }
     >
-      <div className={authCard}>
-        <h1 className={authTitle}>{t("login.title")}</h1>
-        <p className={authSubtitle}>{t("login.subtitle")}</p>
-        {registered && <p className={authBannerSuccess}>{t("login.registered")}</p>}
+      <div className={authCardLogin}>
+        <div className="mb-4 flex justify-center sm:mb-5">
+          <AppLogo variant="auth" title={t("login.title")} />
+        </div>
+        <p className={authSubtitleLogin}>{t("login.subtitle")}</p>
+        {registered && <p className={`${authBannerSuccess} mt-4`}>{t("login.registered")}</p>}
+        {sessionInvalid && <p className={authBannerWarning}>{t("login.sessionInvalid")}</p>}
         {dbHint && <p className={authBannerWarning}>{dbHint}</p>}
-        <form onSubmit={onSubmit} className={authForm}>
+        <form onSubmit={onSubmit} className={authFormLogin}>
           <div className={authFieldGroup}>
             <label className={authLabel}>{t("login.email")}</label>
             <input
@@ -113,7 +119,7 @@ function LoginForm() {
             {loading ? t("login.submitting") : t("login.submit")}
           </button>
         </form>
-        <p className={authFooter}>
+        <p className={`${authFooter} mt-6`}>
           <Link href="/signup" className={authLink}>
             {t("login.signupLink")}
           </Link>
@@ -126,7 +132,7 @@ function LoginForm() {
 function LoginLoading() {
   const { t } = useI18n();
   return (
-    <div className="flex flex-1 items-center justify-center p-8 text-center text-[0.9375rem] text-[#3c3c43]/60">
+    <div className="flex flex-1 items-center justify-center p-8 text-center text-[0.8125rem] text-[var(--apple-label-secondary)]">
       {t("common.loading")}
     </div>
   );

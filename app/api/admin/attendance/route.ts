@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { aggregateAttendanceByDay } from "@/lib/adminAttendanceByDay";
+import { aggregateAttendanceByDay, filterAttendanceDayRows } from "@/lib/adminAttendanceByDay";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -30,6 +30,9 @@ export async function GET(req: Request) {
 
   const employeeId = url.searchParams.get("employeeId") ?? undefined;
   const status = url.searchParams.get("status") ?? undefined;
+  const from = url.searchParams.get("from") ?? undefined;
+  const to = url.searchParams.get("to") ?? undefined;
+  const q = url.searchParams.get("q") ?? undefined;
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "200") || 200, 500);
 
   const company = await prisma.company.findUnique({
@@ -55,7 +58,10 @@ export async function GET(req: Request) {
     },
   });
 
-  const days = aggregateAttendanceByDay(records, tz, status || undefined).slice(0, limit);
+  const days = filterAttendanceDayRows(
+    aggregateAttendanceByDay(records, tz, status || undefined),
+    { from, to, q }
+  ).slice(0, limit);
 
   return NextResponse.json({ timezone: tz, days });
 }

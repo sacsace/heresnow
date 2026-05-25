@@ -12,7 +12,9 @@ export async function GET() {
   const companies = await prisma.company.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      pricingTier: { select: { label: true, maxSeats: true, pricePerYear: true } },
+      pricingTier: {
+        select: { label: true, maxSeats: true, priceAmount: true, billingPeriod: true },
+      },
       _count: {
         select: { users: true, employees: true, attendanceRecords: true },
       },

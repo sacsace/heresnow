@@ -1,5 +1,7 @@
 "use client";
 
+import { link, mapSurface } from "@/lib/uiStyles";
+
 type StaticMapProps = {
   lat: number;
   lng: number;
@@ -23,32 +25,24 @@ export function StaticMap({ lat, lng, label, className, noKeyFallback = "link" }
       const embedSrc = `https://maps.google.com/maps?q=${lat},${lng}&hl=ko&z=16&output=embed`;
       return (
         <div className={className}>
-          <iframe
-            title={label ?? "현재 위치"}
-            src={embedSrc}
-            className="h-[clamp(11rem,36vh,22rem)] w-full max-w-full rounded-lg border border-slate-200 bg-zinc-100 sm:h-[clamp(12rem,40vh,24rem)] md:h-[clamp(14rem,45vh,26rem)]"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            allowFullScreen
-          />
-          <a
-            href={openUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 inline-block text-xs text-sky-700 underline"
-          >
+          <div className={mapSurface}>
+            <iframe
+              title={label ?? "현재 위치"}
+              src={embedSrc}
+              className="h-[clamp(11rem,36vh,22rem)] w-full max-w-full sm:h-[clamp(12rem,40vh,24rem)] md:h-[clamp(14rem,45vh,26rem)]"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
+          </div>
+          <a href={openUrl} target="_blank" rel="noreferrer" className={`mt-2 inline-block text-[0.8125rem] ${link}`}>
             Google 지도에서 크게 보기
           </a>
         </div>
       );
     }
     return (
-      <a
-        href={openUrl}
-        target="_blank"
-        rel="noreferrer"
-        className={`text-xs text-sky-700 underline ${className ?? ""}`}
-      >
+      <a href={openUrl} target="_blank" rel="noreferrer" className={`text-[0.8125rem] ${link} ${className ?? ""}`}>
         지도에서 열기 ({label ?? "위치"})
       </a>
     );
@@ -58,8 +52,10 @@ export function StaticMap({ lat, lng, label, className, noKeyFallback = "link" }
 
   return (
     <a href={openUrl} target="_blank" rel="noreferrer" className={`block ${className ?? ""}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="위치 미리보기" className="h-auto w-full max-w-full rounded-lg border border-slate-200" />
+      <div className={mapSurface}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="위치 미리보기" className="h-auto w-full max-w-full" />
+      </div>
     </a>
   );
 }

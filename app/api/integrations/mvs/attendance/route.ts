@@ -20,7 +20,7 @@ const querySchema = z.object({
 });
 
 /**
- * MVS가 HereNow 출퇴근 이벤트를 폴링할 때 사용.
+ * MVS가 HeresNow 출퇴근 이벤트를 폴링할 때 사용.
  * Authorization: Bearer {MVS_INTEGRATION_API_KEY}
  */
 export async function GET(req: Request) {

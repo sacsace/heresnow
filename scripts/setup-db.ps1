@@ -1,5 +1,5 @@
 <#!
-  PostgreSQL에 `herenow` DB를 만들고, .env 의 DATABASE_URL 만 갱신(기존 AUTH_SECRET 등 유지)한 뒤
+  PostgreSQL에 `heresnow` DB를 만들고, .env 의 DATABASE_URL 만 갱신(기존 AUTH_SECRET 등 유지)한 뒤
   Prisma migrate deploy + seed 를 실행합니다.
 
   사용 예:
@@ -12,7 +12,7 @@ param(
   [string] $PostgresUser = "postgres",
   [string] $PostgresHost = "127.0.0.1",
   [int] $Port = 5432,
-  [string] $DatabaseName = "herenow"
+  [string] $DatabaseName = "heresnow"
 )
 
 $ErrorActionPreference = "Stop"

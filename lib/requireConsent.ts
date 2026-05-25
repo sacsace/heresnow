@@ -12,5 +12,6 @@ export async function requireConsent() {
     select: { consentGivenAt: true },
   });
 
-  if (!user?.consentGivenAt) redirect("/consent");
+  if (!user) redirect("/login?session=invalid");
+  if (!user.consentGivenAt) redirect("/consent");
 }

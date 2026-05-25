@@ -131,12 +131,12 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
     mode === "enroll" ? t("employee.faceEnrollButton") : t("employee.faceVerifyButton");
 
   return (
-    <div className="rounded-xl border border-violet-200/80 bg-violet-50/40 p-3 sm:p-4">
-      <p className="text-sm font-semibold text-violet-950">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-violet-900/80">{lead}</p>
+    <div className="overflow-hidden rounded-xl bg-[var(--grouped-bg)] p-3 shadow-sm ring-1 ring-black/[0.04] sm:p-4">
+      <p className="text-sm font-semibold text-[var(--foreground)]">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--apple-label-secondary)]">{lead}</p>
 
       {cameraError ? (
-        <p className="mt-3 text-sm text-red-600">{cameraError}</p>
+        <p className="mt-3 text-sm text-[var(--apple-red)]">{cameraError}</p>
       ) : (
         <div className="relative mt-3 overflow-hidden rounded-xl bg-black">
           <video
@@ -157,11 +157,11 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         type="button"
         disabled={!ready || busy || disabled || !!cameraError}
         onClick={() => void capture()}
-        className="mt-3 flex min-h-[3rem] w-full touch-manipulation items-center justify-center rounded-xl bg-violet-600 py-3 text-base font-semibold text-white hover:bg-violet-700 active:bg-violet-800 disabled:opacity-50"
+        className="mt-3 flex min-h-[3rem] w-full touch-manipulation items-center justify-center rounded-xl bg-[var(--apple-blue)] py-3 text-base font-semibold text-white hover:bg-[#0071e3] active:bg-[#0066cc] disabled:opacity-50"
       >
         {busy ? t("employee.faceProcessing") : buttonLabel}
       </button>
-      {status && <p className="mt-2 text-center text-sm text-violet-900">{status}</p>}
+      {status && <p className="mt-2 text-center text-sm text-[var(--apple-label-secondary)]">{status}</p>}
     </div>
   );
 }

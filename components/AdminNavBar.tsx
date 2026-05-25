@@ -1,49 +1,71 @@
 "use client";
 
-import { HeaderSessionUser } from "@/components/HeaderSessionUser";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { SignOutButton } from "@/components/SignOutButton";
+import { AppHeaderActions } from "@/components/AppHeaderActions";
+import { AppLogo } from "@/components/AppLogo";
 import { useI18n } from "@/components/LanguageProvider";
+import { usePunchStatus } from "@/hooks/usePunchStatus";
+import {
+  navBar,
+  navBarInner,
+  navSegmentedBtn,
+  navSegmentedWrap,
+} from "@/lib/uiStyles";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 
 export function AdminNavBar() {
   const { t } = useI18n();
-  const links = [
-    { href: "/admin", label: t("admin.navDashboard") },
-    { href: "/admin/employees", label: t("admin.navEmployees") },
-    { href: "/admin/billing", label: t("admin.navBilling") },
-    { href: "/admin/attendance", label: t("admin.navAttendance") },
-    { href: "/admin/exceptions", label: t("admin.navExceptions") },
-  ];
+  const pathname = usePathname();
+  const { status: punchStatus } = usePunchStatus();
+
+  const punchNav = useMemo(() => {
+    if (!punchStatus) return null;
+    if (punchStatus.isCheckedIn) {
+      return { href: "/admin/punch", label: t("admin.navCheckOut") };
+    }
+    if (punchStatus.canCheckIn) {
+      return { href: "/admin/punch", label: t("admin.navCheckIn") };
+    }
+    return null;
+  }, [punchStatus, t]);
+
+  const links = useMemo(() => {
+    const base = [
+      { href: "/admin", label: t("admin.navDashboard"), exact: true },
+      ...(punchNav ? [punchNav] : []),
+      { href: "/admin/employees", label: t("admin.navEmployees") },
+      { href: "/admin/billing", label: t("admin.navBilling") },
+      { href: "/admin/attendance", label: t("admin.navAttendance") },
+      { href: "/admin/exceptions", label: t("admin.navExceptions") },
+      { href: "/employee", label: t("admin.navEmployeeView") },
+    ];
+    return base;
+  }, [punchNav, t]);
+
+  function isActive(href: string, exact?: boolean) {
+    if (exact) return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
 
   return (
-    <header className="border-b border-zinc-100 bg-white/90 pt-[env(safe-area-inset-top,0px)] backdrop-blur-sm">
-      <div className="mx-auto flex min-w-0 max-w-[86.4rem] flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 sm:gap-4">
-          <span className="text-sm font-semibold tracking-tight text-zinc-800">{t("admin.brand")}</span>
-          <nav className="flex flex-wrap items-center gap-1 text-sm">
+    <header className={`${navBar} pt-[env(safe-area-inset-top,0px)]`}>
+      <div className={`${navBarInner} max-w-[86.4rem]`}>
+        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+          <AppLogo href="/admin" title={t("login.title")} />
+          <nav className={navSegmentedWrap} aria-label={t("admin.navDashboard")}>
             {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="rounded-md px-2.5 py-1 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                className={navSegmentedBtn(isActive(l.href, "exact" in l ? l.exact : false))}
               >
                 {l.label}
               </Link>
             ))}
-            <Link
-              href="/employee"
-              className="rounded-md px-2.5 py-1 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-700"
-            >
-              {t("admin.navEmployeeView")}
-            </Link>
           </nav>
         </div>
-        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
-          <HeaderSessionUser />
-          <LanguageSwitcher />
-          <SignOutButton />
-        </div>
+        <AppHeaderActions />
       </div>
     </header>
   );

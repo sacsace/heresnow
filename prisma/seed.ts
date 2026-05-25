@@ -7,15 +7,25 @@ const prisma = new PrismaClient();
 async function upsertTier(
   minSeats: number,
   maxSeats: number,
-  pricePerYear: number,
+  priceAmount: number,
   label: string,
   sortOrder: number,
+  billingPeriod: "MONTHLY" | "YEARLY",
   trialDays: number | null = null
 ) {
   return prisma.pricingTier.upsert({
-    where: { minSeats_maxSeats: { minSeats, maxSeats } },
-    create: { minSeats, maxSeats, pricePerYear, label, sortOrder, currency: "INR", trialDays },
-    update: { pricePerYear, label, sortOrder, currency: "INR", trialDays },
+    where: { minSeats_maxSeats_billingPeriod: { minSeats, maxSeats, billingPeriod } },
+    create: {
+      minSeats,
+      maxSeats,
+      priceAmount,
+      billingPeriod,
+      label,
+      sortOrder,
+      currency: "INR",
+      trialDays,
+    },
+    update: { priceAmount, label, sortOrder, currency: "INR", trialDays },
   });
 }
 
@@ -32,11 +42,15 @@ async function main() {
   await prisma.user.deleteMany();
   await prisma.company.deleteMany();
 
-  await upsertTier(1, 1, 0, "1명 · 7일 무료", 0, 7);
-  const t1 = await upsertTier(1, 20, 1500, "1–20명", 1, null);
-  const t2 = await upsertTier(21, 50, 2000, "21–50명", 2, null);
-  const t3 = await upsertTier(51, 80, 2500, "51–80명", 3, null);
-  const t4 = await upsertTier(81, 100, 3000, "81–100명", 4, null);
+  await upsertTier(1, 1, 0, "1명 · 7일 무료", 0, "YEARLY", 7);
+  const t1 = await upsertTier(1, 20, 1500, "1–20명 (연)", 1, "YEARLY", null);
+  const t2 = await upsertTier(21, 50, 2000, "21–50명 (연)", 2, "YEARLY", null);
+  const t3 = await upsertTier(51, 80, 2500, "51–80명 (연)", 3, "YEARLY", null);
+  const t4 = await upsertTier(81, 100, 3000, "81–100명 (연)", 4, "YEARLY", null);
+  await upsertTier(1, 20, 150, "1–20명 (월)", 10, "MONTHLY", null);
+  await upsertTier(21, 50, 200, "21–50명 (월)", 11, "MONTHLY", null);
+  await upsertTier(51, 80, 250, "51–80명 (월)", 12, "MONTHLY", null);
+  await upsertTier(81, 100, 300, "81–100명 (월)", 13, "MONTHLY", null);
 
   const subsEnd = addYears(new Date(), 1);
 
@@ -72,7 +86,7 @@ async function main() {
 
   await prisma.user.create({
     data: {
-      email: "super@herenow.local",
+      email: "super@heresnow.local",
       passwordHash: defaultPasswordHash,
       role: Role.SUPER_ADMIN,
       companyId: null,

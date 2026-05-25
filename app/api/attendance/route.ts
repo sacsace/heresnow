@@ -1,30 +1,24 @@
 import { auth } from "@/auth";
 import {
+  checkInErrorMessage,
+  evaluatePunchEligibility,
+  TWENTY_FOUR_H_MS,
+} from "@/lib/attendancePunchRules";
+import { evaluateAttendanceWorkFlags } from "@/lib/companyWorkSchedule";
+import {
   FACE_DESCRIPTOR_LENGTH,
   isFaceMatch,
   parseFaceDescriptor,
 } from "@/lib/faceMatch";
-import { evaluateAttendanceWorkFlags } from "@/lib/companyWorkSchedule";
 import {
   enqueueMvsAttendanceIfEnabled,
   faceVerifiedForAttendance,
 } from "@/lib/integrations/enqueueMvsAttendance";
 import { prisma } from "@/lib/prisma";
+import { computeDistanceFromSite } from "@/lib/siteGeofence";
 import { AttendanceType } from "@prisma/client";
-import { formatInTimeZone } from "date-fns-tz";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-
-const TWENTY_FOUR_H_MS = 24 * 60 * 60 * 1000;
-
-function calendarDayInTz(isoDate: Date, timeZone: string): string {
-  const tz = timeZone.trim() || "UTC";
-  try {
-    return formatInTimeZone(isoDate, tz, "yyyy-MM-dd");
-  } catch {
-    return formatInTimeZone(isoDate, "UTC", "yyyy-MM-dd");
-  }
-}
 
 const bodySchema = z
   .object({
@@ -43,13 +37,6 @@ const bodySchema = z
   })
   .superRefine((data, ctx) => {
     if (data.type === "CHECK_IN" && data.isBusinessTrip) {
-      if (!data.businessTripLocation) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "출장 지역 명칭을 입력해 주세요.",
-          path: ["businessTripLocation"],
-        });
-      }
       if (!data.businessTripReason) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -58,19 +45,10 @@ const bodySchema = z
         });
       }
     }
-    if (data.type === "CHECK_IN" && !data.isBusinessTrip) {
-      if (data.businessTripLocation || data.businessTripReason) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "일반 출근에는 출장 정보를 보낼 수 없습니다. 출장 모드를 선택해 주세요.",
-          path: ["isBusinessTrip"],
-        });
-      }
-    }
   });
 
 /**
- * 출근/퇴근: 버튼 클릭 시점 좌표만 저장 (근무지 등록 불필요).
+ * 출근/퇴근: 어디서든 가능. 근무지가 등록되어 있으면 거리만 기록(차단하지 않음).
  */
 export async function POST(req: Request) {
   const session = await auth();
@@ -120,7 +98,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "직원 정보가 올바르지 않습니다." }, { status: 403 });
   }
 
-  const [company, lastRecord] = await Promise.all([
+  const [company, lastRecord, site] = await Promise.all([
     prisma.company.findUnique({
       where: { id: session.user.companyId },
       select: {
@@ -135,6 +113,17 @@ export async function POST(req: Request) {
       where: { employeeId: employee.id, companyId: session.user.companyId },
       orderBy: { timestamp: "desc" },
       select: { type: true, timestamp: true },
+    }),
+    prisma.site.findFirst({
+      where: { companyId: session.user.companyId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        name: true,
+        latitude: true,
+        longitude: true,
+        allowedRadius: true,
+      },
     }),
   ]);
 
@@ -175,24 +164,15 @@ export async function POST(req: Request) {
       faceMatched = true;
     }
 
-    if (lastRecord?.type === "CHECK_IN") {
-      return NextResponse.json(
-        { error: "이미 출근한 상태입니다. 먼저 퇴근한 뒤 다음 날에 다시 출근해 주세요." },
-        { status: 400 }
-      );
-    }
-    if (lastRecord?.type === "CHECK_OUT") {
-      const dayNow = calendarDayInTz(now, tz);
-      const dayLastOut = calendarDayInTz(lastRecord.timestamp, tz);
-      if (dayNow <= dayLastOut) {
-        return NextResponse.json(
-          {
-            error:
-              "퇴근한 당일에는 다시 출근할 수 없습니다. 회사 기준 날짜가 바뀐 뒤(다음날 0시 이후) 출근해 주세요.",
-          },
-          { status: 400 }
-        );
-      }
+    const eligibility = evaluatePunchEligibility(
+      now,
+      tz,
+      lastRecord ? { type: lastRecord.type, timestamp: lastRecord.timestamp } : null
+    );
+
+    if (!eligibility.canCheckIn) {
+      const msg = checkInErrorMessage(eligibility.checkInBlock) ?? "출근할 수 없습니다.";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
   } else {
     if (!lastRecord || lastRecord.type === "CHECK_OUT") {
@@ -216,21 +196,29 @@ export async function POST(req: Request) {
     workDays: company.workDays,
   });
 
+  let siteId: string | null = null;
+  let distanceFromSite = 0;
+  if (site) {
+    distanceFromSite = computeDistanceFromSite(site, latitude, longitude);
+    siteId = isBusinessTrip && type === "CHECK_IN" ? null : site.id;
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const record = await tx.attendanceRecord.create({
       data: {
         company: { connect: { id: session.user.companyId! } },
         employee: { connect: { id: employee.id } },
+        ...(siteId ? { site: { connect: { id: siteId } } } : {}),
         type,
         latitude,
         longitude,
         accuracy: accuracy ?? null,
-        distanceFromSite: 0,
+        distanceFromSite,
         status: "APPROVED",
         memo: memo?.trim() || null,
         isBusinessTrip: type === "CHECK_IN" ? isBusinessTrip : false,
         businessTripLocation:
-          type === "CHECK_IN" && isBusinessTrip ? businessTripLocation!.trim() : null,
+          type === "CHECK_IN" && isBusinessTrip ? businessTripLocation?.trim() || null : null,
         businessTripReason:
           type === "CHECK_IN" && isBusinessTrip ? businessTripReason!.trim() : null,
         photoUrl: photoUrl?.trim() || null,

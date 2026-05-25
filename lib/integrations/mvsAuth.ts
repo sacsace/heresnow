@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "crypto";
 
-/** MVS(또는 연동 배치)가 HereNow API를 호출할 때 사용하는 공유 키 */
+/** MVS(또는 연동 배치)가 HeresNow API를 호출할 때 사용하는 공유 키 */
 export function verifyMvsIntegrationApiKey(headerValue: string | null): boolean {
   const expected = process.env.MVS_INTEGRATION_API_KEY?.trim();
   if (!expected) return false;

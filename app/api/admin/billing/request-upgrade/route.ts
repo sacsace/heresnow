@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     data: {
       companyId,
       targetTierId: target.id,
-      amountDue: target.pricePerYear,
+      amountDue: target.priceAmount,
       note: parsed.data.note?.trim() || null,
     },
   });

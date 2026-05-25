@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { aggregateAttendanceByDay } from "@/lib/adminAttendanceByDay";
+import { aggregateAttendanceByDay, filterAttendanceDayRows } from "@/lib/adminAttendanceByDay";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { NextResponse } from "next/server";
@@ -34,6 +34,11 @@ export async function GET(req: Request) {
   });
   const tz = company?.timezone?.trim() || "Asia/Seoul";
 
+  const status = url.searchParams.get("status") ?? undefined;
+  const from = url.searchParams.get("from") ?? undefined;
+  const to = url.searchParams.get("to") ?? undefined;
+  const q = url.searchParams.get("q") ?? undefined;
+
   const records = await prisma.attendanceRecord.findMany({
     where: { companyId },
     orderBy: { timestamp: "desc" },
@@ -44,7 +49,10 @@ export async function GET(req: Request) {
     },
   });
 
-  const days = aggregateAttendanceByDay(records, tz);
+  const days = filterAttendanceDayRows(
+    aggregateAttendanceByDay(records, tz, status || undefined),
+    { from, to, q }
+  );
 
   const sheetData = days.map((d) => ({
     날짜: d.date,

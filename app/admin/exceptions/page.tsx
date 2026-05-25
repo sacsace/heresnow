@@ -1,5 +1,16 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  btnSecondary,
+  btnSuccess,
+  emptyState,
+  groupedCard,
+  groupedRow,
+  hint,
+  pageStack,
+  sectionLabel,
+} from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
 
 type Ex = {
@@ -10,7 +21,7 @@ type Ex = {
     type: string;
     timestamp: string;
     employee: { name: string };
-    site: { name: string };
+    site: { name: string } | null;
   };
 };
 
@@ -40,42 +51,50 @@ export default function AdminExceptionsPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-lg font-semibold tracking-tight text-zinc-900">예외 승인 대기</h1>
+    <div className={pageStack}>
+      <PageHeader title="예외 승인" subtitle="반경 외·기타 예외 출퇴근 요청을 검토합니다." />
+
       {loading ? (
-        <p className="mt-4 text-sm text-zinc-500">불러오는 중…</p>
+        <p className="text-[1rem] text-[var(--apple-label-secondary)]">불러오는 중…</p>
       ) : items.length === 0 ? (
-        <p className="mt-4 text-sm text-zinc-500">대기 중인 예외가 없습니다.</p>
+        <p className={emptyState}>대기 중인 예외가 없습니다.</p>
       ) : (
-        <ul className="mt-4 space-y-3">
-          {items.map((x) => (
-            <li key={x.id} className="rounded-xl border border-zinc-200/80 bg-white p-4">
-              <p className="text-sm font-medium text-zinc-900">
-                {x.attendance.employee.name} · {x.attendance.type} · {x.attendance.site.name}
-              </p>
-              <p className="text-xs text-zinc-500">
-                {new Date(x.attendance.timestamp).toLocaleString("ko-KR")}
-              </p>
-              <p className="mt-2 text-sm text-zinc-700">사유: {x.reason}</p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm text-white hover:bg-emerald-600"
-                  onClick={() => void resolve(x.id, "approve")}
-                >
-                  승인
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-                  onClick={() => void resolve(x.id, "reject")}
-                >
-                  반려
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <section>
+          <p className={sectionLabel}>대기 목록</p>
+          <ul className={groupedCard}>
+            {items.map((x, i) => (
+              <li
+                key={x.id}
+                className={`${groupedRow} ${i < items.length - 1 ? "border-b border-[var(--separator)]" : ""}`}
+              >
+                <p className="font-semibold text-[var(--foreground)]">
+                  {x.attendance.employee.name} · {x.attendance.type}
+                  {x.attendance.site?.name ? ` · ${x.attendance.site.name}` : ""}
+                </p>
+                <p className={`mt-1 ${hint}`}>
+                  {new Date(x.attendance.timestamp).toLocaleString("ko-KR")}
+                </p>
+                <p className="mt-2 text-[0.9375rem] text-[var(--foreground)]">사유: {x.reason}</p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    className={btnSuccess}
+                    onClick={() => void resolve(x.id, "approve")}
+                  >
+                    승인
+                  </button>
+                  <button
+                    type="button"
+                    className={btnSecondary}
+                    onClick={() => void resolve(x.id, "reject")}
+                  >
+                    반려
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

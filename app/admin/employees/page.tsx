@@ -1,5 +1,20 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  btnPrimary,
+  card,
+  cardBody,
+  errorText,
+  groupedCard,
+  groupedRow,
+  hint,
+  input,
+  label,
+  link,
+  pageStack,
+  sectionLabel,
+} from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
 
 type Emp = {
@@ -50,60 +65,80 @@ export default function AdminEmployeesPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-lg font-semibold tracking-tight text-zinc-900">직원</h1>
-      {seatInfo && (
-        <p className="text-sm text-zinc-600">
-          좌석: <strong>{seatInfo.used}</strong> / {seatInfo.limit}명 — 상한 초과 시{" "}
-          <a href="/admin/billing" className="text-sky-600 underline">
-            요금·상향
-          </a>
-        </p>
-      )}
+    <div className={pageStack}>
+      <PageHeader
+        title="직원"
+        subtitle={
+          seatInfo
+            ? `좌석 ${seatInfo.used} / ${seatInfo.limit}명 · 상한 초과 시 요금·상향이 필요합니다.`
+            : undefined
+        }
+        actions={
+          seatInfo ? (
+            <a href="/admin/billing" className={link}>
+              요금·상향 →
+            </a>
+          ) : undefined
+        }
+      />
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="font-medium text-zinc-800">직원 추가</h2>
-        <form onSubmit={(e) => void addEmployee(e)} className="mt-4 grid max-w-md gap-3">
-          <input
-            required
-            type="email"
-            placeholder="이메일"
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            required
-            placeholder="이름"
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            required
-            type="password"
-            minLength={8}
-            placeholder="임시 비밀번호 (8자 이상)"
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="submit" className="rounded-lg bg-sky-600 py-2 text-sm font-medium text-white hover:bg-sky-700">
-            추가
-          </button>
-        </form>
+      <section>
+        <p className={sectionLabel}>직원 추가</p>
+        <div className={card}>
+          <div className={cardBody}>
+            <form onSubmit={(e) => void addEmployee(e)} className="grid max-w-lg gap-4">
+              <div>
+                <label className={label}>이메일</label>
+                <input
+                  required
+                  type="email"
+                  className={`${input} mt-1.5`}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={label}>이름</label>
+                <input
+                  required
+                  className={`${input} mt-1.5`}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={label}>임시 비밀번호</label>
+                <input
+                  required
+                  type="password"
+                  minLength={8}
+                  className={`${input} mt-1.5`}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <p className={`mt-1.5 ${hint}`}>8자 이상</p>
+              </div>
+              {error && <p className={errorText}>{error}</p>}
+              <button type="submit" className={`${btnPrimary} w-full sm:w-auto`}>
+                추가
+              </button>
+            </form>
+          </div>
+        </div>
       </section>
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="font-medium text-zinc-800">목록</h2>
-        <ul className="mt-3 divide-y divide-zinc-100 text-sm">
-          {employees.map((emp) => (
-            <li key={emp.id} className="flex justify-between py-2">
-              <span>{emp.name}</span>
-              <span className="text-zinc-500">
-                {emp.user.email} · {emp.user.role}
-              </span>
+      <section>
+        <p className={sectionLabel}>목록</p>
+        <ul className={groupedCard}>
+          {employees.map((e, i) => (
+            <li
+              key={e.id}
+              className={`${groupedRow} ${i < employees.length - 1 ? "border-b border-[var(--separator)]" : ""}`}
+            >
+              <p className="font-semibold text-[var(--foreground)]">{e.name}</p>
+              <p className="mt-0.5 text-[0.875rem] text-[var(--apple-label-secondary)]">
+                {e.user.email} · {e.user.role}
+              </p>
             </li>
           ))}
         </ul>

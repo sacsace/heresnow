@@ -2,7 +2,28 @@
 
 import { FaceCapture } from "@/components/employee/FaceCapture";
 import { StaticMap } from "@/components/admin/StaticMap";
+import { AttendanceTrustHero } from "@/components/ui/AttendanceTrustHero";
 import { useI18n } from "@/components/LanguageProvider";
+import { statusBadge } from "@/lib/statusBadge";
+import {
+  bannerInfo,
+  bannerWarning,
+  btnPrimary,
+  btnSecondary,
+  btnSuccessFull,
+  card,
+  cardBody,
+  cardHeader,
+  groupedCard,
+  groupedRow,
+  hint,
+  input,
+  label,
+  segmentedBtn,
+  segmentedWrap,
+  successText,
+} from "@/lib/uiStyles";
+import { usePunchStatus } from "@/hooks/usePunchStatus";
 import type { AttendanceType } from "@prisma/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -27,7 +48,15 @@ type RecordRow = {
   exception: { status: string } | null;
 };
 
-export function PunchCard() {
+type PunchCardProps = {
+  /** full: employee page · embedded: admin (no hero) */
+  variant?: "full" | "embedded";
+  showRecentRecords?: boolean;
+};
+
+export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProps) {
+  const embedded = variant === "embedded";
+  const showRecords = showRecentRecords ?? !embedded;
   const { t } = useI18n();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [checkInMode, setCheckInMode] = useState<"normal" | "businessTrip">("normal");
@@ -43,6 +72,15 @@ export function PunchCard() {
   const [msg, setMsg] = useState<string | null>(null);
   const [previewCoords, setPreviewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [records, setRecords] = useState<RecordRow[]>([]);
+  const { status: punchStatus, loading: punchStatusLoading, reload: reloadPunchStatus } =
+    usePunchStatus();
+
+  function checkInBlockMessage(): string | null {
+    if (!punchStatus?.checkInBlock) return punchStatus?.checkInMessage ?? null;
+    if (punchStatus.checkInBlock === "ALREADY_CHECKED_IN") return t("employee.alreadyCheckedIn");
+    if (punchStatus.checkInBlock === "COOLDOWN_24H") return t("employee.cooldown24hBlocked");
+    return punchStatus.checkInMessage;
+  }
 
   const loadFaceStatus = useCallback(async () => {
     const r = await fetch("/api/employee/face");
@@ -145,10 +183,6 @@ export function PunchCard() {
 
   function validateBusinessTripFields(): boolean {
     if (checkInMode !== "businessTrip") return true;
-    if (!businessTripLocation.trim()) {
-      setMsg(t("employee.businessTripLocationRequired"));
-      return false;
-    }
     if (!businessTripReason.trim()) {
       setMsg(t("employee.businessTripReasonRequired"));
       return false;
@@ -157,6 +191,10 @@ export function PunchCard() {
   }
 
   async function submitCheckIn(faceDescriptor?: number[]) {
+    if (!punchStatus?.canCheckIn) {
+      setMsg(checkInBlockMessage() ?? t("employee.alreadyCheckedIn"));
+      return;
+    }
     if (!validateBusinessTripFields()) return;
 
     setMsg(null);
@@ -214,6 +252,7 @@ export function PunchCard() {
       setCheckInMode("normal");
       clearPhoto();
       await loadRecords();
+      await reloadPunchStatus();
     } catch (e: unknown) {
       if (e && typeof e === "object" && "message" in e) {
         setMsg(String((e as { message?: string }).message));
@@ -261,6 +300,7 @@ export function PunchCard() {
       setMsg(j.message ?? "저장되었습니다.");
       setMemo("");
       await loadRecords();
+      await reloadPunchStatus();
     } catch (e: unknown) {
       if (e && typeof e === "object" && "message" in e) {
         setMsg(String((e as { message?: string }).message));
@@ -274,22 +314,41 @@ export function PunchCard() {
   const faceRequired = faceRecognitionEnabled !== false;
   const readyForPunch =
     faceRecognitionEnabled !== null && (!faceRequired || faceEnrolled === true);
+  const canCheckIn = Boolean(punchStatus?.canCheckIn);
+  const canCheckOut = Boolean(punchStatus?.canCheckOut);
+  const showCheckIn = readyForPunch && canCheckIn && !punchStatusLoading;
+  const checkInNotice = checkInBlockMessage();
 
   return (
-    <div className="min-w-0 space-y-6">
-      <section className="rounded-xl border border-zinc-200/80 bg-white p-3 sm:p-4 md:p-5">
-        <p className="text-xs text-zinc-500">
-          출근·퇴근 버튼을 누르는 순간의 위치만 사용합니다. 백그라운드 추적은 없습니다.
-        </p>
-        <p className="mt-1 text-xs text-zinc-400">
-          {faceRequired ? t("employee.checkInLeadWithFace") : t("employee.checkInLeadNoFace")}
-        </p>
+    <div className={embedded ? "min-w-0" : "min-w-0 space-y-6 sm:space-y-8"}>
+      {!embedded && <AttendanceTrustHero variant="employee" />}
 
-        {faceRecognitionEnabled === null && (
-          <p className="mt-4 text-sm text-zinc-500">{t("common.loading")}</p>
+      <section className={card}>
+        <div className={cardHeader}>
+          <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">{t("employee.punchSection")}</p>
+          <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
+            {faceRequired ? t("employee.checkInLeadWithFace") : t("employee.checkInLeadNoFace")}
+          </p>
+        </div>
+
+        <div className={cardBody}>
+        {punchStatusLoading && (
+          <p className="text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
         )}
 
-        {faceRequired && faceEnrolled === false && (
+        {!punchStatusLoading && punchStatus?.isCheckedIn && (
+          <p className={`${bannerInfo} mt-4`}>{t("employee.alreadyCheckedIn")}</p>
+        )}
+
+        {!punchStatusLoading && !canCheckIn && checkInNotice && !punchStatus?.isCheckedIn && (
+          <p className={`${bannerInfo} mt-4`}>{checkInNotice}</p>
+        )}
+
+        {faceRecognitionEnabled === null && !punchStatusLoading && (
+          <p className="text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
+        )}
+
+        {faceRequired && faceEnrolled === false && showCheckIn && (
           <div className="mt-4">
             <FaceCapture
               mode="enroll"
@@ -303,18 +362,14 @@ export function PunchCard() {
           </div>
         )}
 
-        {readyForPunch && (
+        {showCheckIn && (
           <>
-            <div className="mt-4 flex rounded-lg border border-zinc-200 bg-zinc-50 p-1">
+            <div className={`mt-4 ${segmentedWrap}`}>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => setCheckInMode("normal")}
-                className={`min-h-[2.5rem] flex-1 touch-manipulation rounded-md px-2 text-sm font-medium transition-colors ${
-                  checkInMode === "normal"
-                    ? "bg-white text-zinc-900 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-700"
-                }`}
+                className={segmentedBtn(checkInMode === "normal")}
               >
                 {t("employee.checkInModeNormal")}
               </button>
@@ -322,40 +377,36 @@ export function PunchCard() {
                 type="button"
                 disabled={busy}
                 onClick={() => setCheckInMode("businessTrip")}
-                className={`min-h-[2.5rem] flex-1 touch-manipulation rounded-md px-2 text-sm font-medium transition-colors ${
-                  checkInMode === "businessTrip"
-                    ? "bg-white text-zinc-900 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-700"
-                }`}
+                className={segmentedBtn(checkInMode === "businessTrip")}
               >
                 {t("employee.checkInModeBusinessTrip")}
               </button>
             </div>
 
             {checkInMode === "businessTrip" && (
-              <div className="mt-4 space-y-3 rounded-xl border border-amber-200/80 bg-amber-50/50 p-3 sm:p-4">
-                <p className="text-xs text-amber-900/90">
+              <div className={`mt-4 space-y-3 border-t border-[var(--separator)] pt-4 ${bannerWarning}`}>
+                <p className="!bg-transparent !p-0 text-[0.8125rem]">
                   {faceRequired ? t("employee.businessTripHint") : t("employee.businessTripHintNoFace")}
                 </p>
-                <label className="block text-sm font-medium text-zinc-700">
+                <label className={label}>
                   {t("employee.businessTripLocationLabel")}
-                  <span className="text-red-600"> *</span>
+                  <span className="text-[var(--apple-red)]"> *</span>
                 </label>
                 <input
                   type="text"
-                  className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
+                  className={input}
                   value={businessTripLocation}
                   onChange={(e) => setBusinessTripLocation(e.target.value)}
                   placeholder={t("employee.businessTripLocationPlaceholder")}
                   maxLength={200}
                   disabled={busy}
                 />
-                <label className="block text-sm font-medium text-zinc-700">
+                <label className={label}>
                   {t("employee.businessTripReasonLabel")}
-                  <span className="text-red-600"> *</span>
+                  <span className="text-[var(--apple-red)]"> *</span>
                 </label>
                 <textarea
-                  className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
+                  className={`${input} min-h-[5rem]`}
                   rows={3}
                   value={businessTripReason}
                   onChange={(e) => setBusinessTripReason(e.target.value)}
@@ -381,7 +432,7 @@ export function PunchCard() {
                   type="button"
                   disabled={busy}
                   onClick={() => void submitCheckIn()}
-                  className="min-h-[3rem] w-full touch-manipulation rounded-xl bg-emerald-500 py-3 text-base font-semibold text-white hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-50 sm:min-h-[3.25rem] sm:py-4"
+                  className={btnSuccessFull}
                 >
                   {t("employee.checkInButton")}
                 </button>
@@ -392,23 +443,23 @@ export function PunchCard() {
 
         {readyForPunch && checkInMode === "normal" && (
           <>
-            <label className="mt-4 block text-sm font-medium text-zinc-600">
-              {t("employee.memoOptional")}
-            </label>
+            <div className="mt-4 border-t border-[var(--separator)] pt-4">
+            <label className={label}>{t("employee.memoOptional")}</label>
             <textarea
-              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
+              className={`${input} mt-1.5`}
               rows={2}
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
               placeholder="선택 입력"
             />
+            </div>
           </>
         )}
 
-        {readyForPunch && (
-          <div className="mt-4 rounded-xl border border-zinc-100 bg-zinc-50/80 p-3 sm:p-4">
-            <p className="text-sm font-medium text-zinc-900">{t("employee.photoCheckInLabel")}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">{t("employee.photoAttached")}</p>
+        {showCheckIn && (
+          <div className="mt-4 border-t border-[var(--separator)] pt-4">
+            <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">{t("employee.photoCheckInLabel")}</p>
+            <p className={`mt-0.5 ${hint}`}>{t("employee.photoAttached")}</p>
             <input
               ref={photoInputRef}
               type="file"
@@ -422,7 +473,7 @@ export function PunchCard() {
                 type="button"
                 disabled={busy}
                 onClick={() => photoInputRef.current?.click()}
-                className="mt-3 flex min-h-[2.75rem] w-full touch-manipulation items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white py-2.5 text-sm font-medium text-zinc-700 active:bg-zinc-50 disabled:opacity-50"
+                className={`mt-3 flex min-h-[2.75rem] w-full touch-manipulation items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--separator-opaque)] bg-[var(--grouped-bg)] py-2.5 text-sm font-medium text-[var(--foreground)] active:bg-[var(--fill-tertiary)] disabled:opacity-50`}
               >
                 <CameraIcon />
                 {t("employee.photoTakeButton")}
@@ -433,14 +484,14 @@ export function PunchCard() {
                 <img
                   src={photoPreviewUrl}
                   alt=""
-                  className="mx-auto max-h-40 w-full rounded-lg border border-zinc-200 object-contain"
+                  className="mx-auto max-h-40 w-full rounded-xl object-contain ring-1 ring-black/[0.06]"
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => photoInputRef.current?.click()}
-                    className="touch-manipulation rounded-lg border border-zinc-200 bg-white py-2 text-sm font-medium text-zinc-700 disabled:opacity-50"
+                    className={`${btnSecondary} w-full py-2.5 text-[0.9375rem]`}
                   >
                     {t("employee.photoRetake")}
                   </button>
@@ -448,7 +499,7 @@ export function PunchCard() {
                     type="button"
                     disabled={busy}
                     onClick={clearPhoto}
-                    className="touch-manipulation rounded-lg border border-zinc-200 bg-white py-2 text-sm font-medium text-red-600 disabled:opacity-50"
+                    className={`${btnSecondary} w-full py-2.5 text-[0.9375rem] text-[var(--apple-red)]`}
                   >
                     {t("employee.photoRemove")}
                   </button>
@@ -458,57 +509,62 @@ export function PunchCard() {
           </div>
         )}
 
-        <div className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50/80 p-2 sm:p-3">
-          <p className="text-sm font-medium text-zinc-900">위치 지도</p>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            출근·퇴근 시 저장되는 좌표와 동일하게, 버튼을 누를 때만 위치를 읽습니다.
-          </p>
+        <div className="mt-4 border-t border-[var(--separator)] pt-4">
+          <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">{t("employee.locationMap")}</p>
+          <p className={`mt-0.5 ${hint}`}>{t("employee.locationMapLead")}</p>
           <button
             type="button"
             disabled={busy || mapBusy}
             onClick={() => void loadMapPreview()}
-            className="mt-2 touch-manipulation rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            className={`mt-2 ${btnSecondary}`}
           >
-            {mapBusy ? "위치 읽는 중…" : "현재 위치를 지도에 표시"}
+            {mapBusy ? t("employee.readingLocation") : t("employee.showOnMap")}
           </button>
           {previewCoords && (
             <div className="mt-3">
               <StaticMap
                 lat={previewCoords.lat}
                 lng={previewCoords.lng}
-                label="현재 위치"
+                label={t("employee.currentLocation")}
                 noKeyFallback="embed"
               />
-              <p className="mt-1 break-all text-[11px] text-zinc-400">
+              <p className="mt-1 break-all text-[0.6875rem] text-[var(--apple-label-tertiary)]">
                 {previewCoords.lat.toFixed(6)}, {previewCoords.lng.toFixed(6)}
               </p>
             </div>
           )}
         </div>
 
-        {readyForPunch && (
-          <div className="mt-6">
+        {canCheckOut && !punchStatusLoading && (
+          <div className="mt-6 border-t border-[var(--separator)] pt-5">
             <button
               type="button"
               disabled={busy}
               onClick={() => void submitCheckOut()}
-              className="min-h-[3rem] w-full touch-manipulation rounded-xl bg-sky-500 py-3 text-base font-semibold text-white hover:bg-sky-600 active:bg-sky-700 disabled:opacity-50 sm:min-h-[3.25rem] sm:py-4"
+              className={btnPrimary + " w-full min-h-[3rem] py-3.5 text-[1.0625rem] sm:min-h-[3.25rem]"}
             >
               {t("employee.checkOutOnly")}
             </button>
           </div>
         )}
 
-        {msg && <p className="mt-3 break-words text-center text-sm text-zinc-600">{msg}</p>}
+        {msg && <p className={`mt-3 break-words text-center ${successText}`}>{msg}</p>}
+        </div>
       </section>
 
+      {showRecords && (
       <section>
-        <h2 className="text-sm font-semibold text-zinc-800">최근 기록</h2>
-        <ul className="mt-2 space-y-2">
-          {records.map((r) => (
-            <li key={r.id} className="rounded-xl border border-zinc-200/80 bg-white p-3 text-sm">
+        <p className="mb-2 px-1 text-[0.8125rem] font-semibold uppercase tracking-wide text-[var(--apple-label-secondary)]">
+          {t("employee.recentRecords")}
+        </p>
+        <ul className={groupedCard}>
+          {records.map((r, i) => (
+            <li
+              key={r.id}
+              className={`${groupedRow} text-[0.875rem] ${i < records.length - 1 ? "border-b border-[var(--separator)]" : ""}`}
+            >
               <div className="flex justify-between gap-2">
-                <span className="font-medium text-zinc-900">
+                <span className="font-semibold text-[var(--foreground)]">
                   {r.type === "CHECK_IN" ? "출근" : "퇴근"}
                   {r.isBusinessTrip && r.businessTripLocation
                     ? ` · 출장 ${r.businessTripLocation}`
@@ -516,26 +572,16 @@ export function PunchCard() {
                       ? ` · ${r.site.name}`
                       : ""}
                 </span>
-                <span
-                  className={
-                    r.status === "APPROVED"
-                      ? "text-emerald-700"
-                      : r.status === "PENDING"
-                        ? "text-amber-700"
-                        : "text-red-700"
-                  }
-                >
-                  {r.status}
-                </span>
+                <span className={statusBadge(r.status)}>{r.status}</span>
               </div>
-              <p className="break-words text-xs text-zinc-500">
+              <p className="mt-1 break-words text-[0.75rem] text-[var(--apple-label-secondary)]">
                 {new Date(r.timestamp).toLocaleString("ko-KR")}
                 {r.site && r.distanceFromSite > 0
                   ? ` · 거리 약 ${Math.round(r.distanceFromSite)}m`
                   : ` · ${r.latitude.toFixed(5)}, ${r.longitude.toFixed(5)}`}
               </p>
               {(r.isHolidayWork || r.isLate || r.isEarlyLeave || r.isOvertime) && (
-                <p className="text-xs text-zinc-600">
+                <p className="text-xs text-[var(--apple-label-secondary)]">
                   {r.isHolidayWork && (
                     <span className="text-violet-700">{t("employee.flagHolidayWork")} </span>
                   )}
@@ -546,7 +592,7 @@ export function PunchCard() {
                     <span className="text-amber-800">{t("employee.flagEarlyLeave")} </span>
                   )}
                   {r.isOvertime && (
-                    <span className="text-sky-800">
+                    <span className="text-[var(--apple-blue)]">
                       {t("employee.flagOvertime")}
                       {r.overtimeMinutes > 0 ? ` ${r.overtimeMinutes}${t("employee.flagMinutes")}` : ""}{" "}
                     </span>
@@ -554,13 +600,14 @@ export function PunchCard() {
                 </p>
               )}
               {r.isBusinessTrip && r.businessTripReason && (
-                <p className="text-xs text-zinc-600">사유: {r.businessTripReason}</p>
+                <p className="text-xs text-[var(--apple-label-secondary)]">사유: {r.businessTripReason}</p>
               )}
-              {r.exception && <p className="text-xs text-zinc-600">예외: {r.exception.status}</p>}
+              {r.exception && <p className="text-xs text-[var(--apple-label-secondary)]">예외: {r.exception.status}</p>}
             </li>
           ))}
         </ul>
       </section>
+      )}
     </div>
   );
 }

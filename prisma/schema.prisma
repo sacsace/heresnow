@@ -40,6 +40,11 @@ enum BillingRequestStatus {
   REJECTED
 }
 
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
 /// 외부 HR/출퇴근 연동 (MVS 등)
 enum IntegrationProvider {
   MVS
@@ -51,24 +56,25 @@ enum IntegrationOutboxStatus {
   FAILED
 }
 
-/// 연간 좌석 구간 요금 (슈퍼관리자가 금액·구간 수정 가능)
+/// 좌석 구간 요금 (월/연 구분, 슈퍼관리자 수정)
 model PricingTier {
-  id           String   @id @default(cuid())
-  minSeats     Int
-  maxSeats     Int
-  pricePerYear Int /// INR 등 정수 금액 (연)
-  currency     String   @default("INR")
-  label        String?
-  /// 가입 시 구독 만료를 `now + trialDays`로 설정. null이면 1년 연장 로직(유료)
-  trialDays    Int?
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String         @id @default(cuid())
+  minSeats       Int
+  maxSeats       Int
+  billingPeriod  BillingPeriod  @default(YEARLY)
+  priceAmount    Int /// INR 등 정수 (월 요금 또는 연 요금)
+  currency       String         @default("INR")
+  label          String?
+  /// 가입 시 구독 만료: 체험일 우선, 없으면 월/연에 따라 1개월·1년
+  trialDays      Int?
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   companiesAsCurrent    Company[]        @relation("CompanyPricingTier")
   billingRequestsTarget BillingRequest[] @relation("BillingTargetTier")
 
-  @@unique([minSeats, maxSeats])
+  @@unique([minSeats, maxSeats, billingPeriod])
 }
 
 model BillingRequest {

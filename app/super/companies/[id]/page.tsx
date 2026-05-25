@@ -1,6 +1,32 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
+import {
+  btnPrimaryLg,
+  cardBodyLg,
+  emptyStateLg,
+  errorText,
+  formGridFull,
+  formGridLg,
+  groupedCardLg,
+  inputLg,
+  inputTableLabelLg,
+  labelLg,
+  linkBackLg,
+  pageStackDetailLg,
+  sectionLabelLg,
+  selectLg,
+  tableHeadLg,
+  tableLg,
+  tableRow,
+  tableWrapLg,
+  tdEmailLg,
+  tdNameLg,
+  tdStatusLg,
+  thLg,
+} from "@/lib/uiStyles";
+import { roleBadge, statusBadge } from "@/lib/statusBadge";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -39,6 +65,9 @@ export default function SuperCompanyUsersPage() {
   const [role, setRole] = useState<(typeof ADD_ROLES)[number]>("EMPLOYEE");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [nameDraft, setNameDraft] = useState<Record<string, string>>({});
+  const [savingNameId, setSavingNameId] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -65,6 +94,14 @@ export default function SuperCompanyUsersPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const m: Record<string, string> = {};
+    for (const u of users) {
+      m[u.id] = u.employee?.name ?? "";
+    }
+    setNameDraft(m);
+  }, [users]);
 
   function roleLabel(r: string) {
     switch (r) {
@@ -103,121 +140,204 @@ export default function SuperCompanyUsersPage() {
     await load();
   }
 
+  async function saveDisplayName(u: RowUser) {
+    if (!u.employee) return;
+    const next = nameDraft[u.id]?.trim() ?? "";
+    const current = u.employee.name;
+    if (!next || next === current) {
+      setNameDraft((prev) => ({ ...prev, [u.id]: current }));
+      return;
+    }
+
+    setNameError(null);
+    setSavingNameId(u.id);
+    const r = await fetch(`/api/super/companies/${id}/users/${u.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: next }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setSavingNameId(null);
+    if (!r.ok) {
+      setNameError(typeof j.error === "string" ? j.error : t("super.saveNameFail"));
+      setNameDraft((prev) => ({ ...prev, [u.id]: current }));
+      return;
+    }
+    setUsers((prev) =>
+      prev.map((row) =>
+        row.id === u.id ? { ...row, employee: { ...row.employee!, name: j.employee?.name ?? next } } : row
+      )
+    );
+  }
+
   if (!id) return null;
 
   if (!company) {
     return (
-      <div className="space-y-4">
-        <Link href="/super" className="text-sm font-medium text-sky-600 hover:text-sky-800 hover:underline">
+      <div className={pageStackDetailLg}>
+        <Link href="/super" className={linkBackLg}>
           ← {t("super.backToCompanies")}
         </Link>
-        <p className="text-sm text-zinc-600">
+        <p className="text-[1rem] text-[var(--apple-label-secondary)] sm:text-[1.0625rem]">
           {notFound ? t("super.companyNotFound") : loadError ?? t("super.addUserFail")}
         </p>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <Link href="/super" className="text-sm font-medium text-sky-600 hover:text-sky-800 hover:underline">
-          ← {t("super.backToCompanies")}
-        </Link>
-        <h1 className="mt-3 text-lg font-semibold tracking-tight text-zinc-900">
-          {company.name} — {t("super.companyUsersTitle")}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">{t("super.companyUsersSubtitle")}</p>
-        <p className="mt-1 text-sm text-zinc-500">
-          {t("super.usersSeatUsage")}: {company._count.employees} / {company.seatLimit}
-        </p>
-      </div>
+  const seatMeta = `${t("super.usersSeatUsage")}: ${company._count.employees} / ${company.seatLimit}`;
 
-      <section className="rounded-xl border border-zinc-200/80 bg-white p-6">
-        <h2 className="text-base font-semibold text-zinc-900">{t("super.addUserSection")}</h2>
-        <form onSubmit={(e) => void onSubmit(e)} className="mt-4 grid max-w-lg gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-zinc-600">{t("super.addEmail")}</label>
-            <input
-              type="email"
-              required
-              autoComplete="off"
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+  return (
+    <div className={pageStackDetailLg}>
+      <PageHeader
+        size="lg"
+        title={`${company.name} — ${t("super.companyUsersTitle")}`}
+        subtitle={t("super.companyUsersSubtitle")}
+        meta={seatMeta}
+        actions={
+          <Link href="/super" className={linkBackLg}>
+            ← {t("super.backToCompanies")}
+          </Link>
+        }
+      />
+
+      <section>
+        <p className={sectionLabelLg}>{t("super.addUserSection")}</p>
+        <div className={groupedCardLg}>
+          <div className={cardBodyLg}>
+            <form onSubmit={(e) => void onSubmit(e)} className={formGridLg}>
+              <div className={formGridFull}>
+                <label className={labelLg}>{t("super.addEmail")}</label>
+                <input
+                  type="email"
+                  required
+                  autoComplete="off"
+                  className={`${inputLg} mt-2`}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelLg}>{t("super.addName")}</label>
+                <input
+                  required
+                  className={`${inputLg} mt-2`}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelLg}>{t("super.addRole")}</label>
+                <select
+                  className={`${selectLg} mt-2`}
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as (typeof ADD_ROLES)[number])}
+                >
+                  {ADD_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {roleLabel(r)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={formGridFull}>
+                <label className={labelLg}>{t("super.addPassword")}</label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  className={`${inputLg} mt-2`}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              {error && (
+                <p className={`${formGridFull} ${errorText}`}>
+                  {error}
+                </p>
+              )}
+              <div className={formGridFull}>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`${btnPrimaryLg} w-full sm:w-auto`}
+                >
+                  {loading ? t("common.processing") : t("super.addButton")}
+                </button>
+              </div>
+            </form>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-600">{t("super.addName")}</label>
-            <input
-              required
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-600">{t("super.addRole")}</label>
-            <select
-              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
-              value={role}
-              onChange={(e) => setRole(e.target.value as (typeof ADD_ROLES)[number])}
-            >
-              {ADD_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-zinc-600">{t("super.addPassword")}</label>
-            <input
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {error && <p className="sm:col-span-2 text-sm text-red-600">{error}</p>}
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
-            >
-              {loading ? t("common.processing") : t("super.addButton")}
-            </button>
-          </div>
-        </form>
+        </div>
       </section>
 
       <section>
-        <h2 className="text-base font-semibold text-zinc-900">{t("super.userListTitle")}</h2>
-        <div className="mt-3 overflow-x-auto rounded-xl border border-zinc-200/80 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-zinc-100 bg-zinc-50/80 text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <p className={sectionLabelLg}>{t("super.userListTitle")}</p>
+        {nameError && <p className={`mb-3 ${errorText}`}>{nameError}</p>}
+        <div className={tableWrapLg}>
+          <table className={tableLg}>
+            <thead className={tableHeadLg}>
               <tr>
-                <th className="px-3 py-2">{t("super.listEmail")}</th>
-                <th className="px-3 py-2">{t("super.listName")}</th>
-                <th className="px-3 py-2">{t("super.listRole")}</th>
-                <th className="px-3 py-2">{t("super.listConsent")}</th>
+                <th className={`${thLg} w-[38%]`}>{t("super.listEmail")}</th>
+                <th className={`${thLg} w-[22%]`}>{t("super.listName")}</th>
+                <th className={`${thLg} w-[22%]`}>{t("super.listRole")}</th>
+                <th className={`${thLg} w-[18%]`}>{t("super.listConsent")}</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-t border-zinc-100">
-                  <td className="px-3 py-2 font-mono text-xs text-zinc-800">{u.email}</td>
-                  <td className="px-3 py-2 text-zinc-700">{u.employee?.name ?? "—"}</td>
-                  <td className="px-3 py-2 text-zinc-700">{roleLabel(u.role)}</td>
-                  <td className="px-3 py-2 text-xs text-zinc-500">
-                    {u.consentGivenAt ? t("super.consentDone") : t("super.consentPending")}
+              {users.length === 0 ? (
+                <tr className={tableRow}>
+                  <td colSpan={4} className={emptyStateLg}>
+                    {t("common.noData")}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                users.map((u) => (
+                  <tr key={u.id} className={tableRow}>
+                    <td className={tdEmailLg}>
+                      <span className="block truncate" title={u.email}>
+                        {u.email}
+                      </span>
+                    </td>
+                    <td className={tdNameLg}>
+                      {u.employee ? (
+                        <input
+                          className={inputTableLabelLg}
+                          value={nameDraft[u.id] ?? u.employee.name}
+                          disabled={savingNameId === u.id}
+                          aria-label={t("super.listName")}
+                          onChange={(e) =>
+                            setNameDraft((prev) => ({ ...prev, [u.id]: e.target.value }))
+                          }
+                          onBlur={() => void saveDisplayName(u)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.currentTarget.blur();
+                            }
+                            if (e.key === "Escape") {
+                              setNameDraft((prev) => ({
+                                ...prev,
+                                [u.id]: u.employee?.name ?? "",
+                              }));
+                              e.currentTarget.blur();
+                            }
+                          }}
+                        />
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className={tdStatusLg}>
+                      <span className={roleBadge(u.role, true)}>{roleLabel(u.role)}</span>
+                    </td>
+                    <td className={tdStatusLg}>
+                      <span className={statusBadge(u.consentGivenAt ? "APPROVED" : "PENDING", true)}>
+                        {u.consentGivenAt ? t("super.consentDone") : t("super.consentPending")}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

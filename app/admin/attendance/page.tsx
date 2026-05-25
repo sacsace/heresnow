@@ -1,202 +1,229 @@
 "use client";
 
-import { StaticMap } from "@/components/admin/StaticMap";
-import type { AdminAttendanceDayRow, AttendancePunchSummary } from "@/lib/adminAttendanceByDay";
-import { useEffect, useState } from "react";
+import { AttendanceByEmployeeView } from "@/components/admin/attendance/ByEmployeeView";
+import { AttendanceChartView } from "@/components/admin/attendance/ChartView";
+import { AttendanceDayTable } from "@/components/admin/attendance/DayTable";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { useI18n } from "@/components/LanguageProvider";
+import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
+import {
+  btnPrimary,
+  btnSecondary,
+  emptyState,
+  groupedCard,
+  inputCompact,
+  label,
+  pageStack,
+  searchFieldWrap,
+  searchToolbar,
+  segmentedBtn,
+  segmentedWrap,
+  selectSm,
+  tableToolbar,
+} from "@/lib/uiStyles";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-function badge(s: string) {
-  if (s === "APPROVED") return "bg-emerald-100 text-emerald-800";
-  if (s === "PENDING") return "bg-amber-100 text-amber-900";
-  if (s === "MIXED") return "bg-zinc-100 text-zinc-700";
-  return "bg-red-100 text-red-800";
+type AttendanceTab = "daily" | "byEmployee" | "holiday" | "chart";
+
+type SearchFilters = {
+  q: string;
+  from: string;
+  to: string;
+  status: string;
+};
+
+function currentMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const mm = String(month + 1).padStart(2, "0");
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return {
+    from: `${year}-${mm}-01`,
+    to: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
+  };
 }
 
-function formatDate(date: string) {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  });
+function defaultFilters(): SearchFilters {
+  const { from, to } = currentMonthRange();
+  return { q: "", from, to, status: "" };
 }
 
-function locationLabel(p: AttendancePunchSummary) {
-  if (p.isBusinessTrip && p.businessTripLocation) {
-    return (
-      <>
-        {p.businessTripLocation}
-        <span className="block text-zinc-400">출장 · GPS</span>
-      </>
-    );
-  }
-  if (p.site?.name) {
-    return (
-      <>
-        {p.site.name}
-        <span className="block text-zinc-400">약 {Math.round(p.distanceFromSite)}m</span>
-      </>
-    );
-  }
-  return (
-    <>
-      {p.latitude.toFixed(5)}, {p.longitude.toFixed(5)}
-      <span className="block text-zinc-400">GPS</span>
-    </>
-  );
+function filtersDifferFromDefault(f: SearchFilters): boolean {
+  const d = defaultFilters();
+  return f.q !== d.q || f.from !== d.from || f.to !== d.to || f.status !== d.status;
 }
 
 export default function AdminAttendancePage() {
+  const { t, locale } = useI18n();
   const [rows, setRows] = useState<AdminAttendanceDayRow[]>([]);
-  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<AttendanceTab>("daily");
+  const [draft, setDraft] = useState<SearchFilters>(() => defaultFilters());
+  const [filters, setFilters] = useState<SearchFilters>(() => defaultFilters());
 
-  async function load() {
+  const dateLocale = locale === "en" ? "en-US" : "ko-KR";
+
+  const tabs: { id: AttendanceTab; label: string }[] = [
+    { id: "daily", label: t("admin.attendanceTabDaily") },
+    { id: "byEmployee", label: t("admin.attendanceTabByEmployee") },
+    { id: "holiday", label: t("admin.attendanceTabHoliday") },
+    { id: "chart", label: t("admin.attendanceTabChart") },
+  ];
+
+  const subtitleByTab: Record<AttendanceTab, string> = {
+    daily: t("admin.attendanceTabDailyLead"),
+    byEmployee: t("admin.attendanceTabByEmployeeLead"),
+    holiday: t("admin.attendanceTabHolidayLead"),
+    chart: t("admin.attendanceTabChartLead"),
+  };
+
+  const exportHref = useMemo(() => {
+    const q = new URLSearchParams();
+    if (filters.status) q.set("status", filters.status);
+    if (filters.from) q.set("from", filters.from);
+    if (filters.to) q.set("to", filters.to);
+    if (filters.q) q.set("q", filters.q);
+    const s = q.toString();
+    return s ? `/api/admin/export?${s}` : "/api/admin/export";
+  }, [filters]);
+
+  const load = useCallback(async () => {
     setLoading(true);
     const q = new URLSearchParams();
-    if (status) q.set("status", status);
+    if (filters.status) q.set("status", filters.status);
+    if (filters.from) q.set("from", filters.from);
+    if (filters.to) q.set("to", filters.to);
+    if (filters.q) q.set("q", filters.q);
     const r = await fetch(`/api/admin/attendance?${q.toString()}`);
     const j = await r.json();
     if (r.ok) setRows(j.days ?? []);
     setLoading(false);
-  }
+  }, [filters]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [load]);
+
+  function applySearch(e: React.FormEvent) {
+    e.preventDefault();
+    setFilters({ ...draft });
+  }
+
+  function resetSearch() {
+    const next = defaultFilters();
+    setDraft(next);
+    setFilters(next);
+  }
+
+  const holidayRows = useMemo(() => rows.filter((r) => r.isHolidayWork), [rows]);
+  const displayRows = tab === "holiday" ? holidayRows : rows;
+  const hasActiveFilters = filtersDifferFromDefault(filters);
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-zinc-900">출퇴근 기록</h1>
-          <p className="mt-1 text-sm text-zinc-500">직원·날짜별로 하루 한 줄(출근·퇴근)로 표시합니다.</p>
-        </div>
-        <div className="flex gap-2">
-          <select
-            className="rounded-lg border border-zinc-300 px-2 py-1 text-sm"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
+    <div className={pageStack}>
+      <PageHeader title={t("admin.attendanceTitle")} subtitle={subtitleByTab[tab]} />
+
+      <div className={`max-w-full overflow-x-auto ${segmentedWrap}`}>
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={segmentedBtn(tab === item.id)}
           >
-            <option value="">전체 상태</option>
-            <option value="APPROVED">APPROVED</option>
-            <option value="PENDING">PENDING</option>
-            <option value="REJECTED">REJECTED</option>
-          </select>
-          <a
-            href="/api/admin/export"
-            className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm text-white hover:bg-sky-600"
-          >
-            Excel
-          </a>
-        </div>
+            {item.label}
+          </button>
+        ))}
       </div>
+
+      <div className={groupedCard}>
+        <form onSubmit={applySearch} className={tableToolbar}>
+          <div className={searchToolbar}>
+            <div className={searchFieldWrap}>
+              <label className={label} htmlFor="attendance-search-name">
+                {t("admin.attendanceSearchName")}
+              </label>
+              <input
+                id="attendance-search-name"
+                type="search"
+                className={`${inputCompact} mt-1.5`}
+                placeholder={t("admin.attendanceSearchNamePlaceholder")}
+                value={draft.q}
+                onChange={(e) => setDraft((prev) => ({ ...prev, q: e.target.value }))}
+              />
+            </div>
+            <div className="min-w-0 w-full sm:w-auto">
+              <label className={label} htmlFor="attendance-from">
+                {t("admin.attendanceDateFrom")}
+              </label>
+              <input
+                id="attendance-from"
+                type="date"
+                className={`${inputCompact} mt-1.5 sm:min-w-[10rem]`}
+                value={draft.from}
+                onChange={(e) => setDraft((prev) => ({ ...prev, from: e.target.value }))}
+              />
+            </div>
+            <div className="min-w-0 w-full sm:w-auto">
+              <label className={label} htmlFor="attendance-to">
+                {t("admin.attendanceDateTo")}
+              </label>
+              <input
+                id="attendance-to"
+                type="date"
+                className={`${inputCompact} mt-1.5 sm:min-w-[10rem]`}
+                value={draft.to}
+                onChange={(e) => setDraft((prev) => ({ ...prev, to: e.target.value }))}
+              />
+            </div>
+            <div className="min-w-0 w-full sm:w-auto">
+              <label className={label} htmlFor="attendance-status">
+                {t("admin.attendanceFilterStatus")}
+              </label>
+              <select
+                id="attendance-status"
+                className={`${selectSm} mt-1.5`}
+                value={draft.status}
+                onChange={(e) => setDraft((prev) => ({ ...prev, status: e.target.value }))}
+              >
+                <option value="">{t("admin.attendanceFilterAll")}</option>
+                <option value="APPROVED">APPROVED</option>
+                <option value="PENDING">PENDING</option>
+                <option value="REJECTED">REJECTED</option>
+              </select>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-end gap-2">
+              <button type="submit" className={`${btnPrimary} h-9 px-4`}>
+                {t("admin.attendanceSearchApply")}
+              </button>
+              {hasActiveFilters && (
+                <button type="button" onClick={resetSearch} className={`${btnSecondary} h-9 px-4`}>
+                  {t("admin.attendanceSearchReset")}
+                </button>
+              )}
+              <a href={exportHref} className={`${btnSecondary} h-9 px-4 !text-[0.875rem]`}>
+                Excel
+              </a>
+            </div>
+          </div>
+        </form>
+      </div>
+
       {loading ? (
-        <p className="mt-4 text-sm text-zinc-500">불러오는 중…</p>
-      ) : rows.length === 0 ? (
-        <p className="mt-4 text-sm text-zinc-500">표시할 기록이 없습니다.</p>
+        <p className="text-[1rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
+      ) : tab === "chart" ? (
+        rows.length === 0 ? (
+          <p className={emptyState}>{t("admin.attendanceEmpty")}</p>
+        ) : (
+          <AttendanceChartView rows={rows} />
+        )
+      ) : displayRows.length === 0 ? (
+        <p className={emptyState}>{t("admin.attendanceEmpty")}</p>
+      ) : tab === "byEmployee" ? (
+        <AttendanceByEmployeeView rows={displayRows} dateLocale={dateLocale} />
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-zinc-50/80 text-xs uppercase text-zinc-500">
-              <tr>
-                <th className="px-3 py-2">날짜</th>
-                <th className="px-3 py-2">직원</th>
-                <th className="px-3 py-2">출근</th>
-                <th className="px-3 py-2">퇴근</th>
-                <th className="px-3 py-2">출장</th>
-                <th className="px-3 py-2">상태</th>
-                <th className="px-3 py-2">근태</th>
-                <th className="px-3 py-2">지도</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-zinc-100">
-                  <td className="whitespace-nowrap px-3 py-2 text-zinc-800">
-                    {formatDate(r.date)}
-                    {r.incomplete && (
-                      <span className="mt-0.5 block text-[11px] text-amber-700">미완료</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 font-medium text-zinc-900">{r.employeeName}</td>
-                  <td className="px-3 py-2 text-xs text-zinc-600">
-                    {r.checkIn ? (
-                      <>
-                        <span className="font-medium text-zinc-800">{r.checkIn.time}</span>
-                        <span className="mt-0.5 block">{locationLabel(r.checkIn)}</span>
-                      </>
-                    ) : (
-                      <span className="text-zinc-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-zinc-600">
-                    {r.checkOut ? (
-                      <>
-                        <span className="font-medium text-zinc-800">{r.checkOut.time}</span>
-                        <span className="mt-0.5 block">{locationLabel(r.checkOut)}</span>
-                      </>
-                    ) : (
-                      <span className="text-zinc-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-zinc-600">
-                    {r.checkIn?.isBusinessTrip ? (
-                      <span title={r.checkIn.businessTripReason ?? ""}>
-                        {r.checkIn.businessTripLocation ?? "출장"}
-                        {r.checkIn.businessTripReason ? (
-                          <span className="mt-0.5 block max-w-[12rem] truncate text-zinc-500">
-                            {r.checkIn.businessTripReason}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${badge(r.status)}`}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-zinc-600">
-                    {r.isHolidayWork && <span className="text-violet-700">휴일근무 </span>}
-                    {r.isLate && <span className="text-amber-800">지각 </span>}
-                    {r.isEarlyLeave && <span className="text-amber-800">조퇴 </span>}
-                    {r.isOvertime && (
-                      <span className="text-sky-800">
-                        초과{r.overtimeMinutes > 0 ? ` ${r.overtimeMinutes}분` : ""}{" "}
-                      </span>
-                    )}
-                    {!r.isHolidayWork &&
-                      !r.isLate &&
-                      !r.isEarlyLeave &&
-                      !r.isOvertime &&
-                      "—"}
-                  </td>
-                  <td className="px-3 py-2">
-                    {r.checkIn ? (
-                      <StaticMap
-                        lat={r.checkIn.latitude}
-                        lng={r.checkIn.longitude}
-                        label={`${r.employeeName} 출근`}
-                      />
-                    ) : r.checkOut ? (
-                      <StaticMap
-                        lat={r.checkOut.latitude}
-                        lng={r.checkOut.longitude}
-                        label={`${r.employeeName} 퇴근`}
-                      />
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <AttendanceDayTable rows={displayRows} dateLocale={dateLocale} />
       )}
     </div>
   );

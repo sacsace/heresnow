@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { addYears } from "@/lib/pricing";
+import { subscriptionEndsAtForTier } from "@/lib/pricing";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -54,7 +54,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       data: {
         pricingTierId: br.targetTierId,
         seatLimit: br.targetTier.maxSeats,
-        subscriptionEndsAt: addYears(new Date(), 1),
+        subscriptionEndsAt: subscriptionEndsAtForTier(br.targetTier),
       },
     });
     await tx.billingRequest.update({

@@ -14,7 +14,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const company = await prisma.company.findUnique({
     where: { id },
     include: {
-      pricingTier: { select: { label: true, maxSeats: true, pricePerYear: true } },
+      pricingTier: {
+        select: { label: true, maxSeats: true, priceAmount: true, billingPeriod: true },
+      },
       _count: { select: { users: true, employees: true, attendanceRecords: true } },
     },
   });
@@ -96,7 +98,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         ...(ends !== undefined ? { subscriptionEndsAt: ends } : {}),
       },
       include: {
-        pricingTier: { select: { label: true, maxSeats: true, pricePerYear: true } },
+        pricingTier: {
+        select: { label: true, maxSeats: true, priceAmount: true, billingPeriod: true },
+      },
         _count: { select: { users: true, employees: true, attendanceRecords: true } },
       },
     });

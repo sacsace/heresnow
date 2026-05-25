@@ -1,22 +1,27 @@
 "use client";
 
+import { AppLogo } from "@/components/AppLogo";
 import { AuthShell } from "@/components/auth/AuthShell";
 import {
   authButtonPrimary,
-  authCard,
+  authCardSignup,
+  authShellSignupWidth,
   authError,
   authFieldGroup,
   authFooter,
-  authForm,
+  authFormSignup,
   authHint,
   authInput,
   authLabel,
   authLink,
   authSelect,
-  authSubtitle,
+  authSubtitleSignup,
   authTitle,
 } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
+import { formatTierPrice } from "@/lib/pricing";
+import { segmentedBtn, segmentedWrap } from "@/lib/uiStyles";
+import type { BillingPeriod } from "@prisma/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -25,7 +30,8 @@ type Tier = {
   id: string;
   minSeats: number;
   maxSeats: number;
-  pricePerYear: number;
+  billingPeriod: BillingPeriod;
+  priceAmount: number;
   currency: string;
   label: string | null;
   trialDays: number | null;
@@ -42,12 +48,13 @@ export default function SignupPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminName, setAdminName] = useState("");
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("YEARLY");
   const [tierId, setTierId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    void fetch("/api/public/pricing-tiers")
+  const loadTiers = (period: BillingPeriod) => {
+    void fetch(`/api/public/pricing-tiers?period=${period}`)
       .then((r) => r.json())
       .then((j: { tiers?: Tier[] }) => {
         const list = (j.tiers ?? []).map((row) => ({
@@ -55,20 +62,26 @@ export default function SignupPage() {
           trialDays: row.trialDays ?? null,
         }));
         setTiers(list);
-        if (list[0]) setTierId(list[0].id);
+        setTierId(list[0]?.id ?? "");
       })
       .catch(() => setError(t("signup.errorTiers")));
-  }, [t]);
+  };
+
+  useEffect(() => {
+    loadTiers(billingPeriod);
+  }, [billingPeriod, t]);
+
+  const filteredTiers = tiers.filter((tr) => tr.billingPeriod === billingPeriod);
 
   function tierLabelLine(tr: Tier) {
     if (tr.trialDays != null && tr.trialDays > 0) {
       return t("signup.tierTrialLine").replace("{seats}", String(tr.maxSeats)).replace("{days}", String(tr.trialDays));
     }
     if (tr.label) {
-      return `${tr.label} — Rs.${tr.pricePerYear}${t("signup.tierSuffix")} (${tr.currency})`;
+      return `${tr.label} — ${formatTierPrice(tr)}`;
     }
     const range = `${tr.minSeats}–${tr.maxSeats}${t("signup.seats")}`;
-    return `${range} — Rs.${tr.pricePerYear}${t("signup.tierSuffix")} (${tr.currency})`;
+    return `${range} — ${formatTierPrice(tr)}`;
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -103,12 +116,15 @@ export default function SignupPage() {
   }
 
   return (
-    <AuthShell className="max-w-lg sm:max-w-xl">
-      <div className={authCard}>
+    <AuthShell className={authShellSignupWidth}>
+      <div className={authCardSignup}>
+        <div className="mb-4 flex justify-center sm:mb-5">
+          <AppLogo variant="auth" title={t("login.title")} />
+        </div>
         <h1 className={authTitle}>{t("signup.title")}</h1>
-        <p className={authSubtitle}>{t("signup.subtitle")}</p>
+        <p className={authSubtitleSignup}>{t("signup.subtitle")}</p>
 
-        <form onSubmit={(e) => void onSubmit(e)} className={authForm}>
+        <form onSubmit={(e) => void onSubmit(e)} className={authFormSignup}>
           <div className={authFieldGroup}>
             <label className={authLabel}>{t("signup.companyName")}</label>
             <input
@@ -121,7 +137,7 @@ export default function SignupPage() {
           <div className={authFieldGroup}>
             <label className={authLabel}>{t("signup.timezone")}</label>
             <select
-              className={`${authSelect} auth-select-chevron`}
+              className={authSelect}
               value={timezone}
               disabled
               aria-label={t("signup.timezone")}
@@ -133,14 +149,33 @@ export default function SignupPage() {
             <p className={authHint}>{t("signup.timezoneIndiaOnly")}</p>
           </div>
           <div className={authFieldGroup}>
+            <label className={authLabel}>{t("signup.billingPeriod")}</label>
+            <div className={segmentedWrap}>
+              <button
+                type="button"
+                onClick={() => setBillingPeriod("MONTHLY")}
+                className={segmentedBtn(billingPeriod === "MONTHLY")}
+              >
+                {t("signup.periodMonthly")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingPeriod("YEARLY")}
+                className={segmentedBtn(billingPeriod === "YEARLY")}
+              >
+                {t("signup.periodYearly")}
+              </button>
+            </div>
+          </div>
+          <div className={authFieldGroup}>
             <label className={authLabel}>{t("signup.plan")}</label>
             <select
-              className={`${authSelect} auth-select-chevron`}
+              className={authSelect}
               value={tierId}
               onChange={(e) => setTierId(e.target.value)}
               required
             >
-              {tiers.map((tr) => (
+              {filteredTiers.map((tr) => (
                 <option key={tr.id} value={tr.id}>
                   {tierLabelLine(tr)}
                 </option>

@@ -2,6 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import { sessionRoleLabel } from "@/lib/sessionDisplay";
+import { headerUserEmail, headerUserPanel } from "@/lib/uiStyles";
 import { useSession } from "next-auth/react";
 
 type Props = { className?: string };
@@ -11,7 +12,11 @@ export function HeaderSessionUser({ className = "" }: Props) {
   const { t } = useI18n();
 
   if (status === "loading") {
-    return <div className={`text-xs text-zinc-400 ${className}`}>…</div>;
+    return (
+      <div className={`${headerUserPanel} ${className}`}>
+        <span className="text-[0.8125rem] text-[var(--apple-label-tertiary)]">…</span>
+      </div>
+    );
   }
   if (status !== "authenticated" || !data?.user?.email) {
     return null;
@@ -21,15 +26,8 @@ export function HeaderSessionUser({ className = "" }: Props) {
   const roleLabel = sessionRoleLabel(email, role, t);
 
   return (
-    <div
-      className={`min-w-0 max-w-[min(100%,22rem)] ${className}`}
-      title={`${email} · ${roleLabel}`}
-    >
-      <p className="truncate text-right text-xs leading-snug text-zinc-800">
-        <span className="font-mono">{email}</span>
-        <span className="text-zinc-400"> · </span>
-        <span className="text-zinc-600">{roleLabel}</span>
-      </p>
+    <div className={`${headerUserPanel} ${className}`} title={`${email} · ${roleLabel}`}>
+      <p className={headerUserEmail}>{email}</p>
     </div>
   );
 }

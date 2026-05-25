@@ -175,33 +175,33 @@ export function AdminDayAttendanceMap({ date, className }: Props) {
 
   return (
     <div className={className}>
-      {loading && <p className="text-sm text-zinc-500">{t("common.loading")}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {loading && <p className="text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>}
+      {error && <p className="text-sm text-[var(--apple-red)]">{error}</p>}
       {mapInitError && !error && (
         <p className="text-sm text-amber-800">{mapInitError}</p>
       )}
       {!loading && !error && markers.length === 0 && (
-        <p className="text-sm text-zinc-500">{t("admin.monthlyMapNoCheckIns")}</p>
+        <p className="text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("admin.monthlyMapNoCheckIns")}</p>
       )}
       {!loading && !error && markers.length > 0 && (
         <>
-          <p className="mb-2 text-xs text-zinc-500">
+          <p className="mb-2 text-xs text-[var(--apple-label-secondary)]">
             {t("admin.monthlyMapCountLabel")}: {markers.length}
             {timezone ? ` · ${timezone}` : ""}
           </p>
           <div
             ref={mapContainerRef}
-            className={`z-0 h-[min(28rem,50vh)] w-full min-h-[16rem] rounded-lg border border-zinc-200 bg-zinc-100 ${mapInitError ? "hidden" : ""}`}
+            className={`z-0 h-[min(28rem,50vh)] w-full min-h-[16rem] rounded-2xl bg-[var(--fill-tertiary)] ring-1 ring-black/[0.04] ${mapInitError ? "hidden" : ""}`}
             aria-label={t("admin.monthlyMapTitle")}
           />
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
             {markers.map((m) => (
               <li
                 key={m.attendanceId}
-                className="rounded-lg border border-zinc-100 bg-zinc-50/80 px-3 py-2 text-xs text-zinc-700"
+                className="rounded-xl bg-[var(--fill-tertiary)] px-3.5 py-2.5 text-[0.8125rem] text-[var(--foreground)]"
               >
-                <span className="font-medium text-zinc-900">{m.employeeName}</span>
-                <span className="text-zinc-500"> · {m.checkInTime}</span>
+                <span className="font-medium text-[var(--foreground)]">{m.employeeName}</span>
+                <span className="text-[var(--apple-label-secondary)]"> · {m.checkInTime}</span>
                 {m.isBusinessTrip && m.businessTripLocation && (
                   <span className="block text-amber-800">
                     {t("admin.monthlyMapTrip")}: {m.businessTripLocation}

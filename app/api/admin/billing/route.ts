@@ -30,7 +30,12 @@ export async function GET() {
   const employeeCount = await prisma.employee.count({ where: { companyId } });
   const tiers = await prisma.pricingTier.findMany({ orderBy: { sortOrder: "asc" } });
   const currentMaxSeats = company.pricingTier?.maxSeats ?? company.seatLimit;
-  const upgradeTiers = tiers.filter((t) => t.maxSeats > currentMaxSeats);
+  const currentPeriod = company.pricingTier?.billingPeriod;
+  const upgradeTiers = tiers.filter(
+    (t) =>
+      t.maxSeats > currentMaxSeats &&
+      (currentPeriod == null || t.billingPeriod === currentPeriod)
+  );
 
   const pendingRequest = await prisma.billingRequest.findFirst({
     where: { companyId, status: "PENDING" },

@@ -1,37 +1,34 @@
 "use client";
 
 import { AdminCompanySettings } from "@/components/admin/AdminCompanySettings";
+import { AdminCompanySiteRegistration } from "@/components/admin/AdminCompanySiteRegistration";
+import { AdminMvsIntegrationHint } from "@/components/admin/AdminMvsIntegrationHint";
+import { AdminTodayOverview } from "@/components/admin/AdminTodayOverview";
 import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceOverview";
+import { AttendanceTrustHero } from "@/components/ui/AttendanceTrustHero";
 import { useI18n } from "@/components/LanguageProvider";
-import Link from "next/link";
+import { pageStack, pageSubtitle, pageTitle } from "@/lib/uiStyles";
 
 export default function AdminHomePage() {
   const { t } = useI18n();
   return (
-    <div>
-      <h1 className="text-lg font-semibold tracking-tight text-zinc-900">{t("admin.homeTitle")}</h1>
-      <p className="mt-2 text-sm text-zinc-500">{t("admin.homeLead")}</p>
+    <div className={pageStack}>
+      <header>
+        <h1 className={pageTitle}>{t("admin.homeTitle")}</h1>
+        <p className={pageSubtitle}>{t("admin.homeLead")}</p>
+      </header>
 
-      <AdminCompanySettings />
+      <AttendanceTrustHero variant="admin" />
+
+      <AdminTodayOverview />
 
       <MonthlyAttendanceOverview />
 
-      <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-        <Link
-          href="/admin/attendance"
-          className="rounded-xl border border-zinc-200/80 bg-white p-4 hover:border-sky-200"
-        >
-          <p className="font-medium text-zinc-900">{t("admin.cardAttendanceTitle")}</p>
-          <p className="text-sm text-zinc-500">{t("admin.cardAttendanceDesc")}</p>
-        </Link>
-        <Link
-          href="/admin/exceptions"
-          className="rounded-xl border border-zinc-200/80 bg-white p-4 hover:border-sky-200"
-        >
-          <p className="font-medium text-zinc-900">{t("admin.cardExceptionsTitle")}</p>
-          <p className="text-sm text-zinc-500">{t("admin.cardExceptionsDesc")}</p>
-        </Link>
-      </ul>
+      <AdminCompanySiteRegistration />
+
+      <AdminCompanySettings />
+
+      <AdminMvsIntegrationHint />
     </div>
   );
 }

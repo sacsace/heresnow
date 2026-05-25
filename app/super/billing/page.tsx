@@ -1,5 +1,19 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/PageHeader";
+import { priceSuffix } from "@/lib/pricing";
+import {
+  btnPrimary,
+  btnSecondary,
+  btnSuccess,
+  emptyState,
+  groupedCard,
+  groupedRow,
+  hint,
+  pageStack,
+  sectionLabel,
+} from "@/lib/uiStyles";
+import type { BillingPeriod } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
 
 type Req = {
@@ -9,7 +23,13 @@ type Req = {
   createdAt: string;
   note: string | null;
   company: { id: string; name: string; seatLimit: number };
-  targetTier: { label: string | null; minSeats: number; maxSeats: number; pricePerYear: number };
+  targetTier: {
+    label: string | null;
+    minSeats: number;
+    maxSeats: number;
+    priceAmount: number;
+    billingPeriod: BillingPeriod;
+  };
 };
 
 export default function SuperBillingPage() {
@@ -41,39 +61,47 @@ export default function SuperBillingPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-lg font-semibold tracking-tight text-zinc-900">요금 상향 요청</h1>
-      <p className="text-sm text-zinc-500">회사가 납부 후 요청하면 승인 시 좌석 상한·구독 1년이 갱신됩니다.</p>
-      <ul className="space-y-3">
-        {requests.length === 0 && <li className="text-sm text-zinc-400">대기 중인 요청이 없습니다.</li>}
-        {requests.map((q) => (
-          <li key={q.id} className="rounded-xl border border-zinc-200/80 bg-white p-4 text-sm">
-            <p className="font-medium text-zinc-900">{q.company.name}</p>
-            <p className="mt-1 text-zinc-600">
-              목표: {q.targetTier.label ?? `${q.targetTier.minSeats}–${q.targetTier.maxSeats}명`} · Rs.{q.amountDue} · 현재
-              좌석 상한 {q.company.seatLimit}
-            </p>
-            {q.note && <p className="mt-1 text-zinc-500">메모: {q.note}</p>}
-            <p className="mt-1 text-xs text-zinc-400">{new Date(q.createdAt).toLocaleString("ko-KR")}</p>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm text-white hover:bg-emerald-600"
-                onClick={() => void resolve(q.id, "APPROVED")}
+    <div className={pageStack}>
+      <PageHeader
+        title="요금 상향 요청"
+        subtitle="회사가 납부 후 요청하면 승인 시 좌석 상한·구독이 갱신됩니다."
+      />
+
+      <section>
+        <p className={sectionLabel}>대기 중</p>
+        {requests.length === 0 ? (
+          <p className={emptyState}>대기 중인 요청이 없습니다.</p>
+        ) : (
+          <ul className={groupedCard}>
+            {requests.map((q, i) => (
+              <li
+                key={q.id}
+                className={`${groupedRow} ${i < requests.length - 1 ? "border-b border-[var(--separator)]" : ""}`}
               >
-                승인
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
-                onClick={() => void resolve(q.id, "REJECTED")}
-              >
-                거절
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+                <p className="text-[1.0625rem] font-semibold text-[var(--foreground)]">{q.company.name}</p>
+                <p className={`mt-1.5 ${hint}`}>
+                  목표: {q.targetTier.label ?? `${q.targetTier.minSeats}–${q.targetTier.maxSeats}명`} · Rs.
+                  {q.targetTier.priceAmount}
+                  {priceSuffix(q.targetTier.billingPeriod)} · 청구 Rs.{q.amountDue} · 현재 좌석{" "}
+                  {q.company.seatLimit}
+                </p>
+                {q.note && <p className={`mt-1 ${hint}`}>메모: {q.note}</p>}
+                <p className="mt-1 text-[0.75rem] text-[var(--apple-label-tertiary)]">
+                  {new Date(q.createdAt).toLocaleString("ko-KR")}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button type="button" className={btnSuccess} onClick={() => void resolve(q.id, "APPROVED")}>
+                    승인
+                  </button>
+                  <button type="button" className={btnSecondary} onClick={() => void resolve(q.id, "REJECTED")}>
+                    거절
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

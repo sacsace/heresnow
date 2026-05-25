@@ -15,7 +15,10 @@ export default auth((req) => {
     pathname.startsWith("/api/public") ||
     pathname.startsWith("/api/integrations/") ||
     pathname === "/manifest.webmanifest" ||
-    pathname === "/icons/icon-192.png" ||
+    pathname === "/favicon.png" ||
+    pathname === "/logo.png" ||
+    pathname === "/apple-touch-icon.png" ||
+    pathname.startsWith("/icons/") ||
     isDevHealth;
 
   if (isPublicApi) return NextResponse.next();

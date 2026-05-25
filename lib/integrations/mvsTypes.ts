@@ -6,7 +6,7 @@ export type MvsAttendanceEventType = "attendance.created";
 export type MvsAttendanceEventV1 = {
   version: typeof MVS_ATTENDANCE_EVENT_VERSION;
   eventType: MvsAttendanceEventType;
-  /** HereNow 출퇴근 레코드 ID */
+  /** HeresNow 출퇴근 레코드 ID */
   attendanceId: string;
   companyId: string;
   /** CompanyIntegration.externalCompanyId */

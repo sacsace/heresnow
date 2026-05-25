@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { addDays, addYears } from "@/lib/pricing";
+import { subscriptionEndsAtForTier } from "@/lib/pricing";
 import { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -42,10 +42,7 @@ export async function POST(req: Request) {
   }
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
-  const subscriptionEndsAt =
-    tier.trialDays != null && tier.trialDays > 0
-      ? addDays(new Date(), tier.trialDays)
-      : addYears(new Date(), 1);
+  const subscriptionEndsAt = subscriptionEndsAtForTier(tier);
 
   try {
     await prisma.$transaction(async (tx) => {

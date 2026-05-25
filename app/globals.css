@@ -5,10 +5,32 @@
 :root {
   --foreground: #1d1d1f;
   --background: #f2f2f7;
+  --grouped-bg: #ffffff;
+  --bar-bg: rgba(255, 255, 255, 0.82);
   --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+
+  /* Apple system colors */
   --apple-blue: #007aff;
+  --apple-green: #34c759;
+  --apple-green-dark: #248a3d;
+  --apple-red: #ff3b30;
+  --apple-orange: #ff9500;
+  --apple-orange-dark: #8a6100;
+
+  /* Labels & fills */
   --apple-label-secondary: rgba(60, 60, 67, 0.6);
+  --apple-label-tertiary: rgba(60, 60, 67, 0.4);
+  --fill-secondary: rgba(120, 120, 128, 0.12);
+  --fill-secondary-hover: rgba(120, 120, 128, 0.16);
+  --fill-tertiary: rgba(120, 120, 128, 0.08);
+
+  /* Hairline separators (HIG) */
+  --separator: rgba(60, 60, 67, 0.29);
+  --separator-opaque: #c6c6c8;
+
+  /** App body/header column — full width minus 8rem gutter each side */
+  --app-content-width: calc(100% - 16rem);
 }
 
 html {
@@ -20,15 +42,65 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-system);
-  font-size: 17px;
-  line-height: 1.47;
-  letter-spacing: -0.022em;
+  font-size: 15px;
+  line-height: 1.4;
+  letter-spacing: -0.016em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/** macOS-style compact surfaces (login, signup, consent) */
+.auth-surface {
+  font-size: 13px;
+  line-height: 1.38;
+  letter-spacing: -0.01em;
+}
+
 @layer components {
-  .auth-select-chevron {
+  /** Custom chevron — do not combine with Tailwind bg-* on the same element (causes tile repeat) */
+  .auth-select-field {
+    appearance: none;
+    background-color: var(--fill-secondary);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%233C3C43' stroke-opacity='0.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+  }
+
+  .auth-select-field:focus {
+    background-color: var(--fill-secondary-hover);
+  }
+
+  /** Full-width hairline */
+  .hig-divider {
+    border-bottom: 1px solid var(--separator);
+  }
+
+  /** Inset divider (grouped list row) */
+  .hig-divider-inset {
+    border-bottom: 1px solid var(--separator);
+    margin-left: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .hig-divider-inset {
+      margin-left: 1.25rem;
+    }
+  }
+
+  .hig-divider-inset:last-child,
+  .hig-divider:last-child {
+    border-bottom: none;
+  }
+
+  /** App shell — stable width from first paint (avoids Tailwind JIT missing lib/uiStyles tokens) */
+  .app-content-width {
+    box-sizing: border-box;
+    width: var(--app-content-width);
+    max-width: var(--app-content-width);
+    min-width: 0;
+    flex-shrink: 0;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
