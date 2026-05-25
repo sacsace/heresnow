@@ -227,7 +227,7 @@ export default function SuperCompanyUsersPage() {
     <div className={pageStackDetailLg}>
       <PageHeader
         size="lg"
-        title={`${company.name} — ${t("super.companyUsersTitle")}`}
+        title={company.name}
         subtitle={t("super.companyUsersSubtitle")}
         meta={seatMeta}
         actions={
