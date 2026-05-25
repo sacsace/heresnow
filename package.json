@@ -15,6 +15,7 @@
     "face:models": "node scripts/copy-face-models.mjs",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
+    "db:bootstrap": "tsx prisma/bootstrap.ts",
     "db:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-db.ps1",
     "db:studio": "prisma studio",
     "db:verify": "npx tsx scripts/db-verify.ts"
