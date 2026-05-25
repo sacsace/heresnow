@@ -2,6 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import { useCallback, useEffect, useRef, useState } from "react";
+import "leaflet/dist/leaflet.css";
 
 export type DayMapMarker = {
   employeeId: string;
@@ -69,7 +70,6 @@ export function AdminDayAttendanceMap({ date, className }: Props) {
       let L: typeof import("leaflet");
       try {
         L = await import("leaflet");
-        await import("leaflet/dist/leaflet.css");
       } catch (e) {
         if (!cancelled) {
           setMapInitError(

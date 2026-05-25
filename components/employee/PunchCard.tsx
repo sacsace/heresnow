@@ -78,7 +78,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   function checkInBlockMessage(): string | null {
     if (!punchStatus?.checkInBlock) return punchStatus?.checkInMessage ?? null;
     if (punchStatus.checkInBlock === "ALREADY_CHECKED_IN") return t("employee.alreadyCheckedIn");
-    if (punchStatus.checkInBlock === "COOLDOWN_24H") return t("employee.cooldown24hBlocked");
+    if (punchStatus.checkInBlock === "COOLDOWN") return t("employee.cooldownBlocked");
     return punchStatus.checkInMessage;
   }
 

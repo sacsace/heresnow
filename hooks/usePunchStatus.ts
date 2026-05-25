@@ -6,7 +6,7 @@ export type PunchStatus = {
   isCheckedIn: boolean;
   canCheckIn: boolean;
   canCheckOut: boolean;
-  checkInBlock: "ALREADY_CHECKED_IN" | "COOLDOWN_24H" | null;
+  checkInBlock: "ALREADY_CHECKED_IN" | "COOLDOWN" | null;
   checkInMessage: string | null;
   nextCheckInAt: string | null;
   lastType: "CHECK_IN" | "CHECK_OUT" | null;

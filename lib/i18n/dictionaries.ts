@@ -105,7 +105,7 @@ export const ko = {
     homeTitle: "관리자 대시보드",
     homeLead: "오늘·이달 근태 요약과 회사 근무지·근무 설정·MVS 연동을 한곳에서 확인합니다.",
     punchSection: "내 출퇴근",
-    punchLead: "출근·퇴근 버튼을 누르면 현재 위치(GPS)와 시간이 저장됩니다. 어디서든 출근할 수 있으며, 퇴근 후 24시간이 지나야 다시 출근할 수 있습니다.",
+    punchLead: "출근·퇴근 버튼을 누르면 현재 위치(GPS)와 시간이 저장됩니다. 어디서든 출근할 수 있으며, 퇴근 후 6시간이 지나거나 자정이 지나야 다시 출근할 수 있습니다.",
     navCheckIn: "출근하기",
     navCheckOut: "퇴근하기",
     punchNoProfile: "출퇴근하려면 직원 프로필(표시 이름)이 필요합니다. 슈퍼관리자에게 문의하세요.",
@@ -307,10 +307,10 @@ export const ko = {
     checkOutOnly: "퇴근",
     checkInButton: "출근하기",
     alreadyCheckedIn: "이미 출근하였습니다. 먼저 퇴근해 주세요.",
-    cooldown24hBlocked: "퇴근 후 24시간이 지나야 다시 출근할 수 있습니다.",
+    cooldownBlocked: "퇴근 후 6시간이 지나거나 자정이 지나야 다시 출근할 수 있습니다.",
     checkInLeadWithFace:
-      "출근은 등록된 본인 얼굴 인식 후에만 가능합니다(대리 출근 방지). 퇴근은 24시간 안에 한 번만 가능합니다.",
-    checkInLeadNoFace: "출근·퇴근 시 현재 위치(GPS)가 저장됩니다. 퇴근은 24시간 안에 한 번만 가능합니다.",
+      "출근은 등록된 본인 얼굴 인식 후에만 가능합니다(대리 출근 방지). 퇴근 후 6시간 또는 자정이 지나면 다시 출근할 수 있습니다.",
+    checkInLeadNoFace: "출근·퇴근 시 현재 위치(GPS)가 저장됩니다. 퇴근 후 6시간 또는 자정이 지나면 다시 출근할 수 있습니다.",
     checkInModeNormal: "일반 출근",
     checkInModeBusinessTrip: "출장 출근",
     businessTripLocationLabel: "출장 지역",
@@ -441,7 +441,7 @@ export const en = {
     homeTitle: "Admin dashboard",
     homeLead: "Today's and this month's attendance, worksite, work schedule, and MVS integration in one place.",
     punchSection: "My attendance",
-    punchLead: "Check-in and check-out save your GPS location and timestamp. You may check in from anywhere; the next check-in is allowed only after 24 hours have passed since check-out.",
+    punchLead: "Check-in and check-out save your GPS location and timestamp. You may check in from anywhere; the next check-in is allowed once 6 hours have passed since check-out, or after midnight in the company time zone.",
     navCheckIn: "Check in",
     navCheckOut: "Check out",
     punchNoProfile: "An employee profile (display name) is required to check in. Contact your super admin.",
@@ -644,12 +644,12 @@ export const en = {
     checkOutOnly: "Check out",
     checkInButton: "Check in",
     alreadyCheckedIn: "You are already checked in. Please check out first.",
-    cooldown24hBlocked:
-      "You can check in again only after 24 hours have passed since your last check-out.",
+    cooldownBlocked:
+      "You can check in again 6 hours after your last check-out, or after midnight in the company time zone.",
     checkInLeadWithFace:
-      "Check-in requires face verification after enrollment. Check-out is allowed once within 24 hours.",
+      "Check-in requires face verification after enrollment. The next check-in is allowed 6 hours after check-out or once midnight passes.",
     checkInLeadNoFace:
-      "Check-in/out saves your GPS at tap time. Check-out is allowed once within 24 hours.",
+      "Check-in/out saves your GPS at tap time. The next check-in is allowed 6 hours after check-out or once midnight passes.",
     checkInModeNormal: "Regular check-in",
     checkInModeBusinessTrip: "Business trip check-in",
     businessTripLocationLabel: "Trip location",
