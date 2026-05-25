@@ -29,8 +29,29 @@
   --separator: rgba(60, 60, 67, 0.29);
   --separator-opaque: #c6c6c8;
 
-  /** App body/header column — full width minus 8rem gutter each side */
-  --app-content-width: calc(100% - 16rem);
+  /**
+   * App body/header column — 모바일은 가용 너비 전체, 화면이 커질수록 좌우 여백을 늘린다.
+   * 기존에는 calc(100% - 16rem) 가 모바일에서 본문 폭을 ~120px 까지 줄여 깨졌다.
+   */
+  --app-content-width: 100%;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --app-content-width: calc(100% - 4rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --app-content-width: calc(100% - 8rem);
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --app-content-width: calc(100% - 16rem);
+  }
 }
 
 html {

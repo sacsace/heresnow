@@ -409,9 +409,9 @@ export const btnSuccessFull = `w-full ${btnSuccess} min-h-[2.75rem] py-2.5`;
 export const authPageOuter =
   "auth-surface relative flex min-h-dvh flex-col items-center justify-center px-5 py-8 sm:py-10";
 
-/** 352px / 384px fixed — shrink-0 prevents flex growth */
+/** Up to 352px / 384px — 좁은 모바일에서는 가용 폭에 맞춰 축소 */
 export const authColumn =
-  "flex w-[22rem] shrink-0 grow-0 flex-col sm:w-[24rem]";
+  "flex w-full max-w-[22rem] shrink-0 flex-col sm:max-w-[24rem]";
 
 export const authCardShell =
   "w-full shrink-0 overflow-hidden rounded-xl bg-[var(--grouped-bg)] px-5 py-6 shadow-sm ring-1 ring-black/[0.04] sm:px-6 sm:py-7";

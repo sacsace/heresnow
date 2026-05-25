@@ -13,7 +13,11 @@ export default async function SuperLayout({ children }: { children: React.ReactN
   await requireConsent();
 
   return (
-    <AppShell header={<SuperNavBar />} bodyClassName={appContainerSuper}>
+    <AppShell
+      header={<SuperNavBar />}
+      bodyClassName={appContainerSuper}
+      shellClassName="min-w-0 overflow-x-hidden pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
+    >
       {children}
     </AppShell>
   );

@@ -22,8 +22,8 @@ export const authCardLogin = `${authCardShell} py-7 sm:py-[2.125rem]`;
 /** 가입 카드 — 폼 필드 많음, 로그인보다 넓고 여유 있게 */
 export const authCardSignup = `${authCardShell} py-7 sm:py-8`;
 
-/** AuthShell className — 가입 폼 고정 폭 */
-export const authShellSignupWidth = "!w-[28rem] sm:!w-[32rem]";
+/** AuthShell className — 가입 폼은 더 넓은 카드. 모바일은 가용 폭에 맞춰 축소 */
+export const authShellSignupWidth = "!max-w-[28rem] sm:!max-w-[32rem]";
 
 /** @deprecated use authShellSignupWidth */
 export const authColumnSignup = authShellSignupWidth;
