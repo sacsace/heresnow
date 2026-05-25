@@ -3,7 +3,6 @@
 import { AppHeaderActions } from "@/components/AppHeaderActions";
 import { AppLogo } from "@/components/AppLogo";
 import { useI18n } from "@/components/LanguageProvider";
-import { usePunchStatus } from "@/hooks/usePunchStatus";
 import {
   navBar,
   navBarInner,
@@ -17,31 +16,18 @@ import { useMemo } from "react";
 export function AdminNavBar() {
   const { t } = useI18n();
   const pathname = usePathname();
-  const { status: punchStatus } = usePunchStatus();
-
-  const punchNav = useMemo(() => {
-    if (!punchStatus) return null;
-    if (punchStatus.isCheckedIn) {
-      return { href: "/admin/punch", label: t("admin.navCheckOut") };
-    }
-    if (punchStatus.canCheckIn) {
-      return { href: "/admin/punch", label: t("admin.navCheckIn") };
-    }
-    return null;
-  }, [punchStatus, t]);
 
   const links = useMemo(() => {
-    const base = [
+    return [
       { href: "/admin", label: t("admin.navDashboard"), exact: true },
-      ...(punchNav ? [punchNav] : []),
+      { href: "/admin/punch", label: t("admin.navMyPunch") },
       { href: "/admin/employees", label: t("admin.navEmployees") },
       { href: "/admin/billing", label: t("admin.navBilling") },
       { href: "/admin/attendance", label: t("admin.navAttendance") },
       { href: "/admin/exceptions", label: t("admin.navExceptions") },
       { href: "/employee", label: t("admin.navEmployeeView") },
     ];
-    return base;
-  }, [punchNav, t]);
+  }, [t]);
 
   function isActive(href: string, exact?: boolean) {
     if (exact) return pathname === href;
