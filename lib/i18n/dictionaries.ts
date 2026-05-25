@@ -256,6 +256,7 @@ export const ko = {
     auditColAction: "처리",
     perYear: "/년",
     backToCompanies: "회사 목록으로",
+    openDetail: "상세 열기",
     companyNotFound: "회사를 찾을 수 없습니다.",
     companyUsersTitle: "사용자",
     companyUsersSubtitle: "회사 관리자 또는 직원 등 역할을 선택해 계정을 추가합니다. 출퇴근 카드에는 표시 이름이 쓰입니다.",
@@ -597,6 +598,7 @@ export const en = {
     auditColAction: "Action",
     perYear: "/yr",
     backToCompanies: "Back to companies",
+    openDetail: "Open detail",
     companyNotFound: "Company not found.",
     companyUsersTitle: "Users",
     companyUsersSubtitle:

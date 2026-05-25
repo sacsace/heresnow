@@ -100,11 +100,40 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f2f2f7",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
+  colorScheme: "light dark",
   width: "device-width",
   initialScale: 1,
   /** 휴대폰·태블릿에서 화면 회전·노치 대응, 핀치 줌 허용 */
   viewportFit: "cover",
+};
+
+const organizationLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: SITE_NAME,
+  url: SITE_URL,
+  logo: `${SITE_URL}/favicon.png`,
+  founder: { "@type": "Organization", name: "MS Ventures" },
+};
+
+const softwareLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: SITE_NAME,
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  url: SITE_URL,
+  description: DEFAULT_DESCRIPTION,
+  offers: {
+    "@type": "AggregateOffer",
+    priceCurrency: "INR",
+    lowPrice: "0",
+    highPrice: "3000",
+  },
 };
 
 export default function RootLayout({
@@ -116,6 +145,14 @@ export default function RootLayout({
     <html lang="ko">
       <body className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased">
         <Providers>{children}</Providers>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareLd) }}
+        />
       </body>
     </html>
   );

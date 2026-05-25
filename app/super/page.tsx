@@ -56,7 +56,11 @@ type Company = {
   _count: { users: number; employees: number; attendanceRecords: number };
 };
 
-type RowDraft = { seatLimit: string; subscriptionInput: string };
+type RowDraft = {
+  name: string;
+  seatLimit: string;
+  subscriptionInput: string;
+};
 
 function companyInUse(c: Company) {
   return c._count.users > 0 || c._count.employees > 0 || c._count.attendanceRecords > 0;
@@ -118,6 +122,7 @@ export default function SuperPage() {
     const m: Record<string, RowDraft> = {};
     for (const c of companies) {
       m[c.id] = {
+        name: c.name,
         seatLimit: String(c.seatLimit),
         subscriptionInput: subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone),
       };
@@ -139,6 +144,11 @@ export default function SuperPage() {
   async function saveCompany(id: string) {
     const d = draft[id];
     if (!d) return;
+    const name = d.name.trim();
+    if (!name) {
+      setBanner(t("super.saveCompanyFail"));
+      return;
+    }
     const seatLimit = Number.parseInt(d.seatLimit, 10);
     if (!Number.isFinite(seatLimit) || seatLimit < 1) {
       setBanner(t("super.saveCompanyFail"));
@@ -159,7 +169,7 @@ export default function SuperPage() {
     const r = await fetch(`/api/super/companies/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seatLimit, subscriptionEndsAt }),
+      body: JSON.stringify({ name, seatLimit, subscriptionEndsAt }),
     });
     const body = await r.json().catch(() => ({}));
     setSavingId(null);
@@ -274,13 +284,37 @@ export default function SuperPage() {
                   filteredCompanies.map((c) => (
                     <tr key={c.id} className={tableRow}>
                       <td className={td}>
-                        <div className="flex min-w-[10rem] max-w-md items-center gap-2">
+                        <div className="flex min-w-[12rem] max-w-md items-center gap-2">
+                          <input
+                            id={`name-${c.id}`}
+                            type="text"
+                            aria-label={t("super.thName")}
+                            className={`${inputCompact} flex-1 min-w-0 font-semibold`}
+                            title={c.name}
+                            value={draft[c.id]?.name ?? c.name}
+                            onChange={(e) =>
+                              setDraft((prev) => ({
+                                ...prev,
+                                [c.id]: {
+                                  name: e.target.value,
+                                  seatLimit: prev[c.id]?.seatLimit ?? String(c.seatLimit),
+                                  subscriptionInput:
+                                    prev[c.id]?.subscriptionInput ??
+                                    subscriptionEndsAtToDateInput(
+                                      c.subscriptionEndsAt,
+                                      c.timezone
+                                    ),
+                                },
+                              }))
+                            }
+                          />
                           <Link
                             href={`/super/companies/${c.id}`}
-                            className={`${link} truncate text-[0.875rem] font-semibold sm:text-[0.9375rem]`}
-                            title={c.name}
+                            className={`${link} shrink-0 text-[0.8125rem]`}
+                            aria-label={`${c.name} ${t("super.openDetail")}`}
+                            title={t("super.openDetail")}
                           >
-                            {c.name}
+                            ↗
                           </Link>
                           <span className={`${caption} hidden shrink-0 whitespace-nowrap lg:inline`}>
                             {c._count.users}/{c._count.employees}/{c._count.attendanceRecords}
@@ -299,6 +333,7 @@ export default function SuperPage() {
                             setDraft((prev) => ({
                               ...prev,
                               [c.id]: {
+                                name: prev[c.id]?.name ?? c.name,
                                 seatLimit: e.target.value,
                                 subscriptionInput:
                                   prev[c.id]?.subscriptionInput ??
@@ -322,6 +357,7 @@ export default function SuperPage() {
                             setDraft((prev) => ({
                               ...prev,
                               [c.id]: {
+                                name: prev[c.id]?.name ?? c.name,
                                 seatLimit: prev[c.id]?.seatLimit ?? String(c.seatLimit),
                                 subscriptionInput: e.target.value,
                               },
