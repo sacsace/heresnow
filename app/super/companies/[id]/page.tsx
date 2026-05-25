@@ -3,6 +3,7 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
 import {
+  btnDestructive,
   btnPrimaryLg,
   cardBodyLg,
   emptyStateLg,
@@ -68,6 +69,8 @@ export default function SuperCompanyUsersPage() {
   const [nameDraft, setNameDraft] = useState<Record<string, string>>({});
   const [savingNameId, setSavingNameId] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -167,6 +170,39 @@ export default function SuperCompanyUsersPage() {
       prev.map((row) =>
         row.id === u.id ? { ...row, employee: { ...row.employee!, name: j.employee?.name ?? next } } : row
       )
+    );
+  }
+
+  async function deleteUser(u: RowUser) {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(
+        `${u.email}\n\n${t("super.deleteUserConfirm")}`
+      );
+      if (!ok) return;
+    }
+    setDeleteError(null);
+    setDeletingId(u.id);
+    const r = await fetch(`/api/super/companies/${id}/users/${u.id}`, {
+      method: "DELETE",
+    });
+    const j = await r.json().catch(() => ({}));
+    setDeletingId(null);
+    if (!r.ok) {
+      setDeleteError(typeof j.error === "string" ? j.error : t("super.deleteUserFail"));
+      return;
+    }
+    setUsers((prev) => prev.filter((row) => row.id !== u.id));
+    setCompany((prev) =>
+      prev
+        ? {
+            ...prev,
+            _count: {
+              ...prev._count,
+              users: Math.max(0, prev._count.users - 1),
+              employees: Math.max(0, prev._count.employees - (u.employee ? 1 : 0)),
+            },
+          }
+        : prev
     );
   }
 
@@ -274,20 +310,24 @@ export default function SuperCompanyUsersPage() {
       <section>
         <p className={sectionLabelLg}>{t("super.userListTitle")}</p>
         {nameError && <p className={`mb-3 ${errorText}`}>{nameError}</p>}
+        {deleteError && <p className={`mb-3 ${errorText}`}>{deleteError}</p>}
         <div className={tableWrapLg}>
           <table className={tableLg}>
             <thead className={tableHeadLg}>
               <tr>
-                <th className={`${thLg} w-[38%]`}>{t("super.listEmail")}</th>
-                <th className={`${thLg} w-[22%]`}>{t("super.listName")}</th>
-                <th className={`${thLg} w-[22%]`}>{t("super.listRole")}</th>
-                <th className={`${thLg} w-[18%]`}>{t("super.listConsent")}</th>
+                <th className={`${thLg} w-[32%]`}>{t("super.listEmail")}</th>
+                <th className={`${thLg} w-[20%]`}>{t("super.listName")}</th>
+                <th className={`${thLg} w-[18%]`}>{t("super.listRole")}</th>
+                <th className={`${thLg} w-[14%]`}>{t("super.listConsent")}</th>
+                <th className={`${thLg} w-[16%] text-right`}>
+                  {t("super.listActions")}
+                </th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
                 <tr className={tableRow}>
-                  <td colSpan={4} className={emptyStateLg}>
+                  <td colSpan={5} className={emptyStateLg}>
                     {t("common.noData")}
                   </td>
                 </tr>
@@ -334,6 +374,19 @@ export default function SuperCompanyUsersPage() {
                       <span className={statusBadge(u.consentGivenAt ? "APPROVED" : "PENDING", true)}>
                         {u.consentGivenAt ? t("super.consentDone") : t("super.consentPending")}
                       </span>
+                    </td>
+                    <td className={`${tdStatusLg} text-right`}>
+                      <button
+                        type="button"
+                        className={btnDestructive}
+                        disabled={deletingId === u.id}
+                        onClick={() => void deleteUser(u)}
+                        aria-label={`${t("super.deleteUserButton")} — ${u.email}`}
+                      >
+                        {deletingId === u.id
+                          ? t("common.processing")
+                          : t("super.deleteUserButton")}
+                      </button>
                     </td>
                   </tr>
                 ))

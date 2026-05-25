@@ -46,3 +46,37 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; u
 
   return NextResponse.json({ employee });
 }
+
+export async function DELETE(
+  _req: Request,
+  ctx: { params: Promise<{ id: string; userId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id || session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id: companyId, userId } = await ctx.params;
+
+  // 자기 자신은 이 페이지에서 다루는 회사 사용자(SUPER_ADMIN은 companyId가 null)
+  // 가 아니지만 안전망으로 추가 차단한다.
+  if (session.user.id === userId) {
+    return NextResponse.json(
+      { error: "본인 계정은 삭제할 수 없습니다." },
+      { status: 400 }
+    );
+  }
+
+  const target = await prisma.user.findFirst({
+    where: { id: userId, companyId },
+    select: { id: true },
+  });
+  if (!target) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // User → Employee → AttendanceRecord, ApprovalLog 등은 onDelete: Cascade 로 자동 정리.
+  await prisma.user.delete({ where: { id: target.id } });
+
+  return NextResponse.json({ ok: true });
+}

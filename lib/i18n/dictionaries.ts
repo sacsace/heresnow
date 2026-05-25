@@ -273,6 +273,11 @@ export const ko = {
     listName: "표시 이름",
     listRole: "역할",
     listConsent: "동의",
+    listActions: "관리",
+    deleteUserButton: "삭제",
+    deleteUserConfirm:
+      "이 사용자를 삭제하시겠습니까?\n출퇴근 기록·예외·승인 로그도 함께 삭제됩니다.",
+    deleteUserFail: "사용자 삭제에 실패했습니다.",
     consentDone: "완료",
     consentPending: "대기",
     roleCompanyAdmin: "회사 관리자",
@@ -610,6 +615,11 @@ export const en = {
     listName: "Display name",
     listRole: "Role",
     listConsent: "Consent",
+    listActions: "Manage",
+    deleteUserButton: "Delete",
+    deleteUserConfirm:
+      "Delete this user?\nTheir attendance records, exceptions, and approval logs will also be removed.",
+    deleteUserFail: "Failed to delete user.",
     consentDone: "Done",
     consentPending: "Pending",
     roleCompanyAdmin: "Company admin",
