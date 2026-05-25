@@ -312,11 +312,23 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   }
 
   const faceRequired = faceRecognitionEnabled !== false;
+  const faceStatusReady = faceRecognitionEnabled !== null && faceEnrolled !== null;
   const readyForPunch =
-    faceRecognitionEnabled !== null && (!faceRequired || faceEnrolled === true);
+    faceStatusReady && (!faceRequired || faceEnrolled === true);
   const canCheckIn = Boolean(punchStatus?.canCheckIn);
   const canCheckOut = Boolean(punchStatus?.canCheckOut);
   const showCheckIn = readyForPunch && canCheckIn && !punchStatusLoading;
+  /**
+   * 등록 단계는 readyForPunch 가 false 일 수밖에 없으므로(faceEnrolled !== true),
+   * showCheckIn 대신 canCheckIn + 상태 로드 완료 조건만으로 노출한다.
+   * (이전 로직은 등록되지 않은 사용자에게 등록 화면이 영영 보이지 않는 버그가 있었음)
+   */
+  const showFaceEnroll =
+    faceRequired &&
+    faceStatusReady &&
+    faceEnrolled === false &&
+    canCheckIn &&
+    !punchStatusLoading;
   const checkInNotice = checkInBlockMessage();
 
   return (
@@ -348,7 +360,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
           <p className="text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
         )}
 
-        {faceRequired && faceEnrolled === false && showCheckIn && (
+        {showFaceEnroll && (
           <div className="mt-4">
             <FaceCapture
               mode="enroll"

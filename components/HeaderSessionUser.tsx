@@ -13,7 +13,7 @@ export function HeaderSessionUser({ className = "" }: Props) {
 
   if (status === "loading") {
     return (
-      <div className={`${headerUserPanel} ${className}`}>
+      <div className={`hidden sm:flex ${headerUserPanel} ${className}`.trim()}>
         <span className="text-[0.8125rem] text-[var(--apple-label-tertiary)]">…</span>
       </div>
     );
@@ -26,7 +26,10 @@ export function HeaderSessionUser({ className = "" }: Props) {
   const roleLabel = sessionRoleLabel(email, role, t);
 
   return (
-    <div className={`${headerUserPanel} ${className}`} title={`${email} · ${roleLabel}`}>
+    <div
+      className={`hidden sm:flex ${headerUserPanel} ${className}`.trim()}
+      title={`${email} · ${roleLabel}`}
+    >
       <p className={headerUserEmail}>{email}</p>
     </div>
   );
