@@ -74,6 +74,8 @@ export default function SuperPage() {
   const [activeOnly, setActiveOnly] = useState(true);
   const [draft, setDraft] = useState<Record<string, RowDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [savingNameId, setSavingNameId] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [logs, setLogs] = useState<
@@ -144,11 +146,6 @@ export default function SuperPage() {
   async function saveCompany(id: string) {
     const d = draft[id];
     if (!d) return;
-    const name = d.name.trim();
-    if (!name) {
-      setBanner(t("super.saveCompanyFail"));
-      return;
-    }
     const seatLimit = Number.parseInt(d.seatLimit, 10);
     if (!Number.isFinite(seatLimit) || seatLimit < 1) {
       setBanner(t("super.saveCompanyFail"));
@@ -169,7 +166,7 @@ export default function SuperPage() {
     const r = await fetch(`/api/super/companies/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, seatLimit, subscriptionEndsAt }),
+      body: JSON.stringify({ seatLimit, subscriptionEndsAt }),
     });
     const body = await r.json().catch(() => ({}));
     setSavingId(null);
@@ -179,6 +176,65 @@ export default function SuperPage() {
     }
     setBanner(t("super.saveCompanyOk"));
     await load();
+  }
+
+  function startEditName(c: Company) {
+    setDraft((prev) => ({
+      ...prev,
+      [c.id]: {
+        name: prev[c.id]?.name ?? c.name,
+        seatLimit: prev[c.id]?.seatLimit ?? String(c.seatLimit),
+        subscriptionInput:
+          prev[c.id]?.subscriptionInput ??
+          subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone),
+      },
+    }));
+    setEditingNameId(c.id);
+    setBanner(null);
+  }
+
+  function cancelEditName(c: Company) {
+    setDraft((prev) => ({
+      ...prev,
+      [c.id]: {
+        name: c.name,
+        seatLimit: prev[c.id]?.seatLimit ?? String(c.seatLimit),
+        subscriptionInput:
+          prev[c.id]?.subscriptionInput ??
+          subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone),
+      },
+    }));
+    setEditingNameId(null);
+  }
+
+  async function saveCompanyName(c: Company) {
+    const next = (draft[c.id]?.name ?? "").trim();
+    if (!next) {
+      setBanner(t("super.saveCompanyFail"));
+      return;
+    }
+    if (next === c.name) {
+      setEditingNameId(null);
+      return;
+    }
+    setSavingNameId(c.id);
+    setBanner(null);
+    const r = await fetch(`/api/super/companies/${c.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: next }),
+    });
+    const body = await r.json().catch(() => ({}));
+    setSavingNameId(null);
+    if (!r.ok) {
+      setBanner(typeof body.error === "string" ? body.error : t("super.saveCompanyFail"));
+      return;
+    }
+    setEditingNameId(null);
+    setCompanies((prev) =>
+      prev.map((row) => (row.id === c.id ? { ...row, name: next } : row))
+    );
+    setBanner(t("super.saveCompanyOk"));
   }
 
   async function remove(id: string) {
@@ -285,40 +341,89 @@ export default function SuperPage() {
                     <tr key={c.id} className={tableRow}>
                       <td className={td}>
                         <div className="flex min-w-[12rem] max-w-md items-center gap-2">
-                          <input
-                            id={`name-${c.id}`}
-                            type="text"
-                            aria-label={t("super.thName")}
-                            className={`${inputCompact} flex-1 min-w-0 font-semibold`}
-                            title={c.name}
-                            value={draft[c.id]?.name ?? c.name}
-                            onChange={(e) =>
-                              setDraft((prev) => ({
-                                ...prev,
-                                [c.id]: {
-                                  name: e.target.value,
-                                  seatLimit: prev[c.id]?.seatLimit ?? String(c.seatLimit),
-                                  subscriptionInput:
-                                    prev[c.id]?.subscriptionInput ??
-                                    subscriptionEndsAtToDateInput(
-                                      c.subscriptionEndsAt,
-                                      c.timezone
-                                    ),
-                                },
-                              }))
-                            }
-                          />
-                          <Link
-                            href={`/super/companies/${c.id}`}
-                            className={`${link} shrink-0 text-[0.8125rem]`}
-                            aria-label={`${c.name} ${t("super.openDetail")}`}
-                            title={t("super.openDetail")}
-                          >
-                            ↗
-                          </Link>
-                          <span className={`${caption} hidden shrink-0 whitespace-nowrap lg:inline`}>
-                            {c._count.users}/{c._count.employees}/{c._count.attendanceRecords}
-                          </span>
+                          {editingNameId === c.id ? (
+                            <>
+                              <input
+                                id={`name-${c.id}`}
+                                type="text"
+                                aria-label={t("super.thName")}
+                                autoFocus
+                                disabled={savingNameId === c.id}
+                                className={`${inputCompact} flex-1 min-w-0 font-semibold`}
+                                value={draft[c.id]?.name ?? c.name}
+                                onChange={(e) =>
+                                  setDraft((prev) => ({
+                                    ...prev,
+                                    [c.id]: {
+                                      name: e.target.value,
+                                      seatLimit:
+                                        prev[c.id]?.seatLimit ?? String(c.seatLimit),
+                                      subscriptionInput:
+                                        prev[c.id]?.subscriptionInput ??
+                                        subscriptionEndsAtToDateInput(
+                                          c.subscriptionEndsAt,
+                                          c.timezone
+                                        ),
+                                    },
+                                  }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void saveCompanyName(c);
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    cancelEditName(c);
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                disabled={savingNameId === c.id}
+                                className={`${btnGhost} shrink-0 px-2`}
+                                onClick={() => void saveCompanyName(c)}
+                                aria-label={t("super.saveCompany")}
+                                title={t("super.saveCompany")}
+                              >
+                                ✓
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingNameId === c.id}
+                                className={`${btnGhost} shrink-0 px-2 text-[var(--apple-label-secondary)]`}
+                                onClick={() => cancelEditName(c)}
+                                aria-label={t("common.cancel")}
+                                title={t("common.cancel")}
+                              >
+                                ×
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <Link
+                                href={`/super/companies/${c.id}`}
+                                className={`${link} truncate text-[0.875rem] font-semibold sm:text-[0.9375rem]`}
+                                title={c.name}
+                              >
+                                {c.name}
+                              </Link>
+                              <button
+                                type="button"
+                                className={`${btnGhost} shrink-0 px-2 text-[var(--apple-label-secondary)]`}
+                                onClick={() => startEditName(c)}
+                                aria-label={t("super.editNameAria")}
+                                title={t("super.editNameAria")}
+                              >
+                                ✏️
+                              </button>
+                              <span
+                                className={`${caption} hidden shrink-0 whitespace-nowrap lg:inline`}
+                              >
+                                {c._count.users}/{c._count.employees}/{c._count.attendanceRecords}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </td>
                       <td className={`${td} w-[7rem] min-w-[7rem]`}>
