@@ -1,6 +1,8 @@
 import { metaCaption } from "@/lib/statusBadge";
 import type { AdminAttendanceDayRow, AttendancePunchSummary } from "@/lib/adminAttendanceByDay";
 
+type T = (path: string) => string;
+
 export function formatShortDate(date: string, locale = "ko-KR") {
   const [y, m, d] = date.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(locale, {
@@ -19,36 +21,61 @@ export function formatAttendanceDate(date: string, locale = "ko-KR") {
   });
 }
 
-export function locationLabel(p: AttendancePunchSummary) {
+export function locationLabel(p: AttendancePunchSummary, t?: T) {
   if (p.isBusinessTrip && p.businessTripLocation) {
     return p.businessTripLocation;
   }
   if (p.site?.name) {
+    const distance = Math.round(p.distanceFromSite);
+    const distanceText = t
+      ? t("admin.attendanceLocationDistance").replace("{m}", String(distance))
+      : `약 ${distance}m`;
     return (
       <>
         {p.site.name}
-        <span className={metaCaption}>약 {Math.round(p.distanceFromSite)}m</span>
+        <span className={metaCaption}>{distanceText}</span>
       </>
     );
   }
   return null;
 }
 
-export function attendanceFlagsRow(r: Pick<
-  AdminAttendanceDayRow,
-  "isHolidayWork" | "isLate" | "isEarlyLeave" | "isOvertime" | "overtimeMinutes"
->) {
+export function attendanceFlagsRow(
+  r: Pick<
+    AdminAttendanceDayRow,
+    "isHolidayWork" | "isLate" | "isEarlyLeave" | "isOvertime" | "overtimeMinutes"
+  >,
+  t?: T
+) {
   if (!r.isHolidayWork && !r.isLate && !r.isEarlyLeave && !r.isOvertime) {
     return <span className="text-[var(--apple-label-tertiary)]">—</span>;
   }
+  const lbl = (key: string, fallback: string) => (t ? t(key) : fallback);
+  const overtimeMinLabel = (n: number) =>
+    t
+      ? t("admin.attendanceOvertimeMinutes").replace("{n}", String(n))
+      : `${n}분`;
   return (
     <>
-      {r.isHolidayWork && <span className="font-medium text-[var(--apple-blue)]">휴일근무 </span>}
-      {r.isLate && <span className="font-medium text-[var(--apple-orange-dark)]">지각 </span>}
-      {r.isEarlyLeave && <span className="font-medium text-[var(--apple-orange-dark)]">조퇴 </span>}
+      {r.isHolidayWork && (
+        <span className="font-medium text-[var(--apple-blue)]">
+          {lbl("admin.attendanceFlagHolidayWork", "휴일근무")}{" "}
+        </span>
+      )}
+      {r.isLate && (
+        <span className="font-medium text-[var(--apple-orange-dark)]">
+          {lbl("admin.attendanceFlagLate", "지각")}{" "}
+        </span>
+      )}
+      {r.isEarlyLeave && (
+        <span className="font-medium text-[var(--apple-orange-dark)]">
+          {lbl("admin.attendanceFlagEarlyLeave", "조퇴")}{" "}
+        </span>
+      )}
       {r.isOvertime && (
         <span className="font-medium text-[var(--apple-blue)]">
-          초과{r.overtimeMinutes > 0 ? ` ${r.overtimeMinutes}분` : ""}{" "}
+          {lbl("admin.attendanceFlagOvertime", "초과")}
+          {r.overtimeMinutes > 0 ? ` ${overtimeMinLabel(r.overtimeMinutes)}` : ""}{" "}
         </span>
       )}
     </>

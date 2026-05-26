@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/LanguageProvider";
 import { link, mapSurface } from "@/lib/uiStyles";
 
 type StaticMapProps = {
@@ -17,17 +18,19 @@ type StaticMapProps = {
  * - 없으면 `noKeyFallback`: 링크만 또는 iframe 임베드(추가 API 키 불필요)
  */
 export function StaticMap({ lat, lng, label, className, noKeyFallback = "link" }: StaticMapProps) {
+  const { t, locale } = useI18n();
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
   const openUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+  const hl = locale === "en" ? "en" : "ko";
 
   if (!key) {
     if (noKeyFallback === "embed") {
-      const embedSrc = `https://maps.google.com/maps?q=${lat},${lng}&hl=ko&z=16&output=embed`;
+      const embedSrc = `https://maps.google.com/maps?q=${lat},${lng}&hl=${hl}&z=16&output=embed`;
       return (
         <div className={className}>
           <div className={mapSurface}>
             <iframe
-              title={label ?? "현재 위치"}
+              title={label ?? t("common.mapEmbedTitle")}
               src={embedSrc}
               className="h-[clamp(11rem,36vh,22rem)] w-full max-w-full sm:h-[clamp(12rem,40vh,24rem)] md:h-[clamp(14rem,45vh,26rem)]"
               loading="lazy"
@@ -36,14 +39,19 @@ export function StaticMap({ lat, lng, label, className, noKeyFallback = "link" }
             />
           </div>
           <a href={openUrl} target="_blank" rel="noreferrer" className={`mt-2 inline-block text-[0.8125rem] ${link}`}>
-            Google 지도에서 크게 보기
+            {t("common.mapOpenLargeLink")}
           </a>
         </div>
       );
     }
     return (
-      <a href={openUrl} target="_blank" rel="noreferrer" className={`text-[0.8125rem] ${link} ${className ?? ""}`}>
-        지도에서 열기 ({label ?? "위치"})
+      <a
+        href={openUrl}
+        target="_blank"
+        rel="noreferrer"
+        className={`text-[0.8125rem] ${link} ${className ?? ""}`}
+      >
+        {t("common.mapOpenLink")} ({label ?? t("common.mapEmbedTitle")})
       </a>
     );
   }
@@ -54,7 +62,7 @@ export function StaticMap({ lat, lng, label, className, noKeyFallback = "link" }
     <a href={openUrl} target="_blank" rel="noreferrer" className={`block ${className ?? ""}`}>
       <div className={mapSurface}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="위치 미리보기" className="h-auto w-full max-w-full" />
+        <img src={src} alt={t("common.mapPreviewAlt")} className="h-auto w-full max-w-full" />
       </div>
     </a>
   );
