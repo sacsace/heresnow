@@ -4,6 +4,7 @@ import {
   filterAttendanceDayRows,
   type AttendancePunchSummary,
 } from "@/lib/adminAttendanceByDay";
+import { lateMinutesFor, overtimeMinutesFor } from "@/lib/companyWorkSchedule";
 import { prisma } from "@/lib/prisma";
 import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
@@ -55,9 +56,19 @@ export async function GET(req: Request) {
 
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { timezone: true },
+    select: {
+      timezone: true,
+      workStartTime: true,
+      workEndTime: true,
+      workDays: true,
+    },
   });
   const tz = company?.timezone?.trim() || "Asia/Seoul";
+  const schedule = {
+    workStartTime: company?.workStartTime ?? null,
+    workEndTime: company?.workEndTime ?? null,
+    workDays: company?.workDays ?? null,
+  };
 
   const status = url.searchParams.get("status") ?? undefined;
   const from = url.searchParams.get("from") ?? undefined;
@@ -78,8 +89,21 @@ export async function GET(req: Request) {
     },
   });
 
+  // 마이그레이션 이전 기록 보정 — lateMinutes/overtimeMinutes 가 0 이면 회사 스케줄로 즉석 계산
+  const augmented = records.map((r) => {
+    let lateMinutes = r.lateMinutes;
+    let overtimeMinutes = r.overtimeMinutes;
+    if (r.type === "CHECK_IN" && r.isLate && lateMinutes <= 0) {
+      lateMinutes = lateMinutesFor(r.timestamp, tz, schedule);
+    }
+    if (r.type === "CHECK_OUT" && r.isOvertime && overtimeMinutes <= 0) {
+      overtimeMinutes = overtimeMinutesFor(r.timestamp, tz, schedule);
+    }
+    return { ...r, lateMinutes, overtimeMinutes };
+  });
+
   const days = filterAttendanceDayRows(
-    aggregateAttendanceByDay(records, tz, status || undefined),
+    aggregateAttendanceByDay(augmented, tz, status || undefined),
     { from, to, q }
   );
 

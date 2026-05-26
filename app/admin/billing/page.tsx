@@ -17,6 +17,8 @@ import {
   pageSubtitle,
   pageTitle,
   sectionLabel,
+  segmentedBtn,
+  segmentedWrap,
 } from "@/lib/uiStyles";
 import type { BillingPeriod } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
@@ -54,6 +56,7 @@ export default function AdminBillingPage() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
+  const [period, setPeriod] = useState<BillingPeriod>("YEARLY");
 
   const dateLocale = locale === "en" ? "en-US" : "ko-KR";
 
@@ -73,8 +76,13 @@ export default function AdminBillingPage() {
       setError(typeof j.error === "string" ? j.error : t("admin.billingLoadFail"));
       return;
     }
-    setData(j as BillingState);
+    const next = j as BillingState;
+    setData(next);
     setError(null);
+    // 회사의 현재 결제 주기를 토글 기본값으로
+    if (next.company.pricingTier?.billingPeriod) {
+      setPeriod(next.company.pricingTier.billingPeriod);
+    }
   }, [t]);
 
   useEffect(() => {
@@ -112,6 +120,9 @@ export default function AdminBillingPage() {
   const seatsValue = t("admin.billingSeatsValue")
     .replace("{used}", String(employeeCount))
     .replace("{limit}", String(company.seatLimit));
+
+  // 선택된 결제 주기로 필터링한 상위 티어
+  const filteredUpgradeTiers = upgradeTiers.filter((tier) => tier.billingPeriod === period);
 
   return (
     <div className="space-y-10 sm:space-y-12">
@@ -166,6 +177,28 @@ export default function AdminBillingPage() {
         <div className={card}>
           <div className={cardBody}>
             <p className={hint}>{t("admin.billingUpgradeLead")}</p>
+
+            {/* 결제 주기 토글 — 월 / 년 */}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className={label}>{t("admin.billingPeriodToggleLabel")}</span>
+              <div className={segmentedWrap}>
+                <button
+                  type="button"
+                  className={segmentedBtn(period === "MONTHLY")}
+                  onClick={() => setPeriod("MONTHLY")}
+                >
+                  {t("admin.billingPeriodMonthly")}
+                </button>
+                <button
+                  type="button"
+                  className={segmentedBtn(period === "YEARLY")}
+                  onClick={() => setPeriod("YEARLY")}
+                >
+                  {t("admin.billingPeriodYearly")}
+                </button>
+              </div>
+            </div>
+
             {canRequestUpgrade && (
               <div className="mt-4 hig-divider pt-4">
                 <label className={label}>{t("admin.billingNoteLabel")}</label>
@@ -182,14 +215,14 @@ export default function AdminBillingPage() {
             )}
           </div>
           <ul className={groupedCard}>
-            {upgradeTiers.length === 0 && (
+            {filteredUpgradeTiers.length === 0 && (
               <li className={emptyState}>{t("admin.billingNoHigher")}</li>
             )}
-            {upgradeTiers.map((tier, i) => (
+            {filteredUpgradeTiers.map((tier, i) => (
               <li
                 key={tier.id}
                 className={`${groupedRow} flex flex-wrap items-center justify-between gap-2 ${
-                  i < upgradeTiers.length - 1 ? "border-b border-[var(--separator)]" : ""
+                  i < filteredUpgradeTiers.length - 1 ? "border-b border-[var(--separator)]" : ""
                 }`}
               >
                 <span className="text-[0.9375rem]">

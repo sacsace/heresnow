@@ -30,12 +30,8 @@ export async function GET() {
   const employeeCount = await prisma.employee.count({ where: { companyId } });
   const tiers = await prisma.pricingTier.findMany({ orderBy: { sortOrder: "asc" } });
   const currentMaxSeats = company.pricingTier?.maxSeats ?? company.seatLimit;
-  const currentPeriod = company.pricingTier?.billingPeriod;
-  const upgradeTiers = tiers.filter(
-    (t) =>
-      t.maxSeats > currentMaxSeats &&
-      (currentPeriod == null || t.billingPeriod === currentPeriod)
-  );
+  // 결제 주기 무관하게 좌석 상한이 더 큰 모든 티어를 반환 — 클라이언트에서 월/년 선택 후 필터.
+  const upgradeTiers = tiers.filter((t) => t.maxSeats > currentMaxSeats);
 
   const pendingRequest = await prisma.billingRequest.findFirst({
     where: { companyId, status: "PENDING" },

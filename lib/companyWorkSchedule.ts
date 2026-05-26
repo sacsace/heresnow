@@ -106,6 +106,43 @@ export function workDaysToArray(workDays: string | null | undefined): number[] {
 }
 
 /**
+ * CHECK_IN timestamp 와 회사 스케줄로부터 지각 분을 계산.
+ * 휴일이거나 정시 출근 이전이면 0.
+ * (마이그레이션 이전 기록 — lateMinutes 컬럼이 0 — 의 보정용)
+ */
+export function lateMinutesFor(
+  timestamp: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule
+): number {
+  const tz = timeZone.trim() || "UTC";
+  const workDays = parseWorkDays(schedule.workDays);
+  if (!isWorkDay(timestamp, tz, workDays)) return 0;
+  const startMin = parseHHmm(schedule.workStartTime ?? DEFAULT_WORK_START);
+  if (startMin == null) return 0;
+  const nowMin = localMinutesFromDate(timestamp, tz);
+  return Math.max(0, nowMin - startMin);
+}
+
+/**
+ * CHECK_OUT timestamp 와 회사 스케줄로부터 초과근무 분을 계산.
+ * 휴일이거나 정시 퇴근 이전이면 0.
+ */
+export function overtimeMinutesFor(
+  timestamp: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule
+): number {
+  const tz = timeZone.trim() || "UTC";
+  const workDays = parseWorkDays(schedule.workDays);
+  if (!isWorkDay(timestamp, tz, workDays)) return 0;
+  const endMin = parseHHmm(schedule.workEndTime ?? DEFAULT_WORK_END);
+  if (endMin == null) return 0;
+  const nowMin = localMinutesFromDate(timestamp, tz);
+  return Math.max(0, nowMin - endMin);
+}
+
+/**
  * "지금 퇴근하면 조퇴인가?"를 판정.
  * 회사 근무일이며 회사 타임존 기준 현재시각이 workEndTime 이전일 때만 true.
  */
