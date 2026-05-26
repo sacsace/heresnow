@@ -5,6 +5,7 @@ import { AttendanceByEmployeeView } from "@/components/admin/attendance/ByEmploy
 import { AttendanceCalendarView } from "@/components/admin/attendance/CalendarView";
 import { AttendanceChartView } from "@/components/admin/attendance/ChartView";
 import { AttendanceDayTable } from "@/components/admin/attendance/DayTable";
+import { AttendanceIssuesView } from "@/components/admin/attendance/IssuesView";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
@@ -26,7 +27,14 @@ import {
 } from "@/lib/uiStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type AttendanceTab = "daily" | "byEmployee" | "holiday" | "calendar" | "chart" | "map";
+type AttendanceTab =
+  | "daily"
+  | "byEmployee"
+  | "holiday"
+  | "calendar"
+  | "chart"
+  | "map"
+  | "issues";
 
 type SearchFilters = {
   q: string;
@@ -135,6 +143,7 @@ export default function AdminAttendancePage() {
     { id: "calendar", label: t("admin.attendanceTabCalendar") },
     { id: "map", label: t("admin.attendanceTabMap") },
     { id: "chart", label: t("admin.attendanceTabChart") },
+    { id: "issues", label: t("admin.attendanceTabIssues") },
   ];
 
   const subtitleByTab: Record<AttendanceTab, string> = {
@@ -144,6 +153,7 @@ export default function AdminAttendancePage() {
     calendar: t("admin.attendanceTabCalendarLead"),
     map: t("admin.attendanceTabMapLead"),
     chart: t("admin.attendanceTabChartLead"),
+    issues: t("admin.attendanceTabIssuesLead"),
   };
 
   const exportHref = useMemo(() => {
@@ -444,6 +454,13 @@ export default function AdminAttendancePage() {
             dateLocale={dateLocale}
           />
         )
+      ) : tab === "issues" ? (
+        <AttendanceIssuesView
+          from={filters.from || currentMonthRange().from}
+          to={filters.to || currentMonthRange().to}
+          departmentId={filters.departmentId || null}
+          query={filters.q}
+        />
       ) : displayRows.length === 0 ? (
         <p className={emptyState}>{t("admin.attendanceEmpty")}</p>
       ) : tab === "byEmployee" ? (
