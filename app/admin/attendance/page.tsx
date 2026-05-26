@@ -160,6 +160,7 @@ export default function AdminAttendancePage() {
               <input
                 id="attendance-from"
                 type="date"
+                lang={dateLocale}
                 className={`${inputCompact} mt-1.5 sm:min-w-[10rem]`}
                 value={draft.from}
                 onChange={(e) => setDraft((prev) => ({ ...prev, from: e.target.value }))}
@@ -172,6 +173,7 @@ export default function AdminAttendancePage() {
               <input
                 id="attendance-to"
                 type="date"
+                lang={dateLocale}
                 className={`${inputCompact} mt-1.5 sm:min-w-[10rem]`}
                 value={draft.to}
                 onChange={(e) => setDraft((prev) => ({ ...prev, to: e.target.value }))}

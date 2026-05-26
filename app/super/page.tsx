@@ -452,6 +452,7 @@ export default function SuperPage() {
                         <input
                           id={`sub-${c.id}`}
                           type="date"
+                          lang={locale === "en" ? "en-US" : "ko-KR"}
                           aria-label={t("super.thSubscriptionEnd")}
                           className={`${inputCompact} w-[9.5rem]`}
                           value={

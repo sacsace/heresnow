@@ -161,6 +161,7 @@ export function AdminCompanySettings() {
                     <span className={label}>{t("admin.settingsWorkStart")}</span>
                     <input
                       type="time"
+                      lang={locale === "en" ? "en-US" : "ko-KR"}
                       className={`${input} mt-1.5`}
                       value={workStart}
                       disabled={!settings.canEdit || saving}
@@ -171,6 +172,7 @@ export function AdminCompanySettings() {
                     <span className={label}>{t("admin.settingsWorkEnd")}</span>
                     <input
                       type="time"
+                      lang={locale === "en" ? "en-US" : "ko-KR"}
                       className={`${input} mt-1.5`}
                       value={workEnd}
                       disabled={!settings.canEdit || saving}
