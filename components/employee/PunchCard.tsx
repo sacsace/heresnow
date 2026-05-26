@@ -799,13 +799,21 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                       </td>
                       <td
                         className={`${td} hidden whitespace-nowrap font-medium tabular-nums sm:table-cell ${
-                          isUnderHours ? "text-[var(--apple-red)]" : ""
+                          isUnderHours ? "!text-[var(--apple-red)]" : ""
                         }`}
                         title={
                           isUnderHours ? t("admin.attendanceWorkUnderTooltip") : undefined
                         }
                       >
-                        {workHoursText ?? (
+                        {workHoursText ? (
+                          isUnderHours ? (
+                            <span className="font-semibold text-[var(--apple-red)]">
+                              {workHoursText}
+                            </span>
+                          ) : (
+                            workHoursText
+                          )
+                        ) : (
                           <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
                         )}
                       </td>

@@ -92,7 +92,7 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
                 </td>
                 <td
                   className={`${td} whitespace-nowrap text-[0.875rem] font-medium tabular-nums ${
-                    isUnder ? "text-[var(--apple-red)]" : ""
+                    isUnder ? "!text-[var(--apple-red)]" : ""
                   }`}
                   title={
                     isUnder
@@ -100,7 +100,13 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
                       : undefined
                   }
                 >
-                  {workDuration ?? (
+                  {workDuration ? (
+                    isUnder ? (
+                      <span className="font-semibold text-[var(--apple-red)]">{workDuration}</span>
+                    ) : (
+                      workDuration
+                    )
+                  ) : (
                     <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
                   )}
                 </td>
