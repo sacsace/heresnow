@@ -31,6 +31,21 @@ export function formatDurationMinutes(minutes: number, t?: T): string {
     .replace("{m}", String(m));
 }
 
+/**
+ * 근무 시간 — 출근/퇴근 timestamp 차이를 사람 친화적 텍스트로.
+ * 둘 중 하나라도 없으면 null. 음수는 0 으로 보정.
+ */
+export function formatWorkDuration(
+  checkIn: { timestamp: string } | null | undefined,
+  checkOut: { timestamp: string } | null | undefined,
+  t?: T
+): string | null {
+  if (!checkIn || !checkOut) return null;
+  const diffMs = new Date(checkOut.timestamp).getTime() - new Date(checkIn.timestamp).getTime();
+  const totalMin = Math.max(0, Math.round(diffMs / 60000));
+  return formatDurationMinutes(totalMin, t);
+}
+
 export function formatShortDate(date: string, locale = "ko-KR") {
   const [y, m, d] = date.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(locale, {

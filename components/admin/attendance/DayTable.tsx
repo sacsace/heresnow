@@ -5,6 +5,7 @@ import {
   attendanceFlagsRow,
   formatAttendanceDate,
   formatShortDate,
+  formatWorkDuration,
   locationLabel,
 } from "@/components/admin/attendance/helpers";
 import { useI18n } from "@/components/LanguageProvider";
@@ -38,6 +39,7 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
             {showEmployee && <th className={th}>{t("admin.attendanceColEmployee")}</th>}
             <th className={th}>{t("admin.attendanceColCheckIn")}</th>
             <th className={th}>{t("admin.attendanceColCheckOut")}</th>
+            <th className={th}>{t("admin.attendanceColWorkHours")}</th>
             <th className={th}>{t("admin.attendanceColTrip")}</th>
             <th className={th}>{t("admin.attendanceColStatus")}</th>
             <th className={th}>{t("admin.attendanceColFlags")}</th>
@@ -48,6 +50,7 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
           {rows.map((r) => {
             const checkInExtra = r.checkIn ? locationLabel(r.checkIn, t) : null;
             const checkOutExtra = r.checkOut ? locationLabel(r.checkOut, t) : null;
+            const workDuration = formatWorkDuration(r.checkIn, r.checkOut, t);
             return (
               <tr key={r.id} className={trDivider}>
                 <td className={`${td} whitespace-nowrap`}>
@@ -81,6 +84,11 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
                     </>
                   ) : (
                     <span className="text-[var(--apple-label-tertiary)]">—</span>
+                  )}
+                </td>
+                <td className={`${td} whitespace-nowrap text-[0.875rem] font-medium tabular-nums`}>
+                  {workDuration ?? (
+                    <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
                   )}
                 </td>
                 <td className={`${td} text-[0.875rem]`}>

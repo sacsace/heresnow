@@ -18,14 +18,21 @@ type Props = {
   onError?: (message: string) => void;
 };
 
+type InitPhase = "idle" | "loading-models" | "starting-camera" | "ready" | "error";
+
 export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }: Props) {
   const { t } = useI18n();
+  const tRef = useRef(t);
+  tRef.current = t;
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<InitPhase>("idle");
   const [status, setStatus] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [needsTap, setNeedsTap] = useState(false);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
@@ -35,67 +42,70 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
 
   useEffect(() => {
     let cancelled = false;
+    const tx = tRef.current;
 
     function isIosInAppBrowser(): boolean {
       if (typeof navigator === "undefined") return false;
       const ua = navigator.userAgent || "";
-      // iOS 여부
       const ios = /iPad|iPhone|iPod/.test(ua) ||
         (navigator.platform === "MacIntel" && (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints !== undefined && ((navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0) > 1);
       if (!ios) return false;
-      // iOS 인앱 브라우저 식별자(KakaoTalk, NAVER, Line, Instagram, FB, Snapchat 등)
       return /KAKAOTALK|NAVER|Line\//i.test(ua) ||
         /Instagram|FBAN|FBAV|FB_IAB|Snapchat|Twitter|TikTok|wv\)/i.test(ua) ||
-        // iOS Safari가 아닌 모든 WebView (CriOS=Chrome on iOS, FxiOS=Firefox on iOS는 정상 브라우저로 인정)
         (!/Safari\//.test(ua) && !/CriOS\/|FxiOS\/|EdgiOS\//.test(ua));
     }
 
     function deriveErrorMessage(err: unknown): string {
       if (typeof window !== "undefined" && !window.isSecureContext) {
-        return t("employee.faceInsecureContext");
+        return tx("employee.faceInsecureContext");
       }
       if (isIosInAppBrowser()) {
-        return t("employee.faceInAppBrowser");
+        return tx("employee.faceInAppBrowser");
       }
       if (
         typeof navigator === "undefined" ||
         !navigator.mediaDevices ||
         typeof navigator.mediaDevices.getUserMedia !== "function"
       ) {
-        return t("employee.faceUnsupportedBrowser");
+        return tx("employee.faceUnsupportedBrowser");
       }
       if (err instanceof Error) {
         if (err.message.startsWith("FACE_MODELS_FAILED")) {
-          return t("employee.faceModelLoadFail");
+          return tx("employee.faceModelLoadFail");
         }
         if (err.message === "FACE_BACKEND_UNAVAILABLE") {
-          return t("employee.faceBackendUnavailable");
+          return tx("employee.faceBackendUnavailable");
         }
         switch (err.name) {
           case "NotAllowedError":
           case "SecurityError":
-            return t("employee.faceCameraDenied");
+            return tx("employee.faceCameraDenied");
           case "NotFoundError":
           case "OverconstrainedError":
-            return t("employee.faceNoCamera");
+            return tx("employee.faceNoCamera");
           case "NotReadableError":
           case "AbortError":
-            return t("employee.faceCameraInUse");
+            return tx("employee.faceCameraInUse");
           case "TypeError":
-            return t("employee.faceUnsupportedBrowser");
+            return tx("employee.faceUnsupportedBrowser");
         }
       }
-      return t("employee.faceCameraDenied");
+      return tx("employee.faceCameraDenied");
     }
 
     async function init() {
-      // 보안 컨텍스트(HTTPS/localhost) 사전 체크 — 그렇지 않으면 getUserMedia 호출 자체가 막힘
       if (typeof window !== "undefined" && !window.isSecureContext) {
-        if (!cancelled) setCameraError(t("employee.faceInsecureContext"));
+        if (!cancelled) {
+          setCameraError(tx("employee.faceInsecureContext"));
+          setPhase("error");
+        }
         return;
       }
       if (isIosInAppBrowser()) {
-        if (!cancelled) setCameraError(t("employee.faceInAppBrowser"));
+        if (!cancelled) {
+          setCameraError(tx("employee.faceInAppBrowser"));
+          setPhase("error");
+        }
         return;
       }
       if (
@@ -103,13 +113,18 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         !navigator.mediaDevices ||
         typeof navigator.mediaDevices.getUserMedia !== "function"
       ) {
-        if (!cancelled) setCameraError(t("employee.faceUnsupportedBrowser"));
+        if (!cancelled) {
+          setCameraError(tx("employee.faceUnsupportedBrowser"));
+          setPhase("error");
+        }
         return;
       }
 
       try {
+        if (!cancelled) setPhase("loading-models");
         await loadFaceModels();
         if (cancelled) return;
+        if (!cancelled) setPhase("starting-camera");
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
@@ -123,14 +138,19 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         if (video) {
           video.srcObject = stream;
           // iOS Safari는 srcObject 직후 await play()가 거부되는 경우가 잦음.
-          // 이 거부는 치명적 에러가 아니라 사용자 제스처(캡처 버튼 탭) 때
-          // 자연 재생되므로 무시한다. 'loadedmetadata' 시점에 ready 처리.
-          video.play().catch((e) => {
-            console.warn("[face] video.play() rejected (will retry on user gesture)", e);
-          });
+          // 거부 시 사용자에게 "탭하여 시작" 안내(needsTap) — 실제로는 캡처 버튼 탭에서도 자동 재시도된다.
+          video.play().then(
+            () => {
+              if (!cancelled) setNeedsTap(false);
+            },
+            (e) => {
+              console.warn("[face] video.play() rejected (will retry on user gesture)", e);
+              if (!cancelled) setNeedsTap(true);
+            }
+          );
           if (video.readyState >= 1) {
-            // 메타데이터가 이미 있으면 즉시 ready
             setReady(true);
+            if (!cancelled) setPhase("ready");
           }
         }
         setCameraError(null);
@@ -138,6 +158,7 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         console.error("[face] init failed", err);
         if (!cancelled) {
           setCameraError(deriveErrorMessage(err));
+          setPhase("error");
         }
       }
     }
@@ -147,7 +168,31 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
       cancelled = true;
       stopCamera();
     };
-  }, [stopCamera, t]);
+    // tRef.current 사용 — 로케일 전환 시 카메라 재시작 방지
+  }, [stopCamera]);
+
+  /**
+   * iOS Safari 안전망 — onLoadedMetadata / onCanPlay 가 끝내 발생하지 않는 드문 케이스 대비.
+   * 스트림이 붙은 뒤 5초 동안 video.readyState 를 폴링해서 강제로 ready 처리한다.
+   */
+  useEffect(() => {
+    if (ready || cameraError) return;
+    if (!streamRef.current) return;
+    const start = Date.now();
+    const id = window.setInterval(() => {
+      const v = videoRef.current;
+      if (v && v.readyState >= 2) {
+        setReady(true);
+        setPhase("ready");
+        window.clearInterval(id);
+        return;
+      }
+      if (Date.now() - start > 5000) {
+        window.clearInterval(id);
+      }
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [ready, cameraError]);
 
   async function capture() {
     if (!videoRef.current || !ready || busy || disabled) return;
@@ -230,18 +275,44 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         <div className="relative mt-3 overflow-hidden rounded-xl bg-black">
           <video
             ref={videoRef}
-            className="aspect-[4/3] w-full -scale-x-100 object-cover"
+            className="aspect-[4/3] w-full -scale-x-100 cursor-pointer object-cover"
             playsInline
             muted
             autoPlay
             aria-hidden
-            onLoadedMetadata={() => setReady(true)}
-            onCanPlay={() => setReady(true)}
+            onLoadedMetadata={() => {
+              setReady(true);
+              setPhase("ready");
+            }}
+            onCanPlay={() => {
+              setReady(true);
+              setPhase("ready");
+            }}
+            onClick={() => {
+              const v = videoRef.current;
+              if (v && v.paused) {
+                v.play()
+                  .then(() => setNeedsTap(false))
+                  .catch((e) => console.warn("[face] tap play failed", e));
+              }
+            }}
           />
           <div
             className="pointer-events-none absolute inset-8 rounded-[50%] border-2 border-dashed border-white/70"
             aria-hidden
           />
+          {(phase === "loading-models" || phase === "starting-camera") && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white">
+              {phase === "loading-models"
+                ? t("employee.faceLoadingModels")
+                : t("employee.faceStartingCamera")}
+            </div>
+          )}
+          {needsTap && phase !== "loading-models" && phase !== "starting-camera" && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit max-w-[90%] rounded-full bg-white/85 px-3 py-1 text-center text-[0.6875rem] font-semibold text-[var(--foreground)]">
+              {t("employee.faceTapToStart")}
+            </div>
+          )}
         </div>
       )}
 

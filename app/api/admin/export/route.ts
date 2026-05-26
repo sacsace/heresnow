@@ -106,11 +106,20 @@ export async function GET(req: Request) {
     return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
   }
 
+  /** 출근/퇴근 timestamp 차이를 분으로 — 근무시간 셀에 사용 */
+  function workMinutes(d: typeof days[number]): number {
+    if (!d.checkIn || !d.checkOut) return 0;
+    const diffMs =
+      new Date(d.checkOut.timestamp).getTime() - new Date(d.checkIn.timestamp).getTime();
+    return Math.max(0, Math.round(diffMs / 60000));
+  }
+
   const sheetData: Row[] = days.map((d) => ({
     날짜: d.date,
     직원: d.employeeName,
     출근시각: d.checkIn?.time ?? "",
     퇴근시각: d.checkOut?.time ?? "",
+    근무시간: durationText(workMinutes(d)),
     출근위치: locationCell(d.checkIn),
     퇴근위치: locationCell(d.checkOut),
     미완료: d.incomplete ? "Y" : "",
@@ -135,6 +144,7 @@ export async function GET(req: Request) {
           "직원",
           "출근시각",
           "퇴근시각",
+          "근무시간",
           "출근위치",
           "퇴근위치",
           "미완료",

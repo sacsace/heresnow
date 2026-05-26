@@ -14,18 +14,22 @@ import {
   card,
   cardBody,
   cardHeader,
-  groupedCard,
-  groupedRow,
   hint,
   input,
   label,
   segmentedBtn,
   segmentedWrap,
   successText,
+  table,
+  tableHead,
+  tableRow,
+  tableWrap,
+  td,
+  th,
 } from "@/lib/uiStyles";
 import { usePunchStatus } from "@/hooks/usePunchStatus";
 import type { AttendanceType } from "@prisma/client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type RecordRow = {
   id: string;
@@ -77,6 +81,37 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const [records, setRecords] = useState<RecordRow[]>([]);
   const { status: punchStatus, loading: punchStatusLoading, reload: reloadPunchStatus } =
     usePunchStatus();
+
+  /**
+   * records 는 timestamp DESC 정렬. 인접한 CHECK_IN ↔ CHECK_OUT 을 한 줄로 묶어
+   * (출근, 퇴근) 쌍을 만든다. 매칭되지 않은 단독 기록은 한쪽이 null 인 쌍으로 표시.
+   */
+  const pairedRecords = useMemo(() => {
+    const asc = [...records].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    const pairs: { key: string; checkIn: RecordRow | null; checkOut: RecordRow | null }[] = [];
+    let openCheckIn: RecordRow | null = null;
+    for (const r of asc) {
+      if (r.type === "CHECK_IN") {
+        if (openCheckIn) {
+          pairs.push({ key: openCheckIn.id, checkIn: openCheckIn, checkOut: null });
+        }
+        openCheckIn = r;
+      } else {
+        if (openCheckIn) {
+          pairs.push({ key: `${openCheckIn.id}-${r.id}`, checkIn: openCheckIn, checkOut: r });
+          openCheckIn = null;
+        } else {
+          pairs.push({ key: r.id, checkIn: null, checkOut: r });
+        }
+      }
+    }
+    if (openCheckIn) {
+      pairs.push({ key: openCheckIn.id, checkIn: openCheckIn, checkOut: null });
+    }
+    return pairs.reverse();
+  }, [records]);
 
   function checkInBlockMessage(): string | null {
     if (!punchStatus?.checkInBlock) return punchStatus?.checkInMessage ?? null;
@@ -648,64 +683,190 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         <p className="mb-2 px-1 text-[0.8125rem] font-semibold uppercase tracking-wide text-[var(--apple-label-secondary)]">
           {t("employee.recentRecords")}
         </p>
-        <ul className={groupedCard}>
-          {records.map((r, i) => (
-            <li
-              key={r.id}
-              className={`${groupedRow} text-[0.875rem] ${i < records.length - 1 ? "border-b border-[var(--separator)]" : ""}`}
-            >
-              <div className="flex justify-between gap-2">
-                <span className="font-semibold text-[var(--foreground)]">
-                  {r.type === "CHECK_IN" ? t("employee.recordCheckIn") : t("employee.recordCheckOut")}
-                  {r.isBusinessTrip && r.businessTripLocation
-                    ? ` · ${t("employee.recordBusinessTrip")} ${r.businessTripLocation}`
-                    : r.site?.name
-                      ? ` · ${r.site.name}`
-                      : ""}
-                </span>
-                <span className={statusBadge(r.status)}>{r.status}</span>
-              </div>
-              <p className="mt-1 break-words text-[0.75rem] text-[var(--apple-label-secondary)]">
-                {new Date(r.timestamp).toLocaleString(dateLocale)}
-                {r.site && r.distanceFromSite > 0
-                  ? ` · ${t("employee.recordDistance").replace("{m}", String(Math.round(r.distanceFromSite)))}`
-                  : ` · ${r.latitude.toFixed(5)}, ${r.longitude.toFixed(5)}`}
-              </p>
-              {(r.isHolidayWork || r.isLate || r.isEarlyLeave || r.isOvertime) && (
-                <p className="text-xs text-[var(--apple-label-secondary)]">
-                  {r.isHolidayWork && (
-                    <span className="text-violet-700">{t("employee.flagHolidayWork")} </span>
-                  )}
-                  {r.isLate && (
-                    <span className="text-amber-800">
-                      {t("employee.flagLate")}
-                      {r.lateMinutes > 0 ? ` ${r.lateMinutes}${t("employee.flagMinutes")}` : ""}{" "}
-                    </span>
-                  )}
-                  {r.isEarlyLeave && (
-                    <span className="text-amber-800">{t("employee.flagEarlyLeave")} </span>
-                  )}
-                  {r.isOvertime && (
-                    <span className="text-[var(--apple-blue)]">
-                      {t("employee.flagOvertime")}
-                      {r.overtimeMinutes > 0 ? ` ${r.overtimeMinutes}${t("employee.flagMinutes")}` : ""}{" "}
-                    </span>
-                  )}
-                </p>
+        <div className={tableWrap}>
+          <table className={`${table} text-[0.875rem] sm:text-[0.9375rem]`}>
+            <thead className={tableHead}>
+              <tr>
+                <th className={th}>{t("employee.recordsHeaderDate")}</th>
+                <th className={th}>{t("employee.recordsHeaderCheckIn")}</th>
+                <th className={th}>{t("employee.recordsHeaderCheckOut")}</th>
+                <th className={`${th} hidden sm:table-cell`}>
+                  {t("employee.recordsHeaderWorkHours")}
+                </th>
+                <th className={`${th} hidden md:table-cell`}>
+                  {t("employee.recordsHeaderLocation")}
+                </th>
+                <th className={`${th} hidden sm:table-cell`}>
+                  {t("employee.recordsHeaderFlags")}
+                </th>
+                <th className={`${th} text-right sm:text-left`}>
+                  {t("employee.recordsHeaderStatus")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {pairedRecords.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-5 py-8 text-center text-[0.875rem] text-[var(--apple-label-tertiary)] sm:px-6"
+                  >
+                    {t("employee.recordsEmpty")}
+                  </td>
+                </tr>
+              ) : (
+                pairedRecords.map((pair) => {
+                  const anchor = pair.checkIn ?? pair.checkOut!;
+                  const dateText = new Date(anchor.timestamp).toLocaleDateString(dateLocale, {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    weekday: "short",
+                  });
+                  const formatTime = (r: RecordRow) =>
+                    new Date(r.timestamp).toLocaleTimeString(dateLocale, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                  const locationName = anchor.isBusinessTrip && anchor.businessTripLocation
+                    ? `${t("employee.recordBusinessTrip")} ${anchor.businessTripLocation}`
+                    : anchor.site?.name ?? null;
+                  const distanceText =
+                    anchor.site && anchor.distanceFromSite > 0
+                      ? t("employee.recordDistance").replace(
+                          "{m}",
+                          String(Math.round(anchor.distanceFromSite))
+                        )
+                      : !anchor.site
+                        ? `${anchor.latitude.toFixed(5)}, ${anchor.longitude.toFixed(5)}`
+                        : null;
+                  const status = pair.checkOut?.status ?? pair.checkIn?.status ?? "APPROVED";
+                  const isLate = pair.checkIn?.isLate;
+                  const lateMin = pair.checkIn?.lateMinutes ?? 0;
+                  const isEarly = pair.checkOut?.isEarlyLeave;
+                  const isOvertime = pair.checkOut?.isOvertime;
+                  const overtimeMin = pair.checkOut?.overtimeMinutes ?? 0;
+                  const isHoliday = pair.checkIn?.isHolidayWork ?? pair.checkOut?.isHolidayWork;
+                  const trip = pair.checkIn?.isBusinessTrip ? pair.checkIn : null;
+                  const exception = pair.checkOut?.exception ?? pair.checkIn?.exception ?? null;
+
+                  // 근무 시간 — 출근/퇴근이 모두 있을 때만 산출
+                  let workHoursText: string | null = null;
+                  if (pair.checkIn && pair.checkOut) {
+                    const diffMs =
+                      new Date(pair.checkOut.timestamp).getTime() -
+                      new Date(pair.checkIn.timestamp).getTime();
+                    const totalMin = Math.max(0, Math.round(diffMs / 60000));
+                    if (totalMin < 60) {
+                      workHoursText = t("admin.attendanceDurationMinutes").replace(
+                        "{n}",
+                        String(totalMin)
+                      );
+                    } else {
+                      const h = Math.floor(totalMin / 60);
+                      const m = totalMin % 60;
+                      workHoursText =
+                        m === 0
+                          ? t("admin.attendanceDurationHours").replace("{h}", String(h))
+                          : t("admin.attendanceDurationHm")
+                              .replace("{h}", String(h))
+                              .replace("{m}", String(m));
+                    }
+                  }
+
+                  return (
+                    <tr key={pair.key} className={tableRow}>
+                      <td className={`${td} whitespace-nowrap text-[var(--apple-label-secondary)]`}>
+                        {dateText}
+                      </td>
+                      <td className={`${td} whitespace-nowrap font-semibold tabular-nums`}>
+                        {pair.checkIn ? (
+                          formatTime(pair.checkIn)
+                        ) : (
+                          <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
+                        )}
+                      </td>
+                      <td className={`${td} whitespace-nowrap font-semibold tabular-nums`}>
+                        {pair.checkOut ? (
+                          formatTime(pair.checkOut)
+                        ) : (
+                          <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
+                        )}
+                      </td>
+                      <td className={`${td} hidden whitespace-nowrap font-medium tabular-nums sm:table-cell`}>
+                        {workHoursText ?? (
+                          <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
+                        )}
+                      </td>
+                      <td className={`${td} hidden md:table-cell`}>
+                        {locationName || distanceText ? (
+                          <div className="flex flex-col leading-tight">
+                            {locationName && (
+                              <span className="text-[var(--foreground)]">{locationName}</span>
+                            )}
+                            {distanceText && (
+                              <span className="text-[0.75rem] text-[var(--apple-label-tertiary)]">
+                                {distanceText}
+                              </span>
+                            )}
+                            {trip?.businessTripReason && (
+                              <span className="text-[0.75rem] text-[var(--apple-label-tertiary)]">
+                                {t("employee.recordReason")}: {trip.businessTripReason}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[var(--apple-label-tertiary)]">—</span>
+                        )}
+                      </td>
+                      <td className={`${td} hidden text-[0.75rem] sm:table-cell`}>
+                        <div className="flex flex-col gap-0.5 leading-tight">
+                          {isHoliday && (
+                            <span className="font-medium text-violet-700">
+                              {t("employee.flagHolidayWork")}
+                            </span>
+                          )}
+                          {isLate && (
+                            <span className="font-medium text-amber-800">
+                              {t("employee.flagLate")}
+                              {lateMin > 0
+                                ? ` ${lateMin}${t("employee.flagMinutes")}`
+                                : ""}
+                            </span>
+                          )}
+                          {isEarly && (
+                            <span className="font-medium text-amber-800">
+                              {t("employee.flagEarlyLeave")}
+                            </span>
+                          )}
+                          {isOvertime && (
+                            <span className="font-medium text-[var(--apple-blue)]">
+                              {t("employee.flagOvertime")}
+                              {overtimeMin > 0
+                                ? ` ${overtimeMin}${t("employee.flagMinutes")}`
+                                : ""}
+                            </span>
+                          )}
+                          {exception && (
+                            <span className="text-[var(--apple-label-tertiary)]">
+                              {t("employee.recordException")}: {exception.status}
+                            </span>
+                          )}
+                          {!isHoliday && !isLate && !isEarly && !isOvertime && !exception && (
+                            <span className="text-[var(--apple-label-tertiary)]">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className={`${td} whitespace-nowrap text-right sm:text-left`}>
+                        <span className={statusBadge(status)}>{status}</span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
-              {r.isBusinessTrip && r.businessTripReason && (
-                <p className="text-xs text-[var(--apple-label-secondary)]">
-                  {t("employee.recordReason")}: {r.businessTripReason}
-                </p>
-              )}
-              {r.exception && (
-                <p className="text-xs text-[var(--apple-label-secondary)]">
-                  {t("employee.recordException")}: {r.exception.status}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
+            </tbody>
+          </table>
+        </div>
       </section>
       )}
     </div>
