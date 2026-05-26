@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangePasswordCard } from "@/components/account/ChangePasswordCard";
+import { FaceManagementCard } from "@/components/account/FaceManagementCard";
 import { useI18n } from "@/components/LanguageProvider";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { sessionRoleLabel } from "@/lib/sessionDisplay";
@@ -38,6 +39,7 @@ export function AccountPageBody({ email, role }: Props) {
       </section>
 
       <ChangePasswordCard />
+      <FaceManagementCard />
     </div>
   );
 }
