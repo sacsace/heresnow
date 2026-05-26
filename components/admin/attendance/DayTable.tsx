@@ -2,11 +2,13 @@
 
 import { StaticMap } from "@/components/admin/StaticMap";
 import {
+  STANDARD_WORK_MINUTES,
   attendanceFlagsRow,
   formatAttendanceDate,
   formatShortDate,
   formatWorkDuration,
   locationLabel,
+  workMinutesOf,
 } from "@/components/admin/attendance/helpers";
 import { useI18n } from "@/components/LanguageProvider";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
@@ -51,6 +53,8 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
             const checkInExtra = r.checkIn ? locationLabel(r.checkIn, t) : null;
             const checkOutExtra = r.checkOut ? locationLabel(r.checkOut, t) : null;
             const workDuration = formatWorkDuration(r.checkIn, r.checkOut, t);
+            const workMin = workMinutesOf(r.checkIn, r.checkOut);
+            const isUnder = workMin !== null && workMin < STANDARD_WORK_MINUTES;
             return (
               <tr key={r.id} className={trDivider}>
                 <td className={`${td} whitespace-nowrap`}>
@@ -86,7 +90,16 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
                     <span className="text-[var(--apple-label-tertiary)]">—</span>
                   )}
                 </td>
-                <td className={`${td} whitespace-nowrap text-[0.875rem] font-medium tabular-nums`}>
+                <td
+                  className={`${td} whitespace-nowrap text-[0.875rem] font-medium tabular-nums ${
+                    isUnder ? "text-[var(--apple-red)]" : ""
+                  }`}
+                  title={
+                    isUnder
+                      ? t("admin.attendanceWorkUnderTooltip")
+                      : undefined
+                  }
+                >
                   {workDuration ?? (
                     <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
                   )}

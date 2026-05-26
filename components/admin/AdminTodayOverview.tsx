@@ -42,7 +42,7 @@ export function AdminTodayOverview({ companyId, hideViewAllLink }: Props = {}) {
 
   const tiles = [
     { label: t("admin.todayCheckedIn"), value: stats.checkedIn, sub: `/ ${stats.employeeCount}` },
-    { label: t("admin.todayComplete"), value: stats.completePairs, sub: t("admin.todayPairs") },
+    { label: t("admin.todayComplete"), value: stats.completePairs, sub: "" },
     { label: t("admin.todayLate"), value: stats.lateCount, sub: "" },
     { label: t("admin.todayPending"), value: stats.pendingExceptions, sub: "" },
   ];

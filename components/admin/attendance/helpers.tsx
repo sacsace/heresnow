@@ -31,6 +31,22 @@ export function formatDurationMinutes(minutes: number, t?: T): string {
     .replace("{m}", String(m));
 }
 
+/** 회사 표준 일근무 시간 (분). 정시 9-18 = 9시간 기준. */
+export const STANDARD_WORK_MINUTES = 9 * 60;
+
+/**
+ * 근무 분 — 출근/퇴근 timestamp 차이를 분으로.
+ * 둘 중 하나라도 없으면 null. 음수는 0.
+ */
+export function workMinutesOf(
+  checkIn: { timestamp: string } | null | undefined,
+  checkOut: { timestamp: string } | null | undefined
+): number | null {
+  if (!checkIn || !checkOut) return null;
+  const diffMs = new Date(checkOut.timestamp).getTime() - new Date(checkIn.timestamp).getTime();
+  return Math.max(0, Math.round(diffMs / 60000));
+}
+
 /**
  * 근무 시간 — 출근/퇴근 timestamp 차이를 사람 친화적 텍스트로.
  * 둘 중 하나라도 없으면 null. 음수는 0 으로 보정.
@@ -40,9 +56,8 @@ export function formatWorkDuration(
   checkOut: { timestamp: string } | null | undefined,
   t?: T
 ): string | null {
-  if (!checkIn || !checkOut) return null;
-  const diffMs = new Date(checkOut.timestamp).getTime() - new Date(checkIn.timestamp).getTime();
-  const totalMin = Math.max(0, Math.round(diffMs / 60000));
+  const totalMin = workMinutesOf(checkIn, checkOut);
+  if (totalMin === null) return null;
   return formatDurationMinutes(totalMin, t);
 }
 

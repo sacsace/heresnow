@@ -752,19 +752,20 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
 
                   // 근무 시간 — 출근/퇴근이 모두 있을 때만 산출
                   let workHoursText: string | null = null;
+                  let workTotalMin: number | null = null;
                   if (pair.checkIn && pair.checkOut) {
                     const diffMs =
                       new Date(pair.checkOut.timestamp).getTime() -
                       new Date(pair.checkIn.timestamp).getTime();
-                    const totalMin = Math.max(0, Math.round(diffMs / 60000));
-                    if (totalMin < 60) {
+                    workTotalMin = Math.max(0, Math.round(diffMs / 60000));
+                    if (workTotalMin < 60) {
                       workHoursText = t("admin.attendanceDurationMinutes").replace(
                         "{n}",
-                        String(totalMin)
+                        String(workTotalMin)
                       );
                     } else {
-                      const h = Math.floor(totalMin / 60);
-                      const m = totalMin % 60;
+                      const h = Math.floor(workTotalMin / 60);
+                      const m = workTotalMin % 60;
                       workHoursText =
                         m === 0
                           ? t("admin.attendanceDurationHours").replace("{h}", String(h))
@@ -773,6 +774,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                               .replace("{m}", String(m));
                     }
                   }
+                  const STANDARD_WORK_MIN = 9 * 60;
+                  const isUnderHours =
+                    workTotalMin !== null && workTotalMin < STANDARD_WORK_MIN;
 
                   return (
                     <tr key={pair.key} className={tableRow}>
@@ -793,7 +797,14 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                           <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
                         )}
                       </td>
-                      <td className={`${td} hidden whitespace-nowrap font-medium tabular-nums sm:table-cell`}>
+                      <td
+                        className={`${td} hidden whitespace-nowrap font-medium tabular-nums sm:table-cell ${
+                          isUnderHours ? "text-[var(--apple-red)]" : ""
+                        }`}
+                        title={
+                          isUnderHours ? t("admin.attendanceWorkUnderTooltip") : undefined
+                        }
+                      >
                         {workHoursText ?? (
                           <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
                         )}
