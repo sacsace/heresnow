@@ -1,5 +1,6 @@
 "use client";
 
+import { HeaderAccountIconLink } from "@/components/HeaderAccountIconLink";
 import { HeaderSessionUser } from "@/components/HeaderSessionUser";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -10,6 +11,7 @@ export function AppHeaderActions() {
   return (
     <div className={headerActions}>
       <HeaderSessionUser />
+      <HeaderAccountIconLink />
       <LanguageSwitcher />
       <SignOutButton />
     </div>

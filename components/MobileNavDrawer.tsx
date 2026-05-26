@@ -1,6 +1,8 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
+import { sessionRoleLabel } from "@/lib/sessionDisplay";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -29,6 +31,7 @@ type Props = {
 export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -36,6 +39,12 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
     if (exact) return pathname === href;
     return pathname === href || pathname.startsWith(`${href}/`);
   }
+
+  const userEmail = session?.user?.email ?? null;
+  const roleLabel = userEmail
+    ? sessionRoleLabel(userEmail, session?.user?.role ?? "EMPLOYEE", t)
+    : null;
+  const accountActive = isActive("/account");
 
   useEffect(() => {
     setMounted(true);
@@ -123,6 +132,33 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
               })}
             </ul>
           </nav>
+
+          {userEmail && (
+            <div className="border-t border-[var(--separator)] p-2">
+              <Link
+                href="/account"
+                onClick={() => setOpen(false)}
+                aria-current={accountActive ? "page" : undefined}
+                className={`block rounded-[0.625rem] px-3 py-2.5 transition-colors ${
+                  accountActive
+                    ? "bg-[var(--fill-tertiary)] text-[var(--foreground)]"
+                    : "text-[var(--foreground)] hover:bg-[var(--fill-tertiary)]"
+                }`}
+              >
+                <p className="text-[0.8125rem] font-semibold">
+                  {t("common.myAccount")}
+                </p>
+                <p className="mt-0.5 break-all text-[0.75rem] text-[var(--apple-label-secondary)]">
+                  {userEmail}
+                </p>
+                {roleLabel && (
+                  <p className="mt-0.5 text-[0.6875rem] text-[var(--apple-label-tertiary)]">
+                    {roleLabel}
+                  </p>
+                )}
+              </Link>
+            </div>
+          )}
         </aside>
       </div>
     ) : null;

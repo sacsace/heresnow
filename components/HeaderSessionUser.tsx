@@ -4,6 +4,7 @@ import { useI18n } from "@/components/LanguageProvider";
 import { sessionRoleLabel } from "@/lib/sessionDisplay";
 import { headerUserEmail, headerUserPanel } from "@/lib/uiStyles";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 type Props = { className?: string };
 
@@ -26,11 +27,16 @@ export function HeaderSessionUser({ className = "" }: Props) {
   const roleLabel = sessionRoleLabel(email, role, t);
 
   return (
-    <div
-      className={`hidden sm:flex ${headerUserPanel} ${className}`.trim()}
-      title={`${email} · ${roleLabel}`}
+    <Link
+      href="/account"
+      className={`hidden sm:flex ${headerUserPanel} ${className} rounded-md transition-colors hover:bg-[var(--fill-secondary)]`.trim()}
+      title={`${email} · ${roleLabel} — ${t("common.myAccount")}`}
+      aria-label={t("common.myAccount")}
     >
       <p className={headerUserEmail}>{email}</p>
-    </div>
+      <p className="mt-0.5 truncate text-[0.6875rem] leading-tight text-[var(--apple-label-secondary)] sm:text-[0.75rem]">
+        {roleLabel}
+      </p>
+    </Link>
   );
 }
