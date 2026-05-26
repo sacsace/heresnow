@@ -57,7 +57,8 @@ type PunchCardProps = {
 export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProps) {
   const embedded = variant === "embedded";
   const showRecords = showRecentRecords ?? !embedded;
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "ko-KR";
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [checkInMode, setCheckInMode] = useState<"normal" | "businessTrip">("normal");
   const [businessTripLocation, setBusinessTripLocation] = useState("");
@@ -462,7 +463,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
               rows={2}
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              placeholder="선택 입력"
+              placeholder={t("employee.memoPlaceholder")}
             />
             </div>
           </>
@@ -577,9 +578,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
             >
               <div className="flex justify-between gap-2">
                 <span className="font-semibold text-[var(--foreground)]">
-                  {r.type === "CHECK_IN" ? "출근" : "퇴근"}
+                  {r.type === "CHECK_IN" ? t("employee.recordCheckIn") : t("employee.recordCheckOut")}
                   {r.isBusinessTrip && r.businessTripLocation
-                    ? ` · 출장 ${r.businessTripLocation}`
+                    ? ` · ${t("employee.recordBusinessTrip")} ${r.businessTripLocation}`
                     : r.site?.name
                       ? ` · ${r.site.name}`
                       : ""}
@@ -587,9 +588,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                 <span className={statusBadge(r.status)}>{r.status}</span>
               </div>
               <p className="mt-1 break-words text-[0.75rem] text-[var(--apple-label-secondary)]">
-                {new Date(r.timestamp).toLocaleString("ko-KR")}
+                {new Date(r.timestamp).toLocaleString(dateLocale)}
                 {r.site && r.distanceFromSite > 0
-                  ? ` · 거리 약 ${Math.round(r.distanceFromSite)}m`
+                  ? ` · ${t("employee.recordDistance").replace("{m}", String(Math.round(r.distanceFromSite)))}`
                   : ` · ${r.latitude.toFixed(5)}, ${r.longitude.toFixed(5)}`}
               </p>
               {(r.isHolidayWork || r.isLate || r.isEarlyLeave || r.isOvertime) && (
@@ -612,9 +613,15 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                 </p>
               )}
               {r.isBusinessTrip && r.businessTripReason && (
-                <p className="text-xs text-[var(--apple-label-secondary)]">사유: {r.businessTripReason}</p>
+                <p className="text-xs text-[var(--apple-label-secondary)]">
+                  {t("employee.recordReason")}: {r.businessTripReason}
+                </p>
               )}
-              {r.exception && <p className="text-xs text-[var(--apple-label-secondary)]">예외: {r.exception.status}</p>}
+              {r.exception && (
+                <p className="text-xs text-[var(--apple-label-secondary)]">
+                  {t("employee.recordException")}: {r.exception.status}
+                </p>
+              )}
             </li>
           ))}
         </ul>
