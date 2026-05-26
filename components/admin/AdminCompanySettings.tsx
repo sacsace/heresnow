@@ -1,13 +1,13 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
+import { LocaleTimeInput } from "@/components/LocaleTimeInput";
 import { weekdayShortLabel } from "@/lib/companyWorkSchedule";
 import {
   btnPrimary,
   chipBtn,
   errorText,
   groupedCard,
-  input,
   label,
   sectionLabel,
   successText,
@@ -159,24 +159,22 @@ export function AdminCompanySettings() {
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label className="block">
                     <span className={label}>{t("admin.settingsWorkStart")}</span>
-                    <input
-                      type="time"
-                      lang={locale === "en" ? "en-US" : "ko-KR"}
-                      className={`${input} mt-1.5`}
+                    <LocaleTimeInput
                       value={workStart}
+                      onChange={setWorkStart}
                       disabled={!settings.canEdit || saving}
-                      onChange={(e) => setWorkStart(e.target.value)}
+                      ariaLabel={t("admin.settingsWorkStart")}
+                      className="mt-1.5"
                     />
                   </label>
                   <label className="block">
                     <span className={label}>{t("admin.settingsWorkEnd")}</span>
-                    <input
-                      type="time"
-                      lang={locale === "en" ? "en-US" : "ko-KR"}
-                      className={`${input} mt-1.5`}
+                    <LocaleTimeInput
                       value={workEnd}
+                      onChange={setWorkEnd}
                       disabled={!settings.canEdit || saving}
-                      onChange={(e) => setWorkEnd(e.target.value)}
+                      ariaLabel={t("admin.settingsWorkEnd")}
+                      className="mt-1.5"
                     />
                   </label>
                 </div>

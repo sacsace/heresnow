@@ -36,9 +36,26 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
   useEffect(() => {
     let cancelled = false;
 
+    function isIosInAppBrowser(): boolean {
+      if (typeof navigator === "undefined") return false;
+      const ua = navigator.userAgent || "";
+      // iOS 여부
+      const ios = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === "MacIntel" && (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints !== undefined && ((navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0) > 1);
+      if (!ios) return false;
+      // iOS 인앱 브라우저 식별자(KakaoTalk, NAVER, Line, Instagram, FB, Snapchat 등)
+      return /KAKAOTALK|NAVER|Line\//i.test(ua) ||
+        /Instagram|FBAN|FBAV|FB_IAB|Snapchat|Twitter|TikTok|wv\)/i.test(ua) ||
+        // iOS Safari가 아닌 모든 WebView (CriOS=Chrome on iOS, FxiOS=Firefox on iOS는 정상 브라우저로 인정)
+        (!/Safari\//.test(ua) && !/CriOS\/|FxiOS\/|EdgiOS\//.test(ua));
+    }
+
     function deriveErrorMessage(err: unknown): string {
       if (typeof window !== "undefined" && !window.isSecureContext) {
         return t("employee.faceInsecureContext");
+      }
+      if (isIosInAppBrowser()) {
+        return t("employee.faceInAppBrowser");
       }
       if (
         typeof navigator === "undefined" ||
@@ -77,6 +94,10 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         if (!cancelled) setCameraError(t("employee.faceInsecureContext"));
         return;
       }
+      if (isIosInAppBrowser()) {
+        if (!cancelled) setCameraError(t("employee.faceInAppBrowser"));
+        return;
+      }
       if (
         typeof navigator === "undefined" ||
         !navigator.mediaDevices ||
@@ -98,11 +119,20 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          // iOS Safari는 srcObject 직후 await play()가 거부되는 경우가 잦음.
+          // 이 거부는 치명적 에러가 아니라 사용자 제스처(캡처 버튼 탭) 때
+          // 자연 재생되므로 무시한다. 'loadedmetadata' 시점에 ready 처리.
+          video.play().catch((e) => {
+            console.warn("[face] video.play() rejected (will retry on user gesture)", e);
+          });
+          if (video.readyState >= 1) {
+            // 메타데이터가 이미 있으면 즉시 ready
+            setReady(true);
+          }
         }
-        setReady(true);
         setCameraError(null);
       } catch (err) {
         console.error("[face] init failed", err);
@@ -124,7 +154,16 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
     setBusy(true);
     setStatus(null);
     try {
-      const desc = await extractFaceDescriptor(videoRef.current);
+      // iOS Safari: 첫 사용자 제스처 시점에 다시 한번 play() — 정책상 여기서는 거의 항상 성공.
+      const v = videoRef.current;
+      if (v.paused) {
+        try {
+          await v.play();
+        } catch (e) {
+          console.warn("[face] play() on capture failed", e);
+        }
+      }
+      const desc = await extractFaceDescriptor(v);
       if (!desc) {
         const msg = t("employee.faceNotDetected");
         setStatus(msg);
@@ -194,7 +233,10 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
             className="aspect-[4/3] w-full -scale-x-100 object-cover"
             playsInline
             muted
+            autoPlay
             aria-hidden
+            onLoadedMetadata={() => setReady(true)}
+            onCanPlay={() => setReady(true)}
           />
           <div
             className="pointer-events-none absolute inset-8 rounded-[50%] border-2 border-dashed border-white/70"

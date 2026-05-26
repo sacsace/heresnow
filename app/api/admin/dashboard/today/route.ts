@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { fromZonedTime } from "date-fns-tz";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -14,12 +14,21 @@ export async function GET() {
   if (
     role !== "COMPANY_ADMIN" &&
     role !== "HR_MANAGER" &&
-    role !== "APPROVER"
+    role !== "APPROVER" &&
+    role !== "SUPER_ADMIN"
   ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const companyId = session.user.companyId;
+  let companyId = session.user.companyId;
+  if (role === "SUPER_ADMIN") {
+    const url = new URL(req.url);
+    const q = url.searchParams.get("companyId");
+    if (!q) {
+      return NextResponse.json({ error: "companyId required" }, { status: 400 });
+    }
+    companyId = q;
+  }
   if (!companyId) {
     return NextResponse.json({ error: "No company" }, { status: 400 });
   }

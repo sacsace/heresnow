@@ -7,27 +7,74 @@ export type FaceApiModule = typeof import("@vladmandic/face-api");
 let faceApiMod: FaceApiModule | null = null;
 let modelsReady = false;
 let loadPromise: Promise<void> | null = null;
+let activeBackend: "webgl" | "wasm" | "cpu" | null = null;
 
+export function getActiveFaceBackend(): "webgl" | "wasm" | "cpu" | null {
+  return activeBackend;
+}
+
+/**
+ * iOS Safari를 포함한 다양한 환경에서 안정적으로 동작하도록
+ * 백엔드 우선순위: WebGL → WASM(SIMD) → CPU.
+ *
+ * - WebGL: 데스크톱·최신 안드로이드에서 가장 빠름.
+ * - WASM:  iOS Safari WebGL 정밀도 이슈를 회피하는 표준 폴백.
+ * - CPU:   최후의 수단(매우 느림).
+ */
 export async function loadFaceModels(): Promise<void> {
   if (modelsReady) return;
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
     const tf = await import("@tensorflow/tfjs-core");
-    await import("@tensorflow/tfjs-backend-webgl");
+
+    let backendOk = false;
+
+    // 1) WebGL 시도
     try {
+      await import("@tensorflow/tfjs-backend-webgl");
       await tf.setBackend("webgl");
       await tf.ready();
+      activeBackend = "webgl";
+      backendOk = true;
     } catch (e) {
-      // 일부 모바일·구형 브라우저는 WebGL 가속이 없거나 차단됨 → CPU 폴백
-      console.warn("[face] WebGL backend unavailable, falling back to CPU", e);
+      console.warn("[face] WebGL backend unavailable, will try WASM", e);
+    }
+
+    // 2) WASM 폴백 (iOS Safari 권장 경로)
+    if (!backendOk) {
+      try {
+        const wasm = await import("@tensorflow/tfjs-backend-wasm");
+        // CDN에서 WASM 바이너리 로드 — 번들에 .wasm을 끼워넣지 않아도 됨
+        wasm.setWasmPaths(
+          "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/"
+        );
+        await tf.setBackend("wasm");
+        await tf.ready();
+        activeBackend = "wasm";
+        backendOk = true;
+      } catch (e) {
+        console.warn("[face] WASM backend unavailable, will try CPU", e);
+      }
+    }
+
+    // 3) CPU 최후 폴백
+    if (!backendOk) {
       try {
         await tf.setBackend("cpu");
         await tf.ready();
-      } catch {
+        activeBackend = "cpu";
+        backendOk = true;
+      } catch (e) {
+        console.error("[face] CPU backend also failed", e);
         loadPromise = null;
         throw new Error("FACE_BACKEND_UNAVAILABLE");
       }
+    }
+
+    if (!backendOk) {
+      loadPromise = null;
+      throw new Error("FACE_BACKEND_UNAVAILABLE");
     }
 
     faceApiMod = await import("@vladmandic/face-api");
@@ -44,6 +91,7 @@ export async function loadFaceModels(): Promise<void> {
       throw new Error(`FACE_MODELS_FAILED:${detail}`);
     }
     modelsReady = true;
+    console.info(`[face] ready on backend=${activeBackend}`);
   })();
 
   return loadPromise;

@@ -16,15 +16,23 @@ type TodayStats = {
   pendingExceptions: number;
 };
 
-export function AdminTodayOverview() {
+type Props = {
+  /** SUPER_ADMIN이 다른 회사의 대시보드를 볼 때만 지정. 미지정 시 세션 회사 사용. */
+  companyId?: string;
+  /** 우측 상단 "전체 보기" 링크를 숨기고 싶을 때 (super 컨텍스트 등) */
+  hideViewAllLink?: boolean;
+};
+
+export function AdminTodayOverview({ companyId, hideViewAllLink }: Props = {}) {
   const { t } = useI18n();
   const [stats, setStats] = useState<TodayStats | null>(null);
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/admin/dashboard/today");
+    const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
+    const r = await fetch(`/api/admin/dashboard/today${qs}`);
     const j = await r.json().catch(() => ({}));
     if (r.ok) setStats(j as TodayStats);
-  }, []);
+  }, [companyId]);
 
   useEffect(() => {
     void load();
@@ -48,9 +56,11 @@ export function AdminTodayOverview() {
             {stats.date} · {t("admin.todayLead")}
           </p>
         </div>
-        <Link href="/admin/attendance" className={`${link} text-[0.875rem]`}>
-          {t("admin.todayViewAll")} →
-        </Link>
+        {!hideViewAllLink && (
+          <Link href="/admin/attendance" className={`${link} text-[0.875rem]`}>
+            {t("admin.todayViewAll")} →
+          </Link>
+        )}
       </div>
       <div className={statGrid}>
         {tiles.map((tile) => (

@@ -19,10 +19,12 @@ export type DayMapMarker = {
 
 type Props = {
   date: string;
+  /** SUPER_ADMIN이 다른 회사 일자 지도를 조회할 때만 지정. */
+  companyId?: string;
   className?: string;
 };
 
-export function AdminDayAttendanceMap({ date, className }: Props) {
+export function AdminDayAttendanceMap({ date, companyId, className }: Props) {
   const { t } = useI18n();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<import("leaflet").Map | null>(null);
@@ -36,7 +38,8 @@ export function AdminDayAttendanceMap({ date, className }: Props) {
   const loadMarkers = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const r = await fetch(`/api/admin/dashboard/day-map?date=${encodeURIComponent(date)}`);
+    const cidQs = companyId ? `&companyId=${encodeURIComponent(companyId)}` : "";
+    const r = await fetch(`/api/admin/dashboard/day-map?date=${encodeURIComponent(date)}${cidQs}`);
     const j = await r.json().catch(() => ({}));
     setLoading(false);
     if (!r.ok) {
@@ -54,7 +57,7 @@ export function AdminDayAttendanceMap({ date, className }: Props) {
     }
     setMarkers((j as { markers?: DayMapMarker[] }).markers ?? []);
     setTimezone((j as { timezone?: string }).timezone ?? null);
-  }, [date, t]);
+  }, [date, companyId, t]);
 
   useEffect(() => {
     void loadMarkers();

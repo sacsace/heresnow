@@ -28,7 +28,14 @@ function cellState(d: MonthlyEmployeeRow["days"][number]) {
   return "partial" as const;
 }
 
-export function MonthlyAttendanceOverview() {
+type Props = {
+  /** SUPER_ADMIN이 다른 회사의 대시보드를 볼 때만 지정. 미지정 시 세션 회사 사용. */
+  companyId?: string;
+  /** 하단 "전체 보기" 링크 숨김 (super 컨텍스트에선 admin/attendance 라우트가 의미 없음) */
+  hideViewAllLink?: boolean;
+};
+
+export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props = {}) {
   const { t, locale } = useI18n();
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
@@ -42,7 +49,8 @@ export function MonthlyAttendanceOverview() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const r = await fetch(`/api/admin/dashboard/monthly?year=${year}&month=${month}`);
+    const cidQs = companyId ? `&companyId=${encodeURIComponent(companyId)}` : "";
+    const r = await fetch(`/api/admin/dashboard/monthly?year=${year}&month=${month}${cidQs}`);
     const j = await r.json().catch(() => ({}));
     setLoading(false);
     if (!r.ok) {
@@ -51,7 +59,7 @@ export function MonthlyAttendanceOverview() {
       return;
     }
     setData(j as ApiPayload);
-  }, [year, month, t]);
+  }, [year, month, t, companyId]);
 
   useEffect(() => {
     void load();
@@ -284,9 +292,11 @@ export function MonthlyAttendanceOverview() {
               {selectedDate ? ` (${selectedDate})` : ""}
             </button>
           )}
-          <Link href="/admin/attendance" className={link}>
-            {t("admin.monthlyViewAll")}
-          </Link>
+          {!hideViewAllLink && (
+            <Link href="/admin/attendance" className={link}>
+              {t("admin.monthlyViewAll")}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -296,7 +306,12 @@ export function MonthlyAttendanceOverview() {
             {t("admin.monthlyMapTitle")} — {selectedDate}
           </h3>
           <p className="mt-1 text-xs text-[var(--apple-label-secondary)]">{t("admin.monthlyMapLead")}</p>
-          <AdminDayAttendanceMap key={selectedDate} date={selectedDate} className="mt-4" />
+          <AdminDayAttendanceMap
+            key={`${selectedDate}-${companyId ?? "self"}`}
+            date={selectedDate}
+            companyId={companyId}
+            className="mt-4"
+          />
         </section>
       )}
       </div>

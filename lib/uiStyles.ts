@@ -329,42 +329,70 @@ export const pageSubtitleLg =
 export const pageMetaLg =
   "text-[0.875rem] leading-snug text-[var(--apple-label-secondary)] sm:text-[0.9375rem]";
 
+/**
+ * Apple HIG: 그룹 라벨은 대문자가 아닌 sentence case, 약한 색조.
+ * iOS 설정·연락처 앱의 섹션 헤더와 동일한 톤.
+ */
 export const sectionLabelLg =
-  "mb-4 px-1 text-[0.9375rem] font-semibold uppercase tracking-[0.04em] text-[var(--apple-label-secondary)] sm:text-[1rem]";
+  "mb-3 px-1 text-[0.8125rem] font-medium tracking-[0.005em] text-[var(--apple-label-secondary)] sm:text-[0.875rem]";
 
+/**
+ * Apple HIG 카드: 과한 그림자/대형 라운드 대신 hairline ring + 적당한 라운드.
+ * iCloud 웹·App Store Connect의 폼 카드 톤을 차용.
+ */
 export const groupedCardLg =
-  "overflow-hidden rounded-[1.25rem] bg-[var(--grouped-bg)] shadow-sm ring-1 ring-black/[0.04] sm:rounded-[1.375rem]";
-export const cardBodyLg = "px-6 py-6 sm:px-8 sm:py-8";
+  "overflow-hidden rounded-2xl bg-[var(--grouped-bg)] ring-1 ring-black/[0.05]";
+/** 카드 본문 패딩: Apple 폼 카드는 24~28px 안쪽 여백을 가짐. 과거 32~40px → 축소. */
+export const cardBodyLg = "px-5 py-5 sm:px-6 sm:py-6";
 
+/** 라벨: 작고 가벼운 caption 톤. */
 export const labelLg =
-  "block text-[0.9375rem] font-medium leading-snug text-[var(--apple-label-secondary)] sm:text-[1rem]";
+  "block text-[0.8125rem] font-medium tracking-[0.005em] text-[var(--apple-label-secondary)] sm:text-[0.875rem]";
 
+/**
+ * 입력 필드: 두꺼운 알약 대신 Apple 폼 표준에 가까운 36~40px 높이.
+ * 라운드 0.625rem, 글자 15~16px, 클릭/포커스 시 미세 ring으로 활성 표시.
+ */
 export const inputLg =
-  "w-full rounded-xl border-0 bg-[var(--fill-secondary)] px-4 py-3 text-[1rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color] placeholder:text-[var(--apple-label-tertiary)] focus:bg-[var(--fill-secondary-hover)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 sm:min-h-[3rem] sm:text-[1.0625rem]";
+  "w-full min-h-[2.25rem] rounded-[0.625rem] border-0 bg-[var(--fill-secondary)] px-3 py-2 text-[0.9375rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color] placeholder:text-[var(--apple-label-tertiary)] focus:bg-[var(--fill-secondary-hover)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 sm:min-h-[2.5rem] sm:text-[1rem]";
 
-export const inputTableLabelLg = `${inputLg} !w-full min-w-0 !py-2 sm:min-h-0 sm:py-2.5 sm:text-[0.9375rem]`;
+/**
+ * 인라인 편집용 "고스트" 입력. 평소엔 셀과 구분이 거의 없고 포커스/호버 시에만
+ * 미세한 fill로 입력 가능 영역을 시사 — Apple Settings·연락처의 인라인 편집 룩.
+ */
+export const inputTableLabelLg =
+  "w-full min-w-0 rounded-md border-0 bg-transparent px-2 py-1.5 text-[0.9375rem] font-medium text-[var(--foreground)] outline-none transition-[background-color,box-shadow] hover:bg-[var(--fill-secondary)]/70 focus:bg-[var(--fill-secondary)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60 sm:text-[1rem]";
 
+/** Select: input과 동일한 높이/라운드. */
 export const selectLg =
-  "auth-select-field w-full rounded-xl border-0 px-4 py-3 pr-10 text-[1rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 sm:min-h-[3rem] sm:text-[1.0625rem]";
+  "auth-select-field w-full min-h-[2.25rem] rounded-[0.625rem] border-0 px-3 py-2 pr-9 text-[0.9375rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 sm:min-h-[2.5rem] sm:text-[1rem]";
 
+/** 기본 버튼: 입력 리듬에 맞춘 36~40px 높이. */
 export const btnPrimaryLg =
-  "inline-flex min-h-[2.75rem] touch-manipulation items-center justify-center rounded-xl bg-[var(--apple-blue)] px-6 py-3 text-[1rem] font-semibold text-white transition-colors hover:bg-[#0071e3] active:bg-[#0066cc] disabled:opacity-40 sm:min-h-[3rem] sm:text-[1.0625rem]";
+  "inline-flex min-h-[2.25rem] touch-manipulation items-center justify-center rounded-[0.625rem] bg-[var(--apple-blue)] px-5 py-2 text-[0.9375rem] font-semibold text-white transition-colors hover:bg-[#0071e3] active:bg-[#0066cc] disabled:opacity-40 sm:min-h-[2.5rem] sm:px-6 sm:text-[1rem]";
 
-export const formGridLg = "grid grid-cols-1 gap-5 sm:grid-cols-2";
-export const pageStackDetailLg = "space-y-8 sm:space-y-10";
+/** 폼 그리드 간격 축소. */
+export const formGridLg = "grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2";
+export const pageStackDetailLg = "space-y-6 sm:space-y-8";
 
 export const tableWrapLg = `${groupedCardLg} overflow-x-auto`;
-export const tableLg = "min-w-full text-left text-[1rem] sm:text-[1.0625rem]";
+export const tableLg = "min-w-full text-left text-[0.9375rem] sm:text-[1rem]";
+/**
+ * Apple HIG: list headers are sentence case (not all-caps), low-contrast.
+ * 헤더는 구분선 하나만으로 본문과 분리, 톤 다운된 라벨 색.
+ */
 export const tableHeadLg =
-  "border-b border-[var(--separator)] bg-[var(--fill-tertiary)] text-[0.75rem] font-semibold uppercase tracking-[0.06em] text-[var(--apple-label-secondary)] sm:text-[0.8125rem]";
-export const thLg = "px-6 py-4 whitespace-nowrap sm:px-8";
-export const tdLg = "px-6 py-5 align-middle text-[var(--foreground)] sm:px-8";
+  "border-b border-[var(--separator)] text-[0.75rem] font-medium tracking-[0.005em] text-[var(--apple-label-secondary)] sm:text-[0.8125rem]";
+export const thLg =
+  "px-5 py-3 whitespace-nowrap font-medium text-[var(--apple-label-secondary)] sm:px-6";
+/** 행 높이: 56→44pt (Apple Settings.app 행 높이 가이드). py-3에 align-middle. */
+export const tdLg = "px-5 py-3 align-middle text-[var(--foreground)] sm:px-6 sm:py-3.5";
 export const tdEmailLg =
-  `${tdLg} font-mono text-[0.875rem] tracking-tight text-[var(--apple-label-secondary)] sm:text-[0.9375rem]`;
-export const tdNameLg = `${tdLg} text-[0.9375rem] font-semibold sm:text-[1rem]`;
+  `${tdLg} font-mono text-[0.8125rem] tracking-tight text-[var(--apple-label-secondary)] sm:text-[0.875rem]`;
+export const tdNameLg = `${tdLg} text-[0.9375rem] font-medium sm:text-[1rem]`;
 export const tdStatusLg = `${tdLg} whitespace-nowrap`;
 export const emptyStateLg =
-  "px-6 py-12 text-center text-[0.9375rem] text-[var(--apple-label-tertiary)] sm:px-8 sm:text-[1rem]";
+  "px-5 py-10 text-center text-[0.875rem] text-[var(--apple-label-tertiary)] sm:px-6 sm:text-[0.9375rem]";
 
 export const linkBackLg =
   "inline-flex min-h-[2.75rem] items-center text-[0.9375rem] font-semibold text-[var(--apple-blue)] hover:text-[#0071e3] sm:text-[1rem]";

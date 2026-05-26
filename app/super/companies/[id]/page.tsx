@@ -1,5 +1,8 @@
 "use client";
 
+import { AdminTodayOverview } from "@/components/admin/AdminTodayOverview";
+import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceOverview";
+import { SuperCompanyAttendanceStats } from "@/components/super/SuperCompanyAttendanceStats";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
 import {
@@ -71,6 +74,7 @@ export default function SuperCompanyUsersPage() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"users" | "dashboard" | "stats">("users");
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -237,6 +241,49 @@ export default function SuperCompanyUsersPage() {
         }
       />
 
+      <div
+        role="tablist"
+        aria-label={t("super.companyUsersTitle")}
+        className="flex w-full gap-1 overflow-x-auto rounded-xl bg-[var(--fill-secondary)] p-1 sm:w-auto sm:self-start sm:overflow-visible"
+      >
+        {(["users", "dashboard", "stats"] as const).map((tabKey) => {
+          const labelKey =
+            tabKey === "users"
+              ? "super.tabUsers"
+              : tabKey === "dashboard"
+                ? "super.tabDashboard"
+                : "super.tabStats";
+          const active = tab === tabKey;
+          return (
+            <button
+              key={tabKey}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(tabKey)}
+              className={
+                active
+                  ? "min-h-[2.25rem] flex-1 whitespace-nowrap rounded-lg bg-[var(--background)] px-4 text-[0.9375rem] font-semibold text-[var(--foreground)] shadow-sm sm:flex-none"
+                  : "min-h-[2.25rem] flex-1 whitespace-nowrap rounded-lg px-4 text-[0.9375rem] font-medium text-[var(--apple-label-secondary)] hover:text-[var(--foreground)] sm:flex-none"
+              }
+            >
+              {t(labelKey)}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "dashboard" && (
+        <div className="space-y-8">
+          <AdminTodayOverview companyId={id} hideViewAllLink />
+          <MonthlyAttendanceOverview companyId={id} hideViewAllLink />
+        </div>
+      )}
+
+      {tab === "stats" && <SuperCompanyAttendanceStats companyId={id} />}
+
+      {tab === "users" && (
+      <>
       <section>
         <p className={sectionLabelLg}>{t("super.addUserSection")}</p>
         <div className={groupedCardLg}>
@@ -248,7 +295,7 @@ export default function SuperCompanyUsersPage() {
                   type="email"
                   required
                   autoComplete="off"
-                  className={`${inputLg} mt-2`}
+                  className={`${inputLg} mt-1.5`}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -257,7 +304,7 @@ export default function SuperCompanyUsersPage() {
                 <label className={labelLg}>{t("super.addName")}</label>
                 <input
                   required
-                  className={`${inputLg} mt-2`}
+                  className={`${inputLg} mt-1.5`}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
@@ -265,7 +312,7 @@ export default function SuperCompanyUsersPage() {
               <div>
                 <label className={labelLg}>{t("super.addRole")}</label>
                 <select
-                  className={`${selectLg} mt-2`}
+                  className={`${selectLg} mt-1.5`}
                   value={role}
                   onChange={(e) => setRole(e.target.value as (typeof ADD_ROLES)[number])}
                 >
@@ -283,7 +330,7 @@ export default function SuperCompanyUsersPage() {
                   required
                   minLength={8}
                   autoComplete="new-password"
-                  className={`${inputLg} mt-2`}
+                  className={`${inputLg} mt-1.5`}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -368,10 +415,10 @@ export default function SuperCompanyUsersPage() {
                       )}
                     </td>
                     <td className={tdStatusLg}>
-                      <span className={roleBadge(u.role, true)}>{roleLabel(u.role)}</span>
+                      <span className={roleBadge(u.role)}>{roleLabel(u.role)}</span>
                     </td>
                     <td className={tdStatusLg}>
-                      <span className={statusBadge(u.consentGivenAt ? "APPROVED" : "PENDING", true)}>
+                      <span className={statusBadge(u.consentGivenAt ? "APPROVED" : "PENDING")}>
                         {u.consentGivenAt ? t("super.consentDone") : t("super.consentPending")}
                       </span>
                     </td>
@@ -395,6 +442,8 @@ export default function SuperCompanyUsersPage() {
           </table>
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }
