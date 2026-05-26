@@ -43,6 +43,7 @@ type RecordRow = {
   isEarlyLeave: boolean;
   isOvertime: boolean;
   isHolidayWork: boolean;
+  lateMinutes: number;
   overtimeMinutes: number;
   site: { name: string } | null;
   exception: { status: string } | null;
@@ -283,7 +284,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     setBusy(false);
   }
 
-  async function submitCheckOut() {
+  async function submitCheckOut(faceDescriptor?: number[]) {
     // 조퇴(정규 퇴근시각 이전 퇴근) 인 경우 사유 필수 — 클라이언트 선검증으로 즉시 안내
     if (punchStatus?.earlyLeaveExpected && !earlyLeaveReason.trim()) {
       setMsg(t("employee.earlyLeaveReasonRequired"));
@@ -309,6 +310,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
           accuracy: acc,
           memo: memo.trim() || undefined,
           earlyLeaveReason: earlyLeaveReason.trim() || undefined,
+          ...(faceDescriptor ? { faceDescriptor } : {}),
         }),
       });
       const j = await res.json().catch(() => ({}));
@@ -609,19 +611,31 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                 />
               </div>
             )}
-            <button
-              type="button"
-              disabled={
-                busy ||
-                (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim())
-              }
-              onClick={() => void submitCheckOut()}
-              className={btnPrimary + " w-full min-h-[3rem] py-3.5 text-[1.0625rem] sm:min-h-[3.25rem]"}
-            >
-              {punchStatus?.earlyLeaveExpected
-                ? t("employee.earlyLeaveSubmitButton")
-                : t("employee.checkOutOnly")}
-            </button>
+            {faceRequired ? (
+              <FaceCapture
+                mode="verify"
+                disabled={
+                  busy ||
+                  (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim())
+                }
+                onVerified={(descriptor) => void submitCheckOut(descriptor)}
+                onError={setMsg}
+              />
+            ) : (
+              <button
+                type="button"
+                disabled={
+                  busy ||
+                  (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim())
+                }
+                onClick={() => void submitCheckOut()}
+                className={btnPrimary + " w-full min-h-[3rem] py-3.5 text-[1.0625rem] sm:min-h-[3.25rem]"}
+              >
+                {punchStatus?.earlyLeaveExpected
+                  ? t("employee.earlyLeaveSubmitButton")
+                  : t("employee.checkOutOnly")}
+              </button>
+            )}
           </div>
         )}
 
@@ -663,7 +677,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                     <span className="text-violet-700">{t("employee.flagHolidayWork")} </span>
                   )}
                   {r.isLate && (
-                    <span className="text-amber-800">{t("employee.flagLate")} </span>
+                    <span className="text-amber-800">
+                      {t("employee.flagLate")}
+                      {r.lateMinutes > 0 ? ` ${r.lateMinutes}${t("employee.flagMinutes")}` : ""}{" "}
+                    </span>
                   )}
                   {r.isEarlyLeave && (
                     <span className="text-amber-800">{t("employee.flagEarlyLeave")} </span>

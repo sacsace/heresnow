@@ -13,6 +13,7 @@ export type AttendancePunchSummary = {
   isEarlyLeave: boolean;
   isOvertime: boolean;
   isHolidayWork: boolean;
+  lateMinutes: number;
   overtimeMinutes: number;
   isBusinessTrip: boolean;
   businessTripLocation: string | null;
@@ -38,6 +39,7 @@ export type AdminAttendanceDayRow = {
   isEarlyLeave: boolean;
   isOvertime: boolean;
   isHolidayWork: boolean;
+  lateMinutes: number;
   overtimeMinutes: number;
 };
 
@@ -54,6 +56,7 @@ type RecordInput = {
   isEarlyLeave: boolean;
   isOvertime: boolean;
   isHolidayWork: boolean;
+  lateMinutes: number;
   overtimeMinutes: number;
   memo: string | null;
   isBusinessTrip: boolean;
@@ -76,6 +79,7 @@ function toPunchSummary(r: RecordInput, timeZone: string): AttendancePunchSummar
     isEarlyLeave: r.isEarlyLeave,
     isOvertime: r.isOvertime,
     isHolidayWork: r.isHolidayWork,
+    lateMinutes: r.lateMinutes,
     overtimeMinutes: r.overtimeMinutes,
     isBusinessTrip: r.isBusinessTrip,
     businessTripLocation: r.businessTripLocation,
@@ -104,6 +108,7 @@ function buildDayRow(
   const isLate = baseIsHoliday ? false : checkIn?.isLate ?? false;
   const isEarlyLeave = baseIsHoliday ? false : checkOut?.isEarlyLeave ?? false;
   const isOvertime = baseIsHoliday ? false : checkOut?.isOvertime ?? false;
+  const lateMinutes = baseIsHoliday ? 0 : checkIn?.lateMinutes ?? 0;
   const overtimeMinutes = baseIsHoliday ? 0 : checkOut?.overtimeMinutes ?? 0;
 
   return {
@@ -121,6 +126,7 @@ function buildDayRow(
     isEarlyLeave,
     isOvertime,
     isHolidayWork: baseIsHoliday,
+    lateMinutes,
     overtimeMinutes,
   };
 }

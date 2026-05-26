@@ -71,7 +71,12 @@ export function locationLabel(p: AttendancePunchSummary, t?: T) {
 export function attendanceFlagsRow(
   r: Pick<
     AdminAttendanceDayRow,
-    "isHolidayWork" | "isLate" | "isEarlyLeave" | "isOvertime" | "overtimeMinutes"
+    | "isHolidayWork"
+    | "isLate"
+    | "isEarlyLeave"
+    | "isOvertime"
+    | "lateMinutes"
+    | "overtimeMinutes"
   >,
   t?: T
 ) {
@@ -79,43 +84,41 @@ export function attendanceFlagsRow(
     return <span className="text-[var(--apple-label-tertiary)]">—</span>;
   }
   const lbl = (key: string, fallback: string) => (t ? t(key) : fallback);
+
+  const lateLabel = lbl("admin.attendanceFlagLate", "지각");
+  const overtimeLabel = lbl("admin.attendanceFlagOvertime", "초과 근무");
+  const earlyLabel = lbl("admin.attendanceFlagEarlyLeave", "조퇴");
+  const holidayLabel = lbl("admin.attendanceFlagHolidayWork", "휴일근무");
+
+  const lateText =
+    r.isLate && r.lateMinutes > 0
+      ? `${lateLabel} ${formatDurationMinutes(r.lateMinutes, t)}`
+      : r.isLate
+        ? lateLabel
+        : null;
+
   const overtimeText =
-    r.overtimeMinutes > 0
-      ? t
-        ? t("admin.attendanceFlagOverBy").replace("{d}", formatDurationMinutes(r.overtimeMinutes, t))
-        : `초과 ${formatDurationMinutes(r.overtimeMinutes)}`
-      : "";
-
-  // 지각 + 초과가 함께면 "지각 (초과 X시간 Y분)" 한 칩으로 결합 표기
-  const lateChip = r.isLate ? (
-    <span className="font-medium text-[var(--apple-orange-dark)]">
-      {lbl("admin.attendanceFlagLate", "지각")}
-      {overtimeText ? ` (${overtimeText})` : ""}{" "}
-    </span>
-  ) : null;
-
-  // 지각 없이 초과만 있을 때
-  const overtimeChip = !r.isLate && r.isOvertime ? (
-    <span className="font-medium text-[var(--apple-blue)]">
-      {overtimeText || lbl("admin.attendanceFlagOvertime", "초과")}{" "}
-    </span>
-  ) : null;
+    r.isOvertime && r.overtimeMinutes > 0
+      ? `${overtimeLabel} ${formatDurationMinutes(r.overtimeMinutes, t)}`
+      : r.isOvertime
+        ? overtimeLabel
+        : null;
 
   return (
-    <>
+    <span className="flex flex-col items-start gap-0.5 leading-tight">
       {r.isHolidayWork && (
-        <span className="font-medium text-[var(--apple-blue)]">
-          {lbl("admin.attendanceFlagHolidayWork", "휴일근무")}{" "}
-        </span>
+        <span className="font-medium text-[var(--apple-blue)]">{holidayLabel}</span>
       )}
-      {lateChip}
+      {lateText && (
+        <span className="font-medium text-[var(--apple-orange-dark)]">{lateText}</span>
+      )}
       {r.isEarlyLeave && (
-        <span className="font-medium text-[var(--apple-orange-dark)]">
-          {lbl("admin.attendanceFlagEarlyLeave", "조퇴")}{" "}
-        </span>
+        <span className="font-medium text-[var(--apple-orange-dark)]">{earlyLabel}</span>
       )}
-      {overtimeChip}
-    </>
+      {overtimeText && (
+        <span className="font-medium text-[var(--apple-blue)]">{overtimeText}</span>
+      )}
+    </span>
   );
 }
 

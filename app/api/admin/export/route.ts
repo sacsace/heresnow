@@ -63,9 +63,13 @@ export async function GET(req: Request) {
   const from = url.searchParams.get("from") ?? undefined;
   const to = url.searchParams.get("to") ?? undefined;
   const q = url.searchParams.get("q") ?? undefined;
+  const departmentId = url.searchParams.get("departmentId") ?? undefined;
 
   const records = await prisma.attendanceRecord.findMany({
-    where: { companyId },
+    where: {
+      companyId,
+      ...(departmentId ? { employee: { departmentId } } : {}),
+    },
     orderBy: { timestamp: "desc" },
     take: 5000,
     include: {
@@ -112,6 +116,7 @@ export async function GET(req: Request) {
     미완료: d.incomplete ? "Y" : "",
     상태: d.status,
     지각: d.isLate ? "Y" : "",
+    지각시간: durationText(d.lateMinutes),
     조퇴: d.isEarlyLeave ? "Y" : "",
     초과근무: d.isOvertime ? "Y" : "",
     초과시간: durationText(d.overtimeMinutes),
@@ -135,6 +140,7 @@ export async function GET(req: Request) {
           "미완료",
           "상태",
           "지각",
+          "지각시간",
           "조퇴",
           "초과근무",
           "초과시간",

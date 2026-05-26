@@ -200,6 +200,19 @@ export const searchToolbar = "flex flex-col gap-3 sm:flex-row sm:items-end sm:ju
 
 export const searchFieldWrap = "min-w-0 w-full sm:max-w-sm";
 
+/**
+ * 가로형 검색/필터 행 — 필드들은 같은 baseline (items-end) 으로 정렬되고
+ * 좁은 화면에서는 자동으로 줄바꿈된다. `searchActions` 와 함께 사용해
+ * 액션 버튼을 자연스럽게 오른쪽으로 밀어낸다.
+ */
+export const searchFiltersRow = "flex flex-wrap items-end gap-x-3 gap-y-3";
+
+/** 필드 셀 — 라벨 + 입력 한 묶음. 좁은 화면에서 자체 폭을 가짐. */
+export const searchFieldCol = "flex min-w-0 flex-col gap-1.5";
+
+/** 액션 버튼 클러스터 — 자동으로 우측 정렬 */
+export const searchActions = "ml-auto flex flex-wrap items-end gap-2 pt-1.5 sm:pt-0";
+
 export const filterCheckboxLabel =
   "inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-[0.8125rem] font-medium text-[var(--apple-label-secondary)]";
 

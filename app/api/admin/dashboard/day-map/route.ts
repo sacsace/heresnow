@@ -3,13 +3,18 @@ import { calendarDayInTz, timeInTz } from "@/lib/adminMonthlyAttendance";
 import { prisma } from "@/lib/prisma";
 import { fromZonedTime } from "date-fns-tz";
 import { NextResponse } from "next/server";
-import { z } from "zod";
-
-const querySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
 
 const DAY_PAD_MS = 36 * 60 * 60 * 1000;
+/** 기간 조회 상한 (영업일·주말 포함). 너무 큰 범위는 마커 과다로 가독성이 떨어진다. */
+const RANGE_MAX_DAYS = 31;
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function diffDaysInclusive(from: string, to: string): number {
+  const a = new Date(`${from}T00:00:00Z`);
+  const b = new Date(`${to}T00:00:00Z`);
+  return Math.floor((b.getTime() - a.getTime()) / 86_400_000) + 1;
+}
 
 export async function GET(req: Request) {
   try {
@@ -37,12 +42,42 @@ export async function GET(req: Request) {
     }
     if (!companyId) return NextResponse.json({ error: "No company" }, { status: 400 });
 
-    const parsed = querySchema.safeParse({ date: url.searchParams.get("date") });
-    if (!parsed.success) {
-      return NextResponse.json({ error: "date (YYYY-MM-DD) required" }, { status: 400 });
-    }
+    // 단일 날짜(date=YYYY-MM-DD) 또는 기간(from/to) 모드를 지원
+    const dateParam = url.searchParams.get("date");
+    const fromParam = url.searchParams.get("from");
+    const toParam = url.searchParams.get("to");
 
-    const { date } = parsed.data;
+    let from: string;
+    let to: string;
+    if (dateParam && DATE_RE.test(dateParam)) {
+      from = dateParam;
+      to = dateParam;
+    } else if (fromParam && toParam && DATE_RE.test(fromParam) && DATE_RE.test(toParam)) {
+      if (fromParam > toParam) {
+        return NextResponse.json(
+          { error: "INVALID_RANGE", message: "시작일이 종료일보다 늦을 수 없습니다." },
+          { status: 400 }
+        );
+      }
+      const days = diffDaysInclusive(fromParam, toParam);
+      if (days > RANGE_MAX_DAYS) {
+        return NextResponse.json(
+          {
+            error: "RANGE_TOO_LARGE",
+            message: `기간은 최대 ${RANGE_MAX_DAYS}일까지 조회할 수 있습니다.`,
+            maxDays: RANGE_MAX_DAYS,
+          },
+          { status: 400 }
+        );
+      }
+      from = fromParam;
+      to = toParam;
+    } else {
+      return NextResponse.json(
+        { error: "date(YYYY-MM-DD) 또는 from/to(YYYY-MM-DD) 가 필요합니다." },
+        { status: 400 }
+      );
+    }
 
     const company = await prisma.company.findUnique({
       where: { id: companyId },
@@ -53,16 +88,16 @@ export async function GET(req: Request) {
     }
 
     const tz = company.timezone?.trim() || "Asia/Seoul";
-    const dayStart = fromZonedTime(`${date} 00:00:00`, tz);
-    const dayEnd = fromZonedTime(`${date} 23:59:59.999`, tz);
+    const rangeStart = fromZonedTime(`${from} 00:00:00`, tz);
+    const rangeEnd = fromZonedTime(`${to} 23:59:59.999`, tz);
 
     const records = await prisma.attendanceRecord.findMany({
       where: {
         companyId,
         type: "CHECK_IN",
         timestamp: {
-          gte: new Date(dayStart.getTime() - DAY_PAD_MS),
-          lte: new Date(dayEnd.getTime() + DAY_PAD_MS),
+          gte: new Date(rangeStart.getTime() - DAY_PAD_MS),
+          lte: new Date(rangeEnd.getTime() + DAY_PAD_MS),
         },
       },
       orderBy: { timestamp: "asc" },
@@ -79,20 +114,29 @@ export async function GET(req: Request) {
       },
     });
 
-    const byEmployee = new Map<string, (typeof records)[number]>();
+    /**
+     * 직원별 + 일자별 첫 체크인만 마커로 사용.
+     * - 단일 날짜: 직원 1명당 1개 마커 (기존 동작과 동일)
+     * - 기간: 직원 N명 × 며칠 = 직원·일자별 마커
+     */
+    type MarkerSource = (typeof records)[number] & { day: string };
+    const seen = new Map<string, MarkerSource>();
     for (const r of records) {
-      if (calendarDayInTz(r.timestamp, tz) !== date) continue;
-      if (!byEmployee.has(r.employeeId)) {
-        byEmployee.set(r.employeeId, r);
+      const day = calendarDayInTz(r.timestamp, tz);
+      if (day < from || day > to) continue;
+      const key = `${r.employeeId}:${day}`;
+      if (!seen.has(key)) {
+        seen.set(key, { ...r, day });
       }
     }
 
-    const markers = [...byEmployee.values()].map((r) => ({
+    const markers = [...seen.values()].map((r) => ({
       employeeId: r.employeeId,
       employeeName: r.employee.name,
       attendanceId: r.id,
       timestamp: r.timestamp.toISOString(),
       checkInTime: timeInTz(r.timestamp, tz),
+      date: r.day,
       latitude: r.latitude,
       longitude: r.longitude,
       isBusinessTrip: r.isBusinessTrip,
@@ -101,7 +145,10 @@ export async function GET(req: Request) {
     }));
 
     return NextResponse.json({
-      date,
+      from,
+      to,
+      // 하위 호환: 단일 날짜 모드에서는 date 필드도 함께 노출
+      ...(from === to ? { date: from } : {}),
       timezone: tz,
       count: markers.length,
       markers,

@@ -44,6 +44,7 @@ export type MvsAttendanceEventV1 = {
   isEarlyLeave: boolean;
   isOvertime: boolean;
   isHolidayWork: boolean;
+  lateMinutes: number;
   overtimeMinutes: number;
 };
 

@@ -61,6 +61,7 @@ export function buildMvsAttendancePayload(
     isEarlyLeave: record.isEarlyLeave,
     isOvertime: record.isOvertime,
     isHolidayWork: record.isHolidayWork,
+    lateMinutes: record.lateMinutes,
     overtimeMinutes: record.overtimeMinutes,
   };
 }

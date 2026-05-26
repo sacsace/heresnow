@@ -233,6 +233,8 @@ model AttendanceRecord {
   isOvertime         Boolean  @default(false)
   /// 비근무일(휴일) 출퇴근
   isHolidayWork      Boolean  @default(false)
+  /// 지각 분 (출근 시, 근무일만, 정시 출근 기준 nowMin - workStartMin)
+  lateMinutes        Int      @default(0)
   /// 초과 근무 분(퇴근 시, 근무일만)
   overtimeMinutes    Int      @default(0)
 

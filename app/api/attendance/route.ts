@@ -140,33 +140,42 @@ export async function POST(req: Request) {
   const faceRequired = company.faceRecognitionEnabled;
   let faceMatched = false;
 
-  if (type === "CHECK_IN") {
-    if (faceRequired) {
-      if (!employee.faceEnrolledAt) {
-        return NextResponse.json(
-          { error: "출근 전 안면 등록이 필요합니다." },
-          { status: 400 }
-        );
-      }
-      const probe = parseFaceDescriptor(faceDescriptor);
-      const stored = parseFaceDescriptor(employee.faceDescriptor);
-      if (!probe || !stored) {
-        return NextResponse.json(
-          { error: "안면 인식 정보가 없습니다. 다시 인식해 주세요." },
-          { status: 400 }
-        );
-      }
-      if (!isFaceMatch(stored, probe)) {
-        return NextResponse.json(
-          {
-            error: "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다.",
-          },
-          { status: 403 }
-        );
-      }
-      faceMatched = true;
+  // 안면 인식 검증 — 출근/퇴근 모두 동일 정책 적용
+  if (faceRequired) {
+    if (!employee.faceEnrolledAt) {
+      return NextResponse.json(
+        {
+          error:
+            type === "CHECK_IN"
+              ? "출근 전 안면 등록이 필요합니다."
+              : "퇴근 전 안면 등록이 필요합니다.",
+        },
+        { status: 400 }
+      );
     }
+    const probe = parseFaceDescriptor(faceDescriptor);
+    const stored = parseFaceDescriptor(employee.faceDescriptor);
+    if (!probe || !stored) {
+      return NextResponse.json(
+        { error: "안면 인식 정보가 없습니다. 다시 인식해 주세요." },
+        { status: 400 }
+      );
+    }
+    if (!isFaceMatch(stored, probe)) {
+      return NextResponse.json(
+        {
+          error:
+            type === "CHECK_IN"
+              ? "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다."
+              : "등록된 얼굴과 일치하지 않습니다. 본인만 퇴근할 수 있습니다.",
+        },
+        { status: 403 }
+      );
+    }
+    faceMatched = true;
+  }
 
+  if (type === "CHECK_IN") {
     const eligibility = evaluatePunchEligibility(
       now,
       tz,
@@ -244,6 +253,7 @@ export async function POST(req: Request) {
         isEarlyLeave: workFlags.isEarlyLeave,
         isOvertime: workFlags.isOvertime,
         isHolidayWork: workFlags.isHolidayWork,
+        lateMinutes: workFlags.lateMinutes,
         overtimeMinutes: workFlags.overtimeMinutes,
       },
       include: { site: { select: { name: true } } },
@@ -283,6 +293,7 @@ export async function POST(req: Request) {
     isEarlyLeave: result.record.isEarlyLeave,
     isOvertime: result.record.isOvertime,
     isHolidayWork: result.record.isHolidayWork,
+    lateMinutes: result.record.lateMinutes,
     overtimeMinutes: result.record.overtimeMinutes,
     exceptionId: result.exceptionId,
     pendingApproval: earlyLeavePending,

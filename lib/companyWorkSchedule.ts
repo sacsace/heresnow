@@ -28,6 +28,9 @@ export type AttendanceWorkFlags = {
   isEarlyLeave: boolean;
   isOvertime: boolean;
   isHolidayWork: boolean;
+  /** 지각 분 — 정시 출근 시각보다 nowMin 이 큰 만큼. 0 이상 */
+  lateMinutes: number;
+  /** 초과근무 분 — 정시 퇴근 시각보다 늦게 퇴근한 분. 0 이상 */
   overtimeMinutes: number;
 };
 
@@ -77,11 +80,13 @@ export function evaluateAttendanceWorkFlags(
   let isEarlyLeave = false;
   let isOvertime = false;
   const isHolidayWork = !onWorkDay;
+  let lateMinutes = 0;
   let overtimeMinutes = 0;
 
   if (type === "CHECK_IN") {
-    if (onWorkDay && startMin != null) {
-      isLate = nowMin > startMin;
+    if (onWorkDay && startMin != null && nowMin > startMin) {
+      isLate = true;
+      lateMinutes = nowMin - startMin;
     }
   } else {
     if (onWorkDay && endMin != null) {
@@ -93,7 +98,7 @@ export function evaluateAttendanceWorkFlags(
     }
   }
 
-  return { isLate, isEarlyLeave, isOvertime, isHolidayWork, overtimeMinutes };
+  return { isLate, isEarlyLeave, isOvertime, isHolidayWork, lateMinutes, overtimeMinutes };
 }
 
 export function workDaysToArray(workDays: string | null | undefined): number[] {

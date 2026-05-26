@@ -29,6 +29,7 @@ export async function GET(req: Request) {
   if (!companyId) return NextResponse.json({ error: "No company" }, { status: 400 });
 
   const employeeId = url.searchParams.get("employeeId") ?? undefined;
+  const departmentId = url.searchParams.get("departmentId") ?? undefined;
   const status = url.searchParams.get("status") ?? undefined;
   const from = url.searchParams.get("from") ?? undefined;
   const to = url.searchParams.get("to") ?? undefined;
@@ -49,6 +50,8 @@ export async function GET(req: Request) {
     where: {
       companyId,
       ...(employeeId ? { employeeId } : {}),
+      // 부서 필터 — 해당 부서 소속 직원의 기록만
+      ...(departmentId ? { employee: { departmentId } } : {}),
     },
     orderBy: { timestamp: "desc" },
     take: 5000,
