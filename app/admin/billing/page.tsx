@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/LanguageProvider";
 import { priceSuffix } from "@/lib/pricing";
 import {
   bannerWarning,
@@ -44,6 +45,7 @@ type BillingState = {
 };
 
 export default function AdminBillingPage() {
+  const { t, locale } = useI18n();
   const { data: session } = useSession();
   const canRequestUpgrade =
     session?.user?.role === "COMPANY_ADMIN" || session?.user?.role === "HR_MANAGER";
@@ -53,23 +55,34 @@ export default function AdminBillingPage() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const dateLocale = locale === "en" ? "en-US" : "ko-KR";
+
+  function formatTier(tier: Tier): string {
+    const seats =
+      tier.label ??
+      t("admin.billingTierSeats")
+        .replace("{min}", String(tier.minSeats))
+        .replace("{max}", String(tier.maxSeats));
+    return `${seats} · Rs.${tier.priceAmount}${priceSuffix(tier.billingPeriod, locale)}`;
+  }
+
   const load = useCallback(async () => {
     const r = await fetch("/api/admin/billing");
     const j = await r.json();
     if (!r.ok) {
-      setError(j.error ?? "불러오기 실패");
+      setError(typeof j.error === "string" ? j.error : t("admin.billingLoadFail"));
       return;
     }
     setData(j as BillingState);
     setError(null);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   async function requestUpgrade(tierId: string) {
-    if (!confirm("상위 요금제로 변경을 요청합니다. 슈퍼관리자 승인 후 좌석이 늘어납니다. 계속할까요?")) return;
+    if (!confirm(t("admin.billingConfirmRequest"))) return;
     setLoading(true);
     const r = await fetch("/api/admin/billing/request-upgrade", {
       method: "POST",
@@ -79,28 +92,32 @@ export default function AdminBillingPage() {
     const j = await r.json().catch(() => ({}));
     setLoading(false);
     if (!r.ok) {
-      alert(j.error ?? "요청 실패");
+      alert(typeof j.error === "string" ? j.error : t("admin.billingRequestFail"));
       return;
     }
     setNote("");
     await load();
-    alert("요청이 등록되었습니다. 입금·승인은 슈퍼관리자와 조율하세요.");
+    alert(t("admin.billingRequestOk"));
   }
 
   if (error && !data) {
     return <p className={errorText}>{error}</p>;
   }
   if (!data) {
-    return <p className="text-[var(--apple-label-secondary)]">불러오는 중…</p>;
+    return <p className="text-[var(--apple-label-secondary)]">{t("common.loading")}</p>;
   }
 
   const { company, employeeCount, upgradeTiers, pendingRequest } = data;
 
+  const seatsValue = t("admin.billingSeatsValue")
+    .replace("{used}", String(employeeCount))
+    .replace("{limit}", String(company.seatLimit));
+
   return (
     <div className="space-y-10 sm:space-y-12">
       <header>
-        <h1 className={pageTitle}>요금·좌석</h1>
-        <p className={pageSubtitle}>구독·좌석 상한 및 상위 요금제 변경 요청</p>
+        <h1 className={pageTitle}>{t("admin.billingTitle")}</h1>
+        <p className={pageSubtitle}>{t("admin.billingSubtitle")}</p>
       </header>
 
       <section>
@@ -108,25 +125,21 @@ export default function AdminBillingPage() {
         <div className={card}>
           <dl className={`${cardBody} grid gap-4 sm:grid-cols-2`}>
             <div className="hig-divider pb-4 sm:pb-0 sm:border-b-0">
-              <dt className={label}>현재 좌석 사용</dt>
-              <dd className="mt-1 text-[1.0625rem] font-semibold">
-                {employeeCount} / {company.seatLimit}명
-              </dd>
+              <dt className={label}>{t("admin.billingSeatsUsage")}</dt>
+              <dd className="mt-1 text-[1.0625rem] font-semibold">{seatsValue}</dd>
             </div>
             <div className="hig-divider pb-4 sm:pb-0">
-              <dt className={label}>구독 만료</dt>
+              <dt className={label}>{t("admin.billingExpires")}</dt>
               <dd className="mt-1 text-[1.0625rem] font-semibold">
                 {company.subscriptionEndsAt
-                  ? new Date(company.subscriptionEndsAt).toLocaleDateString("ko-KR")
+                  ? new Date(company.subscriptionEndsAt).toLocaleDateString(dateLocale)
                   : "—"}
               </dd>
             </div>
             <div className="sm:col-span-2 pt-2">
-              <dt className={label}>적용 요금제</dt>
+              <dt className={label}>{t("admin.billingTier")}</dt>
               <dd className="mt-1 text-[0.9375rem]">
-                {company.pricingTier
-                  ? `${company.pricingTier.label ?? `${company.pricingTier.minSeats}–${company.pricingTier.maxSeats}명`} · Rs.${company.pricingTier.priceAmount}${priceSuffix(company.pricingTier.billingPeriod)}`
-                  : "미지정"}
+                {company.pricingTier ? formatTier(company.pricingTier) : t("admin.billingTierNone")}
               </dd>
             </div>
           </dl>
@@ -135,66 +148,69 @@ export default function AdminBillingPage() {
 
       {pendingRequest && (
         <section className={bannerWarning}>
-          <p className="font-semibold">승인 대기 중인 상향 요청</p>
+          <p className="font-semibold">{t("admin.billingPendingTitle")}</p>
           <p className="mt-1">
-            목표:{" "}
+            {t("admin.billingPendingTarget")}:{" "}
             {pendingRequest.targetTier.label ??
-              `${pendingRequest.targetTier.minSeats}–${pendingRequest.targetTier.maxSeats}명`}{" "}
-            · Rs.
-            {pendingRequest.amountDue} · 요청일{" "}
-            {new Date(pendingRequest.createdAt).toLocaleString("ko-KR")}
+              t("admin.billingTierSeats")
+                .replace("{min}", String(pendingRequest.targetTier.minSeats))
+                .replace("{max}", String(pendingRequest.targetTier.maxSeats))}{" "}
+            · Rs.{pendingRequest.amountDue} · {t("admin.billingPendingRequestedAt")}{" "}
+            {new Date(pendingRequest.createdAt).toLocaleString(dateLocale)}
           </p>
         </section>
       )}
 
       <section>
-        <p className={sectionLabel}>상위 요금제로 변경 요청</p>
+        <p className={sectionLabel}>{t("admin.billingUpgradeTitle")}</p>
         <div className={card}>
           <div className={cardBody}>
-            <p className={hint}>
-              추가 비용(Rs, 월·연 요금제 기준) 납부 후 슈퍼관리자가 승인하면 좌석 상한이 늘어납니다.
-            </p>
+            <p className={hint}>{t("admin.billingUpgradeLead")}</p>
             {canRequestUpgrade && (
               <div className="mt-4 hig-divider pt-4">
-                <label className={label}>메모 (선택)</label>
+                <label className={label}>{t("admin.billingNoteLabel")}</label>
                 <input
                   className={`${input} mt-1.5 max-w-md`}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="송금자명·입금일 등"
+                  placeholder={t("admin.billingNotePlaceholder")}
                 />
               </div>
             )}
             {!canRequestUpgrade && (
-              <p className={`mt-3 ${hint}`}>상향 요청은 회사관리자·인사만 등록할 수 있습니다.</p>
+              <p className={`mt-3 ${hint}`}>{t("admin.billingPermissionNote")}</p>
             )}
           </div>
           <ul className={groupedCard}>
             {upgradeTiers.length === 0 && (
-              <li className={emptyState}>더 높은 구간이 없습니다.</li>
+              <li className={emptyState}>{t("admin.billingNoHigher")}</li>
             )}
-            {upgradeTiers.map((t, i) => (
+            {upgradeTiers.map((tier, i) => (
               <li
-                key={t.id}
+                key={tier.id}
                 className={`${groupedRow} flex flex-wrap items-center justify-between gap-2 ${
                   i < upgradeTiers.length - 1 ? "border-b border-[var(--separator)]" : ""
                 }`}
               >
                 <span className="text-[0.9375rem]">
-                  {t.label ?? `${t.minSeats}–${t.maxSeats}명`} —{" "}
+                  {tier.label ??
+                    t("admin.billingTierSeats")
+                      .replace("{min}", String(tier.minSeats))
+                      .replace("{max}", String(tier.maxSeats))}{" "}
+                  —{" "}
                   <strong>
-                    Rs.{t.priceAmount}
-                    {priceSuffix(t.billingPeriod)}
+                    Rs.{tier.priceAmount}
+                    {priceSuffix(tier.billingPeriod, locale)}
                   </strong>
                 </span>
                 {canRequestUpgrade && (
                   <button
                     type="button"
                     disabled={loading || !!pendingRequest}
-                    onClick={() => void requestUpgrade(t.id)}
+                    onClick={() => void requestUpgrade(tier.id)}
                     className={`${btnPrimary} !py-1.5 text-[0.875rem]`}
                   >
-                    이 구간으로 요청
+                    {t("admin.billingRequestThisTier")}
                   </button>
                 )}
               </li>
