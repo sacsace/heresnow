@@ -26,7 +26,6 @@ export function AdminNavBar() {
       { href: "/admin/billing", label: t("admin.navBilling") },
       { href: "/admin/attendance", label: t("admin.navAttendance") },
       { href: "/admin/exceptions", label: t("admin.navExceptions") },
-      { href: "/employee", label: t("admin.navEmployeeView") },
     ];
   }, [t]);
 

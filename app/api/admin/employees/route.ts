@@ -1,9 +1,12 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { canAssignRole } from "@/lib/roleHierarchy";
 import { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+
+const COMPANY_ROLES = ["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE"] as const;
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -39,7 +42,7 @@ export async function GET(req: Request) {
       where: { companyId },
       orderBy: { name: "asc" },
       include: {
-        user: { select: { email: true, role: true } },
+        user: { select: { id: true, email: true, role: true } },
         department: { select: { id: true, name: true } },
       },
     });
@@ -73,6 +76,7 @@ const postSchema = z.object({
   name: z.string().min(1).max(120),
   password: z.string().min(8).max(200),
   departmentId: z.string().min(1).max(40).optional().nullable(),
+  role: z.enum(COMPANY_ROLES).optional(),
 });
 
 /** 직원 추가 (좌석 상한 seatLimit 적용) */
@@ -103,7 +107,18 @@ export async function POST(req: Request) {
   }
 
   const { email, name, password, departmentId } = parsed.data;
-  const role = Role.EMPLOYEE;
+  // 새 직원 역할 — 미지정 시 EMPLOYEE. 호출자보다 *엄격히 낮은* 등급만 허용.
+  const requestedRole = (parsed.data.role ?? "EMPLOYEE") as Role;
+  if (
+    requestedRole !== "EMPLOYEE" &&
+    !canAssignRole(session.user.role, "EMPLOYEE", requestedRole)
+  ) {
+    return NextResponse.json(
+      { error: "ROLE_NOT_ALLOWED", message: "허용되지 않는 역할입니다." },
+      { status: 403 }
+    );
+  }
+  const role = requestedRole;
 
   const company = await prisma.company.findUnique({ where: { id: companyId } });
   if (!company) return NextResponse.json({ error: "Not found" }, { status: 404 });

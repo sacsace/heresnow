@@ -1,6 +1,7 @@
 "use client";
 
 import { AttendanceByEmployeeView } from "@/components/admin/attendance/ByEmployeeView";
+import { AttendanceCalendarView } from "@/components/admin/attendance/CalendarView";
 import { AttendanceChartView } from "@/components/admin/attendance/ChartView";
 import { AttendanceDayTable } from "@/components/admin/attendance/DayTable";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -23,7 +24,7 @@ import {
 } from "@/lib/uiStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type AttendanceTab = "daily" | "byEmployee" | "holiday" | "chart";
+type AttendanceTab = "daily" | "byEmployee" | "holiday" | "calendar" | "chart";
 
 type SearchFilters = {
   q: string;
@@ -32,16 +33,25 @@ type SearchFilters = {
   status: string;
 };
 
-function currentMonthRange(): { from: string; to: string } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+function monthRangeFor(year: number, month: number): { from: string; to: string } {
   const mm = String(month + 1).padStart(2, "0");
   const lastDay = new Date(year, month + 1, 0).getDate();
   return {
     from: `${year}-${mm}-01`,
     to: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
   };
+}
+
+function currentMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  return monthRangeFor(now.getFullYear(), now.getMonth());
+}
+
+function shiftMonth(fromDate: string, delta: number): { from: string; to: string } {
+  const [y, m] = fromDate.split("-").map(Number);
+  const base = new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, 1);
+  base.setMonth(base.getMonth() + delta);
+  return monthRangeFor(base.getFullYear(), base.getMonth());
 }
 
 function defaultFilters(): SearchFilters {
@@ -68,6 +78,7 @@ export default function AdminAttendancePage() {
     { id: "daily", label: t("admin.attendanceTabDaily") },
     { id: "byEmployee", label: t("admin.attendanceTabByEmployee") },
     { id: "holiday", label: t("admin.attendanceTabHoliday") },
+    { id: "calendar", label: t("admin.attendanceTabCalendar") },
     { id: "chart", label: t("admin.attendanceTabChart") },
   ];
 
@@ -75,6 +86,7 @@ export default function AdminAttendancePage() {
     daily: t("admin.attendanceTabDailyLead"),
     byEmployee: t("admin.attendanceTabByEmployeeLead"),
     holiday: t("admin.attendanceTabHolidayLead"),
+    calendar: t("admin.attendanceTabCalendarLead"),
     chart: t("admin.attendanceTabChartLead"),
   };
 
@@ -119,6 +131,18 @@ export default function AdminAttendancePage() {
   const holidayRows = useMemo(() => rows.filter((r) => r.isHolidayWork), [rows]);
   const displayRows = tab === "holiday" ? holidayRows : rows;
   const hasActiveFilters = filtersDifferFromDefault(filters);
+
+  function gotoMonth(delta: number) {
+    const next = shiftMonth(filters.from || currentMonthRange().from, delta);
+    setDraft({ ...draft, from: next.from, to: next.to });
+    setFilters({ ...filters, from: next.from, to: next.to });
+  }
+
+  function gotoToday() {
+    const next = currentMonthRange();
+    setDraft({ ...draft, from: next.from, to: next.to });
+    setFilters({ ...filters, from: next.from, to: next.to });
+  }
 
   return (
     <div className={pageStack}>
@@ -214,11 +238,25 @@ export default function AdminAttendancePage() {
 
       {loading ? (
         <p className="text-[1rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
+      ) : tab === "calendar" ? (
+        <AttendanceCalendarView
+          rows={rows}
+          month={filters.from || currentMonthRange().from}
+          dateLocale={dateLocale}
+          onPrevMonth={() => gotoMonth(-1)}
+          onNextMonth={() => gotoMonth(1)}
+          onToday={gotoToday}
+        />
       ) : tab === "chart" ? (
         rows.length === 0 ? (
           <p className={emptyState}>{t("admin.attendanceEmpty")}</p>
         ) : (
-          <AttendanceChartView rows={rows} />
+          <AttendanceChartView
+            rows={rows}
+            fromDate={filters.from || currentMonthRange().from}
+            toDate={filters.to || currentMonthRange().to}
+            dateLocale={dateLocale}
+          />
         )
       ) : displayRows.length === 0 ? (
         <p className={emptyState}>{t("admin.attendanceEmpty")}</p>
