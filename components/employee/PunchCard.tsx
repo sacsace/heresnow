@@ -28,6 +28,13 @@ import {
   th,
 } from "@/lib/uiStyles";
 import { usePunchStatus } from "@/hooks/usePunchStatus";
+import { formatDurationMinutes } from "@/components/admin/attendance/helpers";
+import {
+  DEFAULT_COMPANY_TIMEZONE,
+  formatDateInCompanyTz,
+  formatTimeInCompanyTz,
+  recordDisplayTimezone,
+} from "@/lib/companyTimezones";
 import type { AttendanceType } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -35,6 +42,7 @@ type RecordRow = {
   id: string;
   type: AttendanceType;
   timestamp: string;
+  recordTimezone?: string | null;
   status: string;
   distanceFromSite: number;
   latitude: number;
@@ -79,6 +87,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const [msg, setMsg] = useState<string | null>(null);
   const [previewCoords, setPreviewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [records, setRecords] = useState<RecordRow[]>([]);
+  const [companyTimezone, setCompanyTimezone] = useState(DEFAULT_COMPANY_TIMEZONE);
   const { status: punchStatus, loading: punchStatusLoading, reload: reloadPunchStatus } =
     usePunchStatus();
 
@@ -138,7 +147,14 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const loadRecords = useCallback(async () => {
     const r = await fetch("/api/attendance/me?limit=20");
     const j = await r.json();
-    if (r.ok) setRecords(j.records ?? []);
+    if (r.ok) {
+      const tz =
+        typeof j.timezone === "string" && j.timezone.trim()
+          ? j.timezone.trim()
+          : DEFAULT_COMPANY_TIMEZONE;
+      setCompanyTimezone(tz);
+      setRecords(j.records ?? []);
+    }
   }, []);
 
   useEffect(() => {
@@ -679,8 +695,8 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       </section>
 
       {showRecords && (
-      <section>
-        <p className="mb-2 px-1 text-[0.8125rem] font-semibold uppercase tracking-wide text-[var(--apple-label-secondary)]">
+      <section className="!mt-10 sm:!mt-12">
+        <p className="mb-3 px-1 text-[0.8125rem] font-semibold uppercase tracking-wide text-[var(--apple-label-secondary)]">
           {t("employee.recentRecords")}
         </p>
         <div className={tableWrap}>
@@ -717,17 +733,18 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
               ) : (
                 pairedRecords.map((pair) => {
                   const anchor = pair.checkIn ?? pair.checkOut!;
-                  const dateText = new Date(anchor.timestamp).toLocaleDateString(dateLocale, {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    weekday: "short",
-                  });
+                  const anchorTz = recordDisplayTimezone(anchor, companyTimezone);
+                  const dateText = formatDateInCompanyTz(
+                    anchor.timestamp,
+                    anchorTz,
+                    dateLocale
+                  );
                   const formatTime = (r: RecordRow) =>
-                    new Date(r.timestamp).toLocaleTimeString(dateLocale, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
+                    formatTimeInCompanyTz(
+                      r.timestamp,
+                      recordDisplayTimezone(r, companyTimezone),
+                      dateLocale
+                    );
                   const locationName = anchor.isBusinessTrip && anchor.businessTripLocation
                     ? `${t("employee.recordBusinessTrip")} ${anchor.businessTripLocation}`
                     : anchor.site?.name ?? null;
@@ -847,10 +864,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                           )}
                           {isLate && (
                             <span className="font-medium text-amber-800">
-                              {t("employee.flagLate")}
                               {lateMin > 0
-                                ? ` ${lateMin}${t("employee.flagMinutes")}`
-                                : ""}
+                                ? `${t("employee.flagLate")} ${formatDurationMinutes(lateMin, t)}`
+                                : t("employee.flagLate")}
                             </span>
                           )}
                           {isEarly && (
@@ -860,10 +876,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                           )}
                           {isOvertime && (
                             <span className="font-medium text-[var(--apple-blue)]">
-                              {t("employee.flagOvertime")}
                               {overtimeMin > 0
-                                ? ` ${overtimeMin}${t("employee.flagMinutes")}`
-                                : ""}
+                                ? `${t("employee.flagOvertime")} ${formatDurationMinutes(overtimeMin, t)}`
+                                : t("employee.flagOvertime")}
                             </span>
                           )}
                           {exception && (

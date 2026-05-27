@@ -37,9 +37,9 @@ export function AdminNavBar() {
   return (
     <header className={`${navBar} pt-[env(safe-area-inset-top,0px)]`}>
       <div className={`${navBarInner} max-w-[86.4rem]`}>
-        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:gap-4">
           <MobileNavDrawer items={links} />
-          <AppLogo href="/admin" title={t("login.title")} />
+          <AppLogo href="/admin" title={t("login.title")} className="min-w-0" />
           <nav
             className={`hidden sm:inline-flex ${navSegmentedWrap}`}
             aria-label={t("admin.navDashboard")}

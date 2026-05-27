@@ -4,6 +4,7 @@ import {
   DepartmentManagerModal,
   type Department,
 } from "@/components/admin/DepartmentManagerModal";
+import { EmployeeListTable } from "@/components/admin/EmployeeListTable";
 import { useI18n } from "@/components/LanguageProvider";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
@@ -12,9 +13,7 @@ import {
   btnSecondary,
   card,
   cardBody,
-  emptyStateCompact,
   errorText,
-  groupedCard,
   input,
   label,
   link,
@@ -22,7 +21,11 @@ import {
   sectionLabel,
   select,
 } from "@/lib/uiStyles";
-import { assignableRolesForCaller, canAssignRole } from "@/lib/roleHierarchy";
+import {
+  assignableRolesForCaller,
+  canAssignRole,
+  canDeleteEmployee,
+} from "@/lib/roleHierarchy";
 import type { Role } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -34,11 +37,7 @@ type Emp = {
   department: { id: string; name: string } | null;
 };
 
-/** 행 우측 컨트롤 — 드롭다운/정적 라벨 모두 동일한 칩 모양으로 렌더 */
-const rowControl =
-  "h-8 w-full rounded-[0.5rem] bg-[var(--fill-secondary)] px-2.5 pr-8 text-[0.8125rem] leading-none text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60";
-const rowControlStatic =
-  "flex h-8 w-full items-center rounded-[0.5rem] bg-[var(--fill-tertiary)] px-2.5 text-[0.8125rem] text-[var(--apple-label-secondary)]";
+const profileEditRoles = new Set<Role>(["COMPANY_ADMIN", "HR_MANAGER", "SUPER_ADMIN"]);
 
 export default function AdminEmployeesPage() {
   const { t } = useI18n();
@@ -58,6 +57,8 @@ export default function AdminEmployeesPage() {
   const [deptModalOpen, setDeptModalOpen] = useState(false);
   const [rowBusyId, setRowBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
+  const [passwordEditId, setPasswordEditId] = useState<string | null>(null);
+  const [passwordDraft, setPasswordDraft] = useState("");
 
   const assignableRoles = useMemo(
     () => assignableRolesForCaller(callerRole),
@@ -149,6 +150,173 @@ export default function AdminEmployeesPage() {
     setDepartmentId("");
     setNewRole("EMPLOYEE");
     await loadAll();
+  }
+
+  const canEditProfile = callerRole != null && profileEditRoles.has(callerRole);
+
+  async function patchEmployee(
+    empId: string,
+    body: Record<string, unknown>,
+    opts?: {
+      optimistic?: (prev: Emp[]) => Emp[];
+      revert?: () => void;
+    }
+  ): Promise<boolean> {
+    setRowBusyId(empId);
+    setRowError(null);
+    if (opts?.optimistic) setEmployees(opts.optimistic);
+    try {
+      const r = await fetch(`/api/admin/employees/${encodeURIComponent(empId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg =
+          j.error === "EMAIL_TAKEN"
+            ? t("admin.employeesEmailTaken")
+            : typeof j.message === "string"
+              ? j.message
+              : typeof j.error === "string"
+                ? j.error
+                : t("admin.employeesProfileSaveFail");
+        setRowError(msg);
+        opts?.revert?.();
+        return false;
+      }
+      const updated = j.employee as Emp | undefined;
+      if (updated) {
+        setEmployees((prev) => prev.map((x) => (x.id === empId ? updated : x)));
+      } else {
+        await loadEmployees();
+      }
+      return true;
+    } catch (err) {
+      console.error("[employees patch]", err);
+      setRowError(t("admin.employeesProfileSaveFail"));
+      opts?.revert?.();
+      return false;
+    } finally {
+      setRowBusyId(null);
+    }
+  }
+
+  async function saveName(emp: Emp, raw: string) {
+    const next = raw.trim();
+    if (!next || next === emp.name) return;
+    const prev = emp.name;
+    await patchEmployee(
+      emp.id,
+      { name: next },
+      {
+        optimistic: (list) =>
+          list.map((x) => (x.id === emp.id ? { ...x, name: next } : x)),
+        revert: () =>
+          setEmployees((list) =>
+            list.map((x) => (x.id === emp.id ? { ...x, name: prev } : x))
+          ),
+      }
+    );
+  }
+
+  async function saveEmail(emp: Emp, raw: string) {
+    const next = raw.trim().toLowerCase();
+    if (!next || next === emp.user.email.toLowerCase()) return;
+    const prev = emp.user.email;
+    await patchEmployee(
+      emp.id,
+      { email: next },
+      {
+        optimistic: (list) =>
+          list.map((x) =>
+            x.id === emp.id ? { ...x, user: { ...x.user, email: next } } : x
+          ),
+        revert: () =>
+          setEmployees((list) =>
+            list.map((x) =>
+              x.id === emp.id ? { ...x, user: { ...x.user, email: prev } } : x
+            )
+          ),
+      }
+    );
+  }
+
+  async function savePassword(empId: string): Promise<boolean> {
+    const pwd = passwordDraft.trim();
+    if (pwd.length < 8) {
+      setRowError(t("admin.employeesPasswordHint"));
+      return false;
+    }
+    const ok = await patchEmployee(empId, { password: pwd });
+    if (ok) {
+      setPasswordEditId(null);
+      setPasswordDraft("");
+    }
+    return ok;
+  }
+
+  async function finishPasswordEdit(empId: string) {
+    if (passwordEditId !== empId) return;
+    const pwd = passwordDraft.trim();
+    if (pwd.length === 0) {
+      setPasswordEditId(null);
+      setPasswordDraft("");
+      return;
+    }
+    if (pwd.length < 8) {
+      setRowError(t("admin.employeesPasswordHint"));
+      return;
+    }
+    await savePassword(empId);
+  }
+
+  function deleteDisabledReason(emp: Emp, isSelf: boolean): string | undefined {
+    if (isSelf) return t("admin.employeesCannotDeleteSelf");
+    if (!canDeleteEmployee(callerRole, emp.user.role, isSelf)) {
+      return t("admin.employeesDeleteNotAllowed");
+    }
+    return undefined;
+  }
+
+  async function deleteEmployee(emp: Emp) {
+    const ok = window.confirm(
+      t("admin.employeesDeleteConfirm").replace("{name}", emp.name)
+    );
+    if (!ok) return;
+    setRowBusyId(emp.id);
+    setRowError(null);
+    if (passwordEditId === emp.id) {
+      setPasswordEditId(null);
+      setPasswordDraft("");
+    }
+    try {
+      const r = await fetch(`/api/admin/employees/${encodeURIComponent(emp.id)}`, {
+        method: "DELETE",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg =
+          j.error === "CANNOT_DELETE_SELF"
+            ? t("admin.employeesCannotDeleteSelf")
+            : j.error === "LAST_ADMIN"
+              ? t("admin.employeesLastAdmin")
+              : j.error === "ROLE_NOT_ALLOWED"
+                ? t("admin.employeesDeleteNotAllowed")
+                : typeof j.message === "string"
+                  ? j.message
+                  : t("admin.employeesDeleteFail");
+        setRowError(msg);
+        return;
+      }
+      setEmployees((prev) => prev.filter((x) => x.id !== emp.id));
+      await loadEmployees();
+    } catch (err) {
+      console.error("[employees delete]", err);
+      setRowError(t("admin.employeesDeleteFail"));
+    } finally {
+      setRowBusyId(null);
+    }
   }
 
   async function changeDepartment(empId: string, nextDeptId: string) {
@@ -365,93 +533,36 @@ export default function AdminEmployeesPage() {
       <section>
         <p className={sectionLabel}>{t("admin.employeesListTitle")}</p>
         {rowError && <p className={`mb-3 ${errorText}`}>{rowError}</p>}
-        <ul className={groupedCard}>
-          {employees.length === 0 ? (
-            <li className={emptyStateCompact}>{t("admin.employeesEmpty")}</li>
-          ) : (
-            employees.map((e, i) => {
-              const isSelf = callerUserId != null && e.user.id === callerUserId;
-              const canEditThisRole =
-                canEditRoles &&
-                !isSelf &&
-                assignableRoles.some((r) => canAssignRole(callerRole, e.user.role, r));
-              const isBusy = rowBusyId === e.id;
-              return (
-                <li
-                  key={e.id}
-                  className={`px-5 py-2 text-[0.9375rem] leading-snug text-[var(--foreground)] sm:px-6 ${i < employees.length - 1 ? "border-b border-[var(--separator)]" : ""}`}
-                >
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 sm:flex-nowrap">
-                    <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-y-0.5 sm:flex-nowrap">
-                      <p className="truncate font-medium text-[var(--foreground)] sm:w-[10rem] sm:shrink-0 md:w-[12rem]">
-                        {e.name}
-                      </p>
-                      <p className="truncate text-[0.8125rem] text-[var(--apple-label-secondary)]">
-                        {e.user.email}
-                      </p>
-                    </div>
-                    <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:shrink-0 sm:grid-cols-[10rem_10rem]">
-                      {canEditThisRole ? (
-                        <>
-                          <label className="sr-only" htmlFor={`emp-role-${e.id}`}>
-                            {t("admin.employeesRoleLabel")}
-                          </label>
-                          <select
-                            id={`emp-role-${e.id}`}
-                            className={`auth-select-field ${rowControl}`}
-                            value={e.user.role}
-                            onChange={(ev) => void changeRole(e, ev.target.value as Role)}
-                            disabled={isBusy}
-                            aria-busy={isBusy}
-                          >
-                            {[
-                              e.user.role as Role,
-                              ...assignableRoles.filter((r) => r !== e.user.role),
-                            ].map((r) => (
-                              <option
-                                key={r}
-                                value={r}
-                                disabled={!canAssignRole(callerRole, e.user.role, r) && r !== e.user.role}
-                              >
-                                {roleLabel(r)}
-                              </option>
-                            ))}
-                          </select>
-                        </>
-                      ) : (
-                        <span
-                          className={rowControlStatic}
-                          title={t("admin.employeesRoleLabel")}
-                          aria-label={t("admin.employeesRoleLabel")}
-                        >
-                          {roleLabel(e.user.role)}
-                        </span>
-                      )}
-                      <label className="sr-only" htmlFor={`emp-dept-${e.id}`}>
-                        {t("admin.employeesDepartmentLabel")}
-                      </label>
-                      <select
-                        id={`emp-dept-${e.id}`}
-                        className={`auth-select-field ${rowControl}`}
-                        value={e.department?.id ?? ""}
-                        onChange={(ev) => void changeDepartment(e.id, ev.target.value)}
-                        disabled={isBusy}
-                        aria-busy={isBusy}
-                      >
-                        <option value="">{t("admin.employeesDepartmentNone")}</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </li>
-              );
-            })
-          )}
-        </ul>
+        <EmployeeListTable
+            employees={employees}
+            departments={departments}
+            canEditProfile={canEditProfile}
+            canEditRoles={canEditRoles}
+            callerRole={callerRole}
+            callerUserId={callerUserId}
+            assignableRoles={assignableRoles}
+            rowBusyId={rowBusyId}
+            passwordEditId={passwordEditId}
+            passwordDraft={passwordDraft}
+            onPasswordDraftChange={setPasswordDraft}
+            onPasswordEditStart={(empId) => {
+              setPasswordEditId(empId);
+              setPasswordDraft("");
+              setRowError(null);
+            }}
+            onPasswordEditFinish={(empId) => void finishPasswordEdit(empId)}
+            onPasswordEditCancel={() => {
+              setPasswordEditId(null);
+              setPasswordDraft("");
+            }}
+            onSaveName={(emp, value) => void saveName(emp, value)}
+            onSaveEmail={(emp, value) => void saveEmail(emp, value)}
+            onChangeRole={(emp, role) => void changeRole(emp, role)}
+            onChangeDepartment={(empId, deptId) => void changeDepartment(empId, deptId)}
+            onDelete={(emp) => void deleteEmployee(emp)}
+            deleteDisabledReason={deleteDisabledReason}
+            roleLabel={roleLabel}
+          />
       </section>
 
       <DepartmentManagerModal

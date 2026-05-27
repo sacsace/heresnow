@@ -1,3 +1,4 @@
+import { recordDisplayTimezone } from "@/lib/companyTimezones";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import type { AttendanceStatus, AttendanceType } from "@prisma/client";
 
@@ -52,6 +53,7 @@ type RecordLike = {
   type: AttendanceType;
   timestamp: Date;
   status: AttendanceStatus;
+  recordTimezone?: string | null;
 };
 
 export function buildMonthlyRows(
@@ -74,7 +76,8 @@ export function buildMonthlyRows(
   >();
 
   for (const r of records) {
-    const day = calendarDayInTz(r.timestamp, timeZone);
+    const rt = recordDisplayTimezone(r, timeZone);
+    const day = calendarDayInTz(r.timestamp, rt);
     if (!dayKeys.includes(day)) continue;
     let emp = byEmpDay.get(r.employeeId);
     if (!emp) {
@@ -86,7 +89,7 @@ export function buildMonthlyRows(
       cell = { checkIn: null, checkOut: null, pending: false };
       emp.set(day, cell);
     }
-    const t = timeInTz(r.timestamp, timeZone);
+    const t = timeInTz(r.timestamp, rt);
     if (r.type === "CHECK_IN") {
       if (!cell.checkIn || t < cell.checkIn) cell.checkIn = t;
     } else {

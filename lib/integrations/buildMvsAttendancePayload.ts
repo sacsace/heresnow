@@ -1,4 +1,5 @@
 import type { AttendanceRecord, Company, Employee, User } from "@prisma/client";
+import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
 import { formatInTimeZone } from "date-fns-tz";
 import {
   MVS_ATTENDANCE_EVENT_VERSION,
@@ -15,7 +16,7 @@ export function buildMvsAttendancePayload(
   externalCompanyId: string | null,
   faceVerified: boolean
 ): MvsAttendanceEventV1 {
-  const tz = record.company.timezone.trim() || "UTC";
+  const tz = recordDisplayTimezone(record, record.company.timezone.trim() || DEFAULT_COMPANY_TIMEZONE);
   let localDate: string;
   let localTime: string;
   try {

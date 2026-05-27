@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { calendarDayInTz, timeInTz } from "@/lib/adminMonthlyAttendance";
+import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
 import { prisma } from "@/lib/prisma";
 import { fromZonedTime } from "date-fns-tz";
 import { NextResponse } from "next/server";
@@ -87,7 +88,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
 
-    const tz = company.timezone?.trim() || "Asia/Seoul";
+    const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
     const rangeStart = fromZonedTime(`${from} 00:00:00`, tz);
     const rangeEnd = fromZonedTime(`${to} 23:59:59.999`, tz);
 
@@ -110,6 +111,7 @@ export async function GET(req: Request) {
         isBusinessTrip: true,
         businessTripLocation: true,
         businessTripReason: true,
+        recordTimezone: true,
         employee: { select: { name: true } },
       },
     });
@@ -122,7 +124,8 @@ export async function GET(req: Request) {
     type MarkerSource = (typeof records)[number] & { day: string };
     const seen = new Map<string, MarkerSource>();
     for (const r of records) {
-      const day = calendarDayInTz(r.timestamp, tz);
+      const rt = recordDisplayTimezone(r, tz);
+      const day = calendarDayInTz(r.timestamp, rt);
       if (day < from || day > to) continue;
       const key = `${r.employeeId}:${day}`;
       if (!seen.has(key)) {
@@ -135,7 +138,7 @@ export async function GET(req: Request) {
       employeeName: r.employee.name,
       attendanceId: r.id,
       timestamp: r.timestamp.toISOString(),
-      checkInTime: timeInTz(r.timestamp, tz),
+      checkInTime: timeInTz(r.timestamp, recordDisplayTimezone(r, tz)),
       date: r.day,
       latitude: r.latitude,
       longitude: r.longitude,

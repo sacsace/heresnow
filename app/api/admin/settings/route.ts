@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { DEFAULT_COMPANY_TIMEZONE, isValidIanaTimezone } from "@/lib/companyTimezones";
 import { formatWorkDays, parseWorkDays } from "@/lib/companyWorkSchedule";
 import { parseHHmm } from "@/lib/attendanceRules";
 import { prisma } from "@/lib/prisma";
@@ -25,6 +26,7 @@ const editRoles = new Set(["COMPANY_ADMIN", "HR_MANAGER", "SUPER_ADMIN"]);
 const companySelect = {
   id: true,
   name: true,
+  timezone: true,
   faceRecognitionEnabled: true,
   workStartTime: true,
   workEndTime: true,
@@ -35,6 +37,7 @@ function settingsPayload(
   company: {
     id: string;
     name: string;
+    timezone: string;
     faceRecognitionEnabled: boolean;
     workStartTime: string | null;
     workEndTime: string | null;
@@ -45,6 +48,7 @@ function settingsPayload(
   return {
     companyId: company.id,
     companyName: company.name,
+    timezone: company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE,
     faceRecognitionEnabled: company.faceRecognitionEnabled,
     workStartTime: company.workStartTime,
     workEndTime: company.workEndTime,
@@ -94,6 +98,14 @@ const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
 const patchSchema = z
   .object({
+    timezone: z
+      .string()
+      .min(1)
+      .max(64)
+      .refine((s) => isValidIanaTimezone(s), {
+        message: "유효한 IANA 타임존을 선택해 주세요.",
+      })
+      .optional(),
     faceRecognitionEnabled: z.boolean().optional(),
     workStartTime: hhmm.nullable().optional(),
     workEndTime: hhmm.nullable().optional(),
@@ -140,12 +152,16 @@ export async function PATCH(req: Request) {
   }
 
   const data: {
+    timezone?: string;
     faceRecognitionEnabled?: boolean;
     workStartTime?: string | null;
     workEndTime?: string | null;
     workDays?: string;
   } = {};
 
+  if (parsed.data.timezone !== undefined) {
+    data.timezone = parsed.data.timezone.trim();
+  }
   if (parsed.data.faceRecognitionEnabled !== undefined) {
     data.faceRecognitionEnabled = parsed.data.faceRecognitionEnabled;
   }

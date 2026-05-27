@@ -25,9 +25,9 @@ export function SuperNavBar() {
   return (
     <header className={`${navBar} pt-[env(safe-area-inset-top,0px)]`}>
       <div className={navBarInnerSuper}>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-4 sm:gap-6">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:gap-6">
           <MobileNavDrawer items={nav} />
-          <AppLogo href="/super" title={t("login.title")} />
+          <AppLogo href="/super" title={t("login.title")} className="min-w-0" />
           <nav className={`hidden sm:flex ${navLinksRow}`}>
             {nav.map((n) => (
               <Link

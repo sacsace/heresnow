@@ -57,7 +57,7 @@ async function main() {
   const acme = await prisma.company.create({
     data: {
       name: "ACME 현장시스템",
-      timezone: "Asia/Seoul",
+      timezone: "Asia/Kolkata",
       pricingTierId: t1.id,
       seatLimit: t1.maxSeats,
       subscriptionEndsAt: subsEnd,
@@ -66,7 +66,7 @@ async function main() {
   const globex = await prisma.company.create({
     data: {
       name: "Globex 로지스틱스",
-      timezone: "Asia/Seoul",
+      timezone: "Asia/Kolkata",
       pricingTierId: t1.id,
       seatLimit: t1.maxSeats,
       subscriptionEndsAt: subsEnd,

@@ -4,6 +4,7 @@ import {
   checkInErrorMessage,
   evaluatePunchEligibility,
 } from "@/lib/attendancePunchRules";
+import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { isCheckOutEarly } from "@/lib/companyWorkSchedule";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -27,7 +28,7 @@ export async function GET() {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const tz = company.timezone?.trim() || "Asia/Seoul";
+  const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const now = new Date();
 
   const lastRecord = await prisma.attendanceRecord.findFirst({

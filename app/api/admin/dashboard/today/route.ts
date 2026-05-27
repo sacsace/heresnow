@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { calendarDayInTz } from "@/lib/adminMonthlyAttendance";
+import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { prisma } from "@/lib/prisma";
 import { fromZonedTime } from "date-fns-tz";
 import { NextResponse } from "next/server";
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const tz = company.timezone?.trim() || "Asia/Kolkata";
+  const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const today = calendarDayInTz(new Date(), tz);
   const dayStart = fromZonedTime(`${today} 00:00:00`, tz);
   const dayEnd = fromZonedTime(`${today} 23:59:59.999`, tz);

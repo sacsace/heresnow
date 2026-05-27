@@ -50,6 +50,21 @@ export function canAssignRole(
   return target < caller && next < caller;
 }
 
+/** 회사 컨텍스트에서 호출자가 대상 직원 계정을 삭제할 수 있는지 (본인·동급·상위 등급 불가) */
+export function canDeleteEmployee(
+  callerRole: Role | string | null | undefined,
+  targetRole: Role | string | null | undefined,
+  isSelf: boolean
+): boolean {
+  if (isSelf) return false;
+  if (!targetRole || targetRole === "SUPER_ADMIN") return false;
+  if (callerRole === "SUPER_ADMIN") return true;
+  if (!canEditCompanyRoles(callerRole)) return false;
+  const caller = roleRank(callerRole);
+  const target = roleRank(targetRole);
+  return caller >= 0 && target >= 0 && target < caller;
+}
+
 /** 회사 컨텍스트에서 호출자가 새 사용자에게 부여할 수 있는 역할 목록 */
 export function assignableRolesForCaller(callerRole: Role | string | null | undefined): Role[] {
   if (callerRole === "SUPER_ADMIN") {

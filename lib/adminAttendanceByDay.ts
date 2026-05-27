@@ -1,4 +1,5 @@
 import { calendarDayInTz, timeInTz } from "@/lib/adminMonthlyAttendance";
+import { recordDisplayTimezone } from "@/lib/companyTimezones";
 import type { AttendanceStatus, AttendanceType } from "@prisma/client";
 
 export type AttendancePunchSummary = {
@@ -62,6 +63,7 @@ type RecordInput = {
   isBusinessTrip: boolean;
   businessTripLocation: string | null;
   businessTripReason: string | null;
+  recordTimezone?: string | null;
   employee: { name: string };
   site: { name: string } | null;
 };
@@ -168,10 +170,10 @@ function matchesStatusFilter(
 
 export function aggregateAttendanceByDay(
   records: RecordInput[],
-  timeZone: string,
+  companyTimeZone: string,
   statusFilter?: string
 ): AdminAttendanceDayRow[] {
-  const tz = timeZone.trim() || "UTC";
+  const companyTz = companyTimeZone.trim() || "UTC";
   const byEmployee = new Map<string, RecordInput[]>();
 
   for (const r of records) {
@@ -193,10 +195,16 @@ export function aggregateAttendanceByDay(
 
       const employeeName =
         checkIn?.employee.name ?? checkOut!.employee.name;
-      const checkInPunch = checkIn ? toPunchSummary(checkIn, tz) : null;
-      const checkOutPunch = checkOut ? toPunchSummary(checkOut, tz) : null;
-      const date = calendarDayInTz((checkIn ?? checkOut!).timestamp, tz);
-      const checkOutDate = checkOut ? calendarDayInTz(checkOut.timestamp, tz) : null;
+      const checkInTz = checkIn
+        ? recordDisplayTimezone(checkIn, companyTz)
+        : checkOut
+          ? recordDisplayTimezone(checkOut, companyTz)
+          : companyTz;
+      const checkOutTz = checkOut ? recordDisplayTimezone(checkOut, companyTz) : checkInTz;
+      const checkInPunch = checkIn ? toPunchSummary(checkIn, checkInTz) : null;
+      const checkOutPunch = checkOut ? toPunchSummary(checkOut, checkOutTz) : null;
+      const date = calendarDayInTz((checkIn ?? checkOut!).timestamp, checkInTz);
+      const checkOutDate = checkOut ? calendarDayInTz(checkOut.timestamp, checkOutTz) : null;
       const pending =
         checkIn?.status === "PENDING" || checkOut?.status === "PENDING" || false;
 

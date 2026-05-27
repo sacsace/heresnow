@@ -25,7 +25,7 @@ export function SignOutButton({ className = "" }: { className?: string }) {
     <button
       type="button"
       disabled={busy}
-      className={`${btnSecondary} shrink-0 !px-3.5 disabled:opacity-50 sm:!px-4 ${className}`}
+      className={`${btnSecondary} shrink-0 !px-2.5 !text-[0.75rem] disabled:opacity-50 sm:!px-4 sm:!text-[0.875rem] ${className}`}
       onClick={() => void handleSignOut()}
     >
       {busy ? t("common.processing") : t("common.signOut")}

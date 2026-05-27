@@ -1,7 +1,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { canAssignRole } from "@/lib/roleHierarchy";
+import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
 import { Role } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -27,6 +28,8 @@ const patchSchema = z.object({
   /** null 로 보내면 부서 미배정 처리 */
   departmentId: z.string().min(1).max(40).nullable().optional(),
   name: z.string().trim().min(1).max(120).optional(),
+  email: z.string().email().transform((e) => e.toLowerCase().trim()).optional(),
+  password: z.string().min(8).max(200).optional(),
   role: z.enum(COMPANY_ROLES).optional(),
 });
 
@@ -60,7 +63,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     select: {
       companyId: true,
       userId: true,
-      user: { select: { id: true, role: true } },
+      user: { select: { id: true, role: true, email: true } },
     },
   });
   if (!existing || existing.companyId !== resolved.companyId) {
@@ -99,6 +102,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
   }
 
+  const wantsEmailChange =
+    parsed.data.email !== undefined && parsed.data.email !== existing.user.email;
+
+  if (wantsEmailChange) {
+    const taken = await prisma.user.findUnique({
+      where: { email: parsed.data.email! },
+      select: { id: true },
+    });
+    if (taken && taken.id !== existing.userId) {
+      return NextResponse.json(
+        { error: "EMAIL_TAKEN", message: "이미 등록된 이메일입니다." },
+        { status: 409 }
+      );
+    }
+  }
+
+  const wantsPasswordChange = parsed.data.password !== undefined;
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       const employee = await tx.employee.update({
@@ -115,14 +136,27 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         },
       });
 
+      let userEmail = employee.user.email;
       let userRole = employee.user.role;
-      if (wantsRoleChange) {
+
+      const userUpdates: { email?: string; passwordHash?: string; role?: Role } = {};
+      if (wantsEmailChange) userUpdates.email = parsed.data.email;
+      if (wantsPasswordChange) {
+        userUpdates.passwordHash = await bcrypt.hash(parsed.data.password!, 10);
+      }
+      if (wantsRoleChange) userUpdates.role = parsed.data.role as Role;
+
+      if (Object.keys(userUpdates).length > 0) {
         const updatedUser = await tx.user.update({
           where: { id: existing.userId },
-          data: { role: parsed.data.role as Role },
-          select: { role: true },
+          data: userUpdates,
+          select: { email: true, role: true },
         });
+        userEmail = updatedUser.email;
         userRole = updatedUser.role;
+      }
+
+      if (wantsRoleChange) {
         await tx.approvalLog.create({
           data: {
             companyId: resolved.companyId,
@@ -133,10 +167,32 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           },
         });
       }
+      if (wantsEmailChange) {
+        await tx.approvalLog.create({
+          data: {
+            companyId: resolved.companyId,
+            approverId: session.user.id!,
+            action: "USER_EMAIL_CHANGE",
+            targetType: "User",
+            targetId: existing.userId,
+          },
+        });
+      }
+      if (wantsPasswordChange) {
+        await tx.approvalLog.create({
+          data: {
+            companyId: resolved.companyId,
+            approverId: session.user.id!,
+            action: "USER_PASSWORD_RESET",
+            targetType: "User",
+            targetId: existing.userId,
+          },
+        });
+      }
 
       return {
         ...employee,
-        user: { ...employee.user, role: userRole },
+        user: { ...employee.user, email: userEmail, role: userRole },
       };
     });
 
@@ -144,5 +200,81 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   } catch (e) {
     console.error("[employees PATCH]", e);
     return NextResponse.json({ error: "Update failed" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user?.id || !editRoles.has(session.user.role ?? "")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const resolved = resolveCompanyId(session.user.role, session.user.companyId, new URL(req.url));
+  if ("error" in resolved) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  }
+
+  const { id } = await ctx.params;
+
+  const existing = await prisma.employee.findUnique({
+    where: { id },
+    select: {
+      companyId: true,
+      userId: true,
+      name: true,
+      user: { select: { id: true, role: true } },
+    },
+  });
+  if (!existing || existing.companyId !== resolved.companyId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (existing.user.id === session.user.id) {
+    return NextResponse.json(
+      { error: "CANNOT_DELETE_SELF", message: "본인 계정은 삭제할 수 없습니다." },
+      { status: 403 }
+    );
+  }
+
+  if (!canDeleteEmployee(session.user.role, existing.user.role, false)) {
+    return NextResponse.json(
+      { error: "ROLE_NOT_ALLOWED", message: "권한이 부족하거나 삭제할 수 없는 사용자입니다." },
+      { status: 403 }
+    );
+  }
+
+  if (existing.user.role === "COMPANY_ADMIN") {
+    const adminCount = await prisma.user.count({
+      where: { companyId: resolved.companyId, role: "COMPANY_ADMIN" },
+    });
+    if (adminCount <= 1) {
+      return NextResponse.json(
+        {
+          error: "LAST_ADMIN",
+          message: "마지막 회사 관리자는 삭제할 수 없습니다. 다른 관리자를 먼저 지정해 주세요.",
+        },
+        { status: 403 }
+      );
+    }
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.approvalLog.create({
+        data: {
+          companyId: resolved.companyId,
+          approverId: session.user.id!,
+          action: "USER_DELETE",
+          targetType: "User",
+          targetId: existing.userId,
+        },
+      });
+      // Employee·출퇴근 기록 등은 User/Employee onDelete Cascade 로 정리됨
+      await tx.user.delete({ where: { id: existing.userId } });
+    });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("[employees DELETE]", e);
+    return NextResponse.json({ error: "Delete failed" }, { status: 500 });
   }
 }

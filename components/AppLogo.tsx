@@ -40,13 +40,21 @@ export function AppLogo({
   const content = (
     <span className={wrapClass}>
       {mark}
-      {title ? <span className={titleClass}>{title}</span> : null}
+      {title ? (
+        <span className={`${titleClass} ${variant === "header" ? "hidden sm:inline" : ""}`}>
+          {title}
+        </span>
+      ) : null}
     </span>
   );
 
   if (href) {
     return (
-      <Link href={href} className="inline-flex shrink-0 items-center" aria-label={title || "HeresNow"}>
+      <Link
+        href={href}
+        className="inline-flex min-w-0 shrink-0 items-center"
+        aria-label={title || "HeresNow"}
+      >
         {content}
       </Link>
     );

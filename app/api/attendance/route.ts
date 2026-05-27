@@ -4,6 +4,7 @@ import {
   evaluatePunchEligibility,
   TWENTY_FOUR_H_MS,
 } from "@/lib/attendancePunchRules";
+import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { evaluateAttendanceWorkFlags } from "@/lib/companyWorkSchedule";
 import {
   FACE_DESCRIPTOR_LENGTH,
@@ -134,7 +135,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "회사 정보를 찾을 수 없습니다." }, { status: 400 });
   }
 
-  const tz = company.timezone?.trim() || "Asia/Seoul";
+  const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const now = new Date();
 
   const faceRequired = company.faceRecognitionEnabled;
@@ -255,6 +256,7 @@ export async function POST(req: Request) {
         isHolidayWork: workFlags.isHolidayWork,
         lateMinutes: workFlags.lateMinutes,
         overtimeMinutes: workFlags.overtimeMinutes,
+        recordTimezone: tz,
       },
       include: { site: { select: { name: true } } },
     });

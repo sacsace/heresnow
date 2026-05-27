@@ -4,6 +4,7 @@ import {
   daysInMonth,
   monthRangeUtc,
 } from "@/lib/adminMonthlyAttendance";
+import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -53,7 +54,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
 
-  const tz = company.timezone?.trim() || "Asia/Seoul";
+  const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const { start, end } = monthRangeUtc(ym.year, ym.month, tz);
 
   const [employees, records] = await Promise.all([

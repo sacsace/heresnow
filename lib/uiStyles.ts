@@ -33,13 +33,13 @@ export const navBar =
   "sticky top-0 z-40 border-b border-[var(--separator)] bg-[var(--bar-bg)] backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--bar-bg)]";
 
 export const navBarInner =
-  "mx-auto flex max-w-[86.4rem] flex-wrap items-center justify-between gap-4 gap-y-3 px-5 py-3.5 sm:gap-6 sm:px-8 sm:py-4 lg:px-10";
+  "mx-auto flex max-w-[86.4rem] min-w-0 flex-nowrap items-center justify-between gap-2 px-4 py-3 sm:gap-6 sm:px-8 sm:py-4 lg:px-10";
 
 export const navBarInnerSuper =
-  "app-content-width flex flex-wrap items-center justify-between gap-4 gap-y-3 px-5 py-3.5 sm:gap-6 sm:px-8 sm:py-4 lg:px-10";
+  "app-content-width flex min-w-0 flex-nowrap items-center justify-between gap-2 px-4 py-3 sm:gap-6 sm:px-8 sm:py-4 lg:px-10";
 
 export const navBarInnerEmployee =
-  "mx-auto flex max-w-[86.4rem] min-w-0 items-center justify-between gap-3 px-5 py-3.5 sm:gap-4 sm:px-8 sm:py-4 lg:px-10";
+  "mx-auto flex max-w-[86.4rem] min-w-0 flex-nowrap items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-8 sm:py-4 lg:px-10";
 
 /** Segmented nav track (admin header) */
 export const navSegmentedWrap =
@@ -85,7 +85,7 @@ export const navLinkSuperMin = "sm:!min-w-[7.25rem]";
 
 /** Header right cluster */
 export const headerActions =
-  "flex shrink-0 flex-wrap items-center justify-end gap-3 sm:gap-4";
+  "flex shrink-0 flex-nowrap items-center justify-end gap-1.5 sm:gap-4";
 
 export const headerDivider = "hidden h-9 w-px shrink-0 bg-[var(--separator)] sm:block";
 

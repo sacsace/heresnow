@@ -10,7 +10,7 @@ export function EmployeeHeader() {
   return (
     <header className={`${navBar} pt-[env(safe-area-inset-top,0px)]`}>
       <div className={navBarInnerEmployee}>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <AppLogo href="/employee" title={t("login.title")} />
         </div>
         <AppHeaderActions />

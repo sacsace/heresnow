@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
 import { lateMinutesFor, overtimeMinutesFor } from "@/lib/companyWorkSchedule";
 import { NextResponse } from "next/server";
 
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
     }),
   ]);
 
-  const tz = company?.timezone?.trim() || "Asia/Seoul";
+  const tz = company?.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const schedule = {
     workStartTime: company?.workStartTime ?? null,
     workEndTime: company?.workEndTime ?? null,
@@ -49,14 +50,15 @@ export async function GET(req: Request) {
   const augmented = rows.map((r) => {
     let lateMinutes = r.lateMinutes;
     let overtimeMinutes = r.overtimeMinutes;
+    const rt = recordDisplayTimezone(r, tz);
     if (r.type === "CHECK_IN" && r.isLate && lateMinutes <= 0) {
-      lateMinutes = lateMinutesFor(r.timestamp, tz, schedule);
+      lateMinutes = lateMinutesFor(r.timestamp, rt, schedule);
     }
     if (r.type === "CHECK_OUT" && r.isOvertime && overtimeMinutes <= 0) {
-      overtimeMinutes = overtimeMinutesFor(r.timestamp, tz, schedule);
+      overtimeMinutes = overtimeMinutesFor(r.timestamp, rt, schedule);
     }
     return { ...r, lateMinutes, overtimeMinutes };
   });
 
-  return NextResponse.json({ records: augmented });
+  return NextResponse.json({ timezone: tz, records: augmented });
 }

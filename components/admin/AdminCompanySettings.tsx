@@ -4,12 +4,19 @@ import { useI18n } from "@/components/LanguageProvider";
 import { LocaleTimeInput } from "@/components/LocaleTimeInput";
 import { weekdayShortLabel } from "@/lib/companyWorkSchedule";
 import {
+  DEFAULT_COMPANY_TIMEZONE,
+  formatTimezoneOptionLabel,
+  timezoneOptionsForSelect,
+} from "@/lib/companyTimezones";
+import {
   btnPrimary,
   chipBtn,
   errorText,
   groupedCard,
+  hint,
   label,
   sectionLabel,
+  select,
   successText,
 } from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
@@ -17,6 +24,7 @@ import { useCallback, useEffect, useState } from "react";
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] as const;
 
 type Settings = {
+  timezone: string;
   faceRecognitionEnabled: boolean;
   workStartTime: string | null;
   workEndTime: string | null;
@@ -31,7 +39,9 @@ type Props = {
 
 export function AdminCompanySettings({ companyId }: Props = {}) {
   const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "ko-KR";
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [timezone, setTimezone] = useState<string>(DEFAULT_COMPANY_TIMEZONE);
   const [workStart, setWorkStart] = useState("09:00");
   const [workEnd, setWorkEnd] = useState("18:00");
   const [workDaySet, setWorkDaySet] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
@@ -58,13 +68,17 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
       workEndTime?: string | null;
       faceRecognitionEnabled?: boolean;
     };
+    const tz =
+      typeof s.timezone === "string" && s.timezone.trim() ? s.timezone.trim() : DEFAULT_COMPANY_TIMEZONE;
     setSettings({
+      timezone: tz,
       faceRecognitionEnabled: Boolean(s.faceRecognitionEnabled),
       workStartTime: s.workStartTime ?? "09:00",
       workEndTime: s.workEndTime ?? "18:00",
       workDaysArray: s.workDaysArray ?? [1, 2, 3, 4, 5],
       canEdit: Boolean(s.canEdit),
     });
+    setTimezone(tz);
     setWorkStart(s.workStartTime ?? "09:00");
     setWorkEnd(s.workEndTime ?? "18:00");
     setWorkDaySet(new Set(s.workDaysArray ?? [1, 2, 3, 4, 5]));
@@ -112,11 +126,14 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
 
   async function saveWorkSchedule() {
     await patch({
+      timezone,
       workStartTime: workStart,
       workEndTime: workEnd,
       workDays: [...workDaySet].sort((a, b) => a - b).join(","),
     });
   }
+
+  const timezoneOptions = timezoneOptionsForSelect(settings?.timezone ?? timezone);
 
   return (
     <section>
@@ -162,6 +179,24 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
                 <p className="mt-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
                   {t("admin.settingsWorkLead")}
                 </p>
+
+                <label className="mt-4 block">
+                  <span className={label}>{t("admin.settingsTimezone")}</span>
+                  <select
+                    className={`${select} mt-1.5 bg-[var(--fill-secondary)]`}
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    disabled={!settings.canEdit || saving}
+                    aria-label={t("admin.settingsTimezone")}
+                  >
+                    {timezoneOptions.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {formatTimezoneOptionLabel(tz, dateLocale)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className={`mt-1.5 ${hint}`}>{t("admin.settingsTimezoneHint")}</p>
+                </label>
 
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label className="block">

@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { calendarDayInTz } from "@/lib/adminMonthlyAttendance";
+import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
 import { lateMinutesFor, parseWorkDays } from "@/lib/companyWorkSchedule";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -87,7 +88,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
 
-  const tz = company.timezone?.trim() || "Asia/Seoul";
+  const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const schedule = {
     workStartTime: company.workStartTime ?? null,
     workEndTime: company.workEndTime ?? null,
@@ -155,6 +156,7 @@ export async function GET(req: Request) {
       isLate: true,
       isEarlyLeave: true,
       lateMinutes: true,
+      recordTimezone: true,
     },
   });
 
@@ -189,7 +191,8 @@ export async function GET(req: Request) {
   }
 
   for (const r of records) {
-    const day = calendarDayInTz(r.timestamp, tz);
+    const rt = recordDisplayTimezone(r, tz);
+    const day = calendarDayInTz(r.timestamp, rt);
     if (day < fromQ || day > toQ) continue;
     if (!workDaySet.has(dateWeekday(day))) continue; // 휴일 근무는 이슈 집계에서 제외
     const state = ensure(r.employeeId, day);
@@ -197,7 +200,7 @@ export async function GET(req: Request) {
       state.hasCheckIn = true;
       if (r.isLate) {
         state.isLate = true;
-        const min = r.lateMinutes > 0 ? r.lateMinutes : lateMinutesFor(r.timestamp, tz, schedule);
+        const min = r.lateMinutes > 0 ? r.lateMinutes : lateMinutesFor(r.timestamp, rt, schedule);
         if (min > state.lateMinutes) state.lateMinutes = min;
       }
     } else {

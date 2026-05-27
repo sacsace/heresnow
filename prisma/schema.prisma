@@ -99,7 +99,7 @@ model Company {
   id        String   @id @default(cuid())
   name      String
   /// IANA 타임존 (지각/조퇴 판별)
-  timezone  String   @default("Asia/Seoul")
+  timezone  String   @default("Asia/Kolkata")
   /// false면 출근 시 안면 등록·인식 없이 GPS만으로 출근
   faceRecognitionEnabled Boolean @default(true)
   /// 회사 타임존 기준 정규 출근 "HH:mm"
@@ -212,6 +212,8 @@ model AttendanceRecord {
   site               Site?             @relation(fields: [siteId], references: [id], onDelete: SetNull)
   type               AttendanceType
   timestamp          DateTime          @default(now())
+  /// 출퇴근 시점 회사 IANA 타임존 — 이후 회사 설정이 바뀌어도 표시·일자는 이 값 기준
+  recordTimezone     String?
   latitude           Float
   longitude          Float
   accuracy           Float?

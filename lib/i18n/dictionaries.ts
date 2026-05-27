@@ -28,6 +28,21 @@ export const ko = {
     mapEmbedTitle: "현재 위치",
     mapOpenLargeLink: "Google 지도에서 크게 보기",
   },
+  install: {
+    title: "HeresNow 앱으로 설치",
+    lead: "홈 화면에 추가하면 앱처럼 빠르게 출퇴근할 수 있습니다.",
+    iosSteps:
+      "1. 하단 또는 상단의 공유 버튼(□↑)을 누릅니다.\n2. 「홈 화면에 추가」를 선택합니다.\n3. 「추가」를 누른 뒤 홈 화면의 HeresNow 아이콘으로 실행하세요.",
+    iosCameraNote:
+      "카카오톡·인스타 등 앱 안 브라우저에서는 카메라가 막힐 수 있습니다. Safari로 연 뒤 홈 화면에 추가해 주세요.",
+    androidSteps:
+      "Chrome 메뉴(⋮) → 「홈 화면에 추가」 또는 「앱 설치」를 선택하세요. 아래 버튼이 보이면 바로 설치할 수 있습니다.",
+    androidInstallReady: "아래 「앱 설치」 버튼을 누르면 바로 설치할 수 있습니다.",
+    genericSteps:
+      "브라우저 메뉴에서 「홈 화면에 추가」 또는 「앱 설치」를 선택해 주세요.",
+    installButton: "앱 설치",
+    laterButton: "나중에",
+  },
   account: {
     title: "내 계정",
     subtitle: "비밀번호를 변경하거나 계정 정보를 확인합니다.",
@@ -149,6 +164,7 @@ export const ko = {
     employeesEmailLabel: "이메일",
     employeesNameLabel: "이름",
     employeesPasswordLabel: "임시 비밀번호",
+    employeesPasswordColLabel: "비밀번호",
     employeesPasswordHint: "8자 이상",
     employeesDepartmentLabel: "부서",
     employeesDepartmentNone: "선택 안 함",
@@ -161,7 +177,21 @@ export const ko = {
     employeesAddFail: "추가에 실패했습니다.",
     employeesRoleLabel: "역할",
     employeesRoleSaveFail: "역할 저장에 실패했습니다.",
+    employeesProfileSaveFail: "저장에 실패했습니다.",
+    employeesEmailTaken: "이미 등록된 이메일입니다.",
+    employeesPasswordReset: "비밀번호 변경",
+    employeesPasswordSave: "저장",
+    employeesPasswordCancel: "취소",
+    employeesDelete: "삭제",
+    employeesDeleteConfirm:
+      "「{name}」 직원을 삭제합니다. 출퇴근 기록 등 연결 데이터도 함께 삭제됩니다. 계속할까요?",
+    employeesDeleteFail: "삭제에 실패했습니다.",
+    employeesCannotDeleteSelf: "본인 계정은 삭제할 수 없습니다.",
+    employeesLastAdmin: "마지막 회사 관리자는 삭제할 수 없습니다.",
+    employeesDeleteNotAllowed: "권한이 부족하거나 삭제할 수 없는 사용자입니다.",
     employeesListTitle: "목록",
+    employeesColActions: "작업",
+    employeesResizeColumn: "열 너비 조절",
     employeesEmpty: "등록된 직원이 없습니다.",
     departmentsTitle: "부서 관리",
     departmentsLead: "회사별 부서 목록을 관리합니다. 같은 회사 내에서 부서명은 중복될 수 없습니다.",
@@ -397,6 +427,9 @@ export const ko = {
     settingsSaved: "저장되었습니다.",
     settingsWorkTitle: "근무 시간·요일",
     settingsWorkLead: "회사 타임존 기준으로 지각·조퇴·초과근무·휴일근무를 자동 판정합니다.",
+    settingsTimezone: "시간대 (타임존)",
+    settingsTimezoneHint:
+      "기본은 인도 표준시(IST, Asia/Kolkata)입니다. 출퇴근·오늘 현황·월간 통계·지각/조퇴 판정에 사용됩니다.",
     settingsWorkStart: "정규 출근",
     settingsWorkEnd: "정규 퇴근",
     settingsWorkDays: "근무 요일",
@@ -642,6 +675,20 @@ export const en = {
     mapEmbedTitle: "Current location",
     mapOpenLargeLink: "Open in Google Maps",
   },
+  install: {
+    title: "Install HeresNow",
+    lead: "Add to your home screen for app-like check-in with camera access.",
+    iosSteps:
+      "1. Tap Share (□↑) in Safari.\n2. Choose “Add to Home Screen”.\n3. Tap Add, then open HeresNow from your home screen.",
+    iosCameraNote:
+      "In-app browsers (KakaoTalk, Instagram, etc.) may block the camera. Open in Safari first, then add to home screen.",
+    androidSteps:
+      "In Chrome: menu (⋮) → “Install app” or “Add to Home screen”. Use the button below if shown.",
+    androidInstallReady: "Tap “Install app” below to install now.",
+    genericSteps: "Use your browser menu to “Add to Home screen” or “Install app”.",
+    installButton: "Install app",
+    laterButton: "Not now",
+  },
   account: {
     title: "My account",
     subtitle: "Change your password or review your account details.",
@@ -765,6 +812,7 @@ export const en = {
     employeesEmailLabel: "Email",
     employeesNameLabel: "Name",
     employeesPasswordLabel: "Temporary password",
+    employeesPasswordColLabel: "Password",
     employeesPasswordHint: "At least 8 characters",
     employeesDepartmentLabel: "Department",
     employeesDepartmentNone: "Unassigned",
@@ -777,7 +825,21 @@ export const en = {
     employeesAddFail: "Could not add the employee.",
     employeesRoleLabel: "Role",
     employeesRoleSaveFail: "Could not save the role.",
+    employeesProfileSaveFail: "Could not save changes.",
+    employeesEmailTaken: "This email is already registered.",
+    employeesPasswordReset: "Change password",
+    employeesPasswordSave: "Save",
+    employeesPasswordCancel: "Cancel",
+    employeesDelete: "Delete",
+    employeesDeleteConfirm:
+      "Delete “{name}” and all linked data (including attendance records). Continue?",
+    employeesDeleteFail: "Could not delete the employee.",
+    employeesCannotDeleteSelf: "You cannot delete your own account.",
+    employeesLastAdmin: "The last company admin cannot be deleted.",
+    employeesDeleteNotAllowed: "You are not allowed to delete this user.",
     employeesListTitle: "Members",
+    employeesColActions: "Actions",
+    employeesResizeColumn: "Resize column",
     employeesEmpty: "No employees yet.",
     departmentsTitle: "Departments",
     departmentsLead:
@@ -1017,6 +1079,9 @@ export const en = {
     settingsSaved: "Saved.",
     settingsWorkTitle: "Work hours & days",
     settingsWorkLead: "Late, early leave, overtime, and holiday work are judged in the company timezone.",
+    settingsTimezone: "Time zone",
+    settingsTimezoneHint:
+      "Default is India Standard Time (IST, Asia/Kolkata). Used for attendance, today’s overview, monthly stats, and late/early-leave rules.",
     settingsWorkStart: "Scheduled check-in",
     settingsWorkEnd: "Scheduled check-out",
     settingsWorkDays: "Work days",

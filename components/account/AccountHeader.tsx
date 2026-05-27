@@ -30,7 +30,7 @@ export function AccountHeader() {
   return (
     <header className={`${navBar} pt-[env(safe-area-inset-top,0px)]`}>
       <div className={navBarInnerEmployee}>
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:gap-3">
           <AppLogo href={home} title={t("login.title")} />
           <Link
             href={home}
