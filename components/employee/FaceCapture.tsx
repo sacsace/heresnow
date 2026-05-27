@@ -352,7 +352,7 @@ export function FaceCapture({
     mode === "enroll"
       ? t("employee.faceEnrollButton")
       : (verifyButton ?? t("employee.faceVerifyButton"));
-  const showManualButton = !autoVerifyActive || mode === "enroll";
+  const showManualButton = mode === "enroll" || !autoVerify;
 
   return (
     <div className="overflow-hidden rounded-xl bg-[var(--grouped-bg)] p-3 shadow-sm ring-1 ring-black/[0.04] sm:p-4">
