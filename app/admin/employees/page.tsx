@@ -23,7 +23,6 @@ import {
 } from "@/lib/uiStyles";
 import {
   assignableRolesForCaller,
-  canAssignRole,
   canDeleteEmployee,
 } from "@/lib/roleHierarchy";
 import type { Role } from "@prisma/client";
