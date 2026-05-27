@@ -23,9 +23,6 @@ import { fromZonedTime } from "date-fns-tz";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-const MIN_COL_WIDTH = 6;
-const MAX_COL_WIDTH = 24;
-
 function visualWidth(value: unknown): number {
   if (value === null || value === undefined) return 0;
   const text = String(value);
