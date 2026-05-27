@@ -6,6 +6,7 @@ import { CalendarDayDetailModal } from "@/components/admin/attendance/CalendarDa
 import { AttendanceCalendarView } from "@/components/admin/attendance/CalendarView";
 import { AttendanceChartView } from "@/components/admin/attendance/ChartView";
 import { AttendanceDayTable } from "@/components/admin/attendance/DayTable";
+import { AttendanceDownloadView } from "@/components/admin/attendance/DownloadView";
 import { AttendanceIssuesView } from "@/components/admin/attendance/IssuesView";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
@@ -35,7 +36,8 @@ type AttendanceTab =
   | "calendar"
   | "chart"
   | "map"
-  | "issues";
+  | "issues"
+  | "download";
 
 type SearchFilters = {
   q: string;
@@ -61,6 +63,20 @@ function currentMonthRange(): { from: string; to: string } {
   return monthRangeFor(now.getFullYear(), now.getMonth());
 }
 
+function todayYmd(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** 검색 기본값: 시작·종료 모두 오늘 */
+function todayRange(): { from: string; to: string } {
+  const today = todayYmd();
+  return { from: today, to: today };
+}
+
 function shiftMonth(fromDate: string, delta: number): { from: string; to: string } {
   const [y, m] = fromDate.split("-").map(Number);
   const base = new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, 1);
@@ -69,7 +85,7 @@ function shiftMonth(fromDate: string, delta: number): { from: string; to: string
 }
 
 function defaultFilters(): SearchFilters {
-  const { from, to } = currentMonthRange();
+  const { from, to } = todayRange();
   return { q: "", from, to, status: "", departmentId: "" };
 }
 
@@ -92,13 +108,7 @@ export default function AdminAttendancePage() {
   const [draft, setDraft] = useState<SearchFilters>(() => defaultFilters());
   const [filters, setFilters] = useState<SearchFilters>(() => defaultFilters());
   const [mapMode, setMapMode] = useState<"single" | "range">("single");
-  const [mapDate, setMapDate] = useState<string>(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  });
+  const [mapDate, setMapDate] = useState<string>(() => todayYmd());
   const [mapFrom, setMapFrom] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 6);
@@ -107,13 +117,7 @@ export default function AdminAttendancePage() {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   });
-  const [mapTo, setMapTo] = useState<string>(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  });
+  const [mapTo, setMapTo] = useState<string>(() => todayYmd());
 
   const [departments, setDepartments] = useState<DepartmentLite[]>([]);
   const [calendarDetailDate, setCalendarDetailDate] = useState<string | null>(null);
@@ -146,6 +150,7 @@ export default function AdminAttendancePage() {
     { id: "map", label: t("admin.attendanceTabMap") },
     { id: "chart", label: t("admin.attendanceTabChart") },
     { id: "issues", label: t("admin.attendanceTabIssues") },
+    { id: "download", label: t("admin.attendanceTabDownload") },
   ];
 
   const subtitleByTab: Record<AttendanceTab, string> = {
@@ -156,18 +161,19 @@ export default function AdminAttendancePage() {
     map: t("admin.attendanceTabMapLead"),
     chart: t("admin.attendanceTabChartLead"),
     issues: t("admin.attendanceTabIssuesLead"),
+    download: t("admin.attendanceTabDownloadLead"),
   };
 
   const exportHref = useMemo(() => {
     const q = new URLSearchParams();
+    q.set("lang", locale);
     if (filters.status) q.set("status", filters.status);
     if (filters.from) q.set("from", filters.from);
     if (filters.to) q.set("to", filters.to);
     if (filters.q) q.set("q", filters.q);
     if (filters.departmentId) q.set("departmentId", filters.departmentId);
-    const s = q.toString();
-    return s ? `/api/admin/export?${s}` : "/api/admin/export";
-  }, [filters]);
+    return `/api/admin/export?${q.toString()}`;
+  }, [filters, locale]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -184,8 +190,12 @@ export default function AdminAttendancePage() {
   }, [filters]);
 
   useEffect(() => {
+    if (tab === "download") {
+      setLoading(false);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [load, tab]);
 
   function applySearch(e: React.FormEvent) {
     e.preventDefault();
@@ -209,6 +219,12 @@ export default function AdminAttendancePage() {
   }
 
   function gotoToday() {
+    const next = todayRange();
+    setDraft({ ...draft, from: next.from, to: next.to });
+    setFilters({ ...filters, from: next.from, to: next.to });
+  }
+
+  function applyMonthRangeForDownload() {
     const next = currentMonthRange();
     setDraft({ ...draft, from: next.from, to: next.to });
     setFilters({ ...filters, from: next.from, to: next.to });
@@ -419,9 +435,11 @@ export default function AdminAttendancePage() {
                     {t("admin.attendanceSearchReset")}
                   </button>
                 )}
-                <a href={exportHref} className={`${btnSecondary} h-9`}>
-                  Excel
-                </a>
+                {tab !== "download" && (
+                  <a href={exportHref} className={`${btnSecondary} h-9`}>
+                    Excel
+                  </a>
+                )}
               </div>
             </div>
           </form>
@@ -439,7 +457,7 @@ export default function AdminAttendancePage() {
       ) : tab === "calendar" ? (
         <AttendanceCalendarView
           rows={rows}
-          month={filters.from || currentMonthRange().from}
+          month={filters.from || todayYmd()}
           dateLocale={dateLocale}
           onPrevMonth={() => gotoMonth(-1)}
           onNextMonth={() => gotoMonth(1)}
@@ -452,17 +470,24 @@ export default function AdminAttendancePage() {
         ) : (
           <AttendanceChartView
             rows={rows}
-            fromDate={filters.from || currentMonthRange().from}
-            toDate={filters.to || currentMonthRange().to}
+            fromDate={filters.from || todayYmd()}
+            toDate={filters.to || todayYmd()}
             dateLocale={dateLocale}
           />
         )
       ) : tab === "issues" ? (
         <AttendanceIssuesView
-          from={filters.from || currentMonthRange().from}
-          to={filters.to || currentMonthRange().to}
+          from={filters.from || todayYmd()}
+          to={filters.to || todayYmd()}
           departmentId={filters.departmentId || null}
           query={filters.q}
+        />
+      ) : tab === "download" ? (
+        <AttendanceDownloadView
+          exportHref={exportHref}
+          filters={filters}
+          departments={departments}
+          onApplyMonthRange={applyMonthRangeForDownload}
         />
       ) : displayRows.length === 0 ? (
         <p className={emptyState}>{t("admin.attendanceEmpty")}</p>
