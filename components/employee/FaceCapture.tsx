@@ -13,26 +13,56 @@ type Mode = "enroll" | "verify";
 type Props = {
   mode: Mode;
   disabled?: boolean;
+  /** verify 모드: 얼굴이 인식되면 버튼 없이 자동으로 onVerified 호출 */
+  autoVerify?: boolean;
+  verifyTitle?: string;
+  verifyLead?: string;
+  verifyButton?: string;
   onEnrolled?: () => void;
-  onVerified?: (descriptor: number[]) => void;
+  onVerified?: (descriptor: number[]) => boolean | void | Promise<boolean | void>;
   onError?: (message: string) => void;
 };
 
 type InitPhase = "idle" | "loading-models" | "starting-camera" | "ready" | "error";
 
-export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }: Props) {
+const AUTO_SCAN_INTERVAL_MS = 1_100;
+const AUTO_SCAN_INITIAL_DELAY_MS = 500;
+
+export function FaceCapture({
+  mode,
+  disabled,
+  autoVerify = false,
+  verifyTitle,
+  verifyLead,
+  verifyButton,
+  onEnrolled,
+  onVerified,
+  onError,
+}: Props) {
   const { t } = useI18n();
   const tRef = useRef(t);
   tRef.current = t;
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const scanStoppedRef = useRef(false);
+  const busyRef = useRef(false);
+  const onVerifiedRef = useRef(onVerified);
+  const onEnrolledRef = useRef(onEnrolled);
+  const onErrorRef = useRef(onError);
+  onVerifiedRef.current = onVerified;
+  onEnrolledRef.current = onEnrolled;
+  onErrorRef.current = onError;
+
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<InitPhase>("idle");
   const [status, setStatus] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [needsTap, setNeedsTap] = useState(false);
+  const [autoScanDone, setAutoScanDone] = useState(false);
+
+  const autoVerifyActive = mode === "verify" && autoVerify;
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
@@ -47,12 +77,17 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
     function isIosInAppBrowser(): boolean {
       if (typeof navigator === "undefined") return false;
       const ua = navigator.userAgent || "";
-      const ios = /iPad|iPhone|iPod/.test(ua) ||
-        (navigator.platform === "MacIntel" && (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints !== undefined && ((navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0) > 1);
+      const ios =
+        /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === "MacIntel" &&
+          (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints !== undefined &&
+          ((navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0) > 1);
       if (!ios) return false;
-      return /KAKAOTALK|NAVER|Line\//i.test(ua) ||
+      return (
+        /KAKAOTALK|NAVER|Line\//i.test(ua) ||
         /Instagram|FBAN|FBAV|FB_IAB|Snapchat|Twitter|TikTok|wv\)/i.test(ua) ||
-        (!/Safari\//.test(ua) && !/CriOS\/|FxiOS\/|EdgiOS\//.test(ua));
+        (!/Safari\//.test(ua) && !/CriOS\/|FxiOS\/|EdgiOS\//.test(ua))
+      );
     }
 
     function deriveErrorMessage(err: unknown): string {
@@ -137,8 +172,6 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         const video = videoRef.current;
         if (video) {
           video.srcObject = stream;
-          // iOS Safari는 srcObject 직후 await play()가 거부되는 경우가 잦음.
-          // 거부 시 사용자에게 "탭하여 시작" 안내(needsTap) — 실제로는 캡처 버튼 탭에서도 자동 재시도된다.
           video.play().then(
             () => {
               if (!cancelled) setNeedsTap(false);
@@ -168,13 +201,8 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
       cancelled = true;
       stopCamera();
     };
-    // tRef.current 사용 — 로케일 전환 시 카메라 재시작 방지
   }, [stopCamera]);
 
-  /**
-   * iOS Safari 안전망 — onLoadedMetadata / onCanPlay 가 끝내 발생하지 않는 드문 케이스 대비.
-   * 스트림이 붙은 뒤 5초 동안 video.readyState 를 폴링해서 강제로 ready 처리한다.
-   */
   useEffect(() => {
     if (ready || cameraError) return;
     if (!streamRef.current) return;
@@ -194,47 +222,66 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
     return () => window.clearInterval(id);
   }, [ready, cameraError]);
 
-  async function capture() {
-    if (!videoRef.current || !ready || busy || disabled) return;
-    setBusy(true);
+  /** 출퇴근 API 실패 후 다시 자동 인식 재개 */
+  useEffect(() => {
+    if (!autoVerifyActive) return;
+    if (disabled) return;
+    if (!scanStoppedRef.current) return;
+    scanStoppedRef.current = false;
+    setAutoScanDone(false);
     setStatus(null);
-    try {
-      // iOS Safari: 첫 사용자 제스처 시점에 다시 한번 play() — 정책상 여기서는 거의 항상 성공.
-      const v = videoRef.current;
-      if (v.paused) {
-        try {
-          await v.play();
-        } catch (e) {
-          console.warn("[face] play() on capture failed", e);
-        }
-      }
-      const desc = await extractFaceDescriptor(v);
-      if (!desc) {
-        const msg = t("employee.faceNotDetected");
-        setStatus(msg);
-        onError?.(msg);
-        setBusy(false);
-        return;
-      }
-      const arr = descriptorToArray(desc);
+  }, [autoVerifyActive, disabled]);
 
-      if (mode === "enroll") {
-        const r = await fetch("/api/employee/face", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ descriptor: arr }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          const msg = typeof j.error === "string" ? j.error : t("employee.faceEnrollFail");
-          setStatus(msg);
-          onError?.(msg);
-          setBusy(false);
-          return;
+  const runCapture = useCallback(
+    async (opts?: { silentNoFace?: boolean }) => {
+      if (!videoRef.current || !ready || busyRef.current || disabled) return false;
+      busyRef.current = true;
+      setBusy(true);
+      if (!opts?.silentNoFace) setStatus(null);
+
+      try {
+        const v = videoRef.current;
+        if (v.paused) {
+          try {
+            await v.play();
+            setNeedsTap(false);
+          } catch (e) {
+            console.warn("[face] play() on capture failed", e);
+          }
         }
-        setStatus(t("employee.faceEnrollOk"));
-        onEnrolled?.();
-      } else {
+        const desc = await extractFaceDescriptor(v);
+        if (!desc) {
+          if (!opts?.silentNoFace) {
+            const msg = tRef.current("employee.faceNotDetected");
+            setStatus(msg);
+            onErrorRef.current?.(msg);
+          } else {
+            setStatus(tRef.current("employee.faceScanning"));
+          }
+          return false;
+        }
+        const arr = descriptorToArray(desc);
+
+        if (mode === "enroll") {
+          const r = await fetch("/api/employee/face", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ descriptor: arr }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            const msg =
+              typeof j.error === "string" ? j.error : tRef.current("employee.faceEnrollFail");
+            setStatus(msg);
+            onErrorRef.current?.(msg);
+            return false;
+          }
+          setStatus(tRef.current("employee.faceEnrollOk"));
+          scanStoppedRef.current = true;
+          onEnrolledRef.current?.();
+          return true;
+        }
+
         const r = await fetch("/api/employee/face", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -242,27 +289,70 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const msg = typeof j.error === "string" ? j.error : t("employee.faceVerifyFail");
+          const msg =
+            typeof j.error === "string" ? j.error : tRef.current("employee.faceVerifyFail");
           setStatus(msg);
-          onError?.(msg);
-          setBusy(false);
-          return;
+          onErrorRef.current?.(msg);
+          return false;
         }
-        setStatus(t("employee.faceVerifyOk"));
-        onVerified?.(arr);
+        setStatus(tRef.current("employee.faceVerifyOk"));
+        const punchOk = await onVerifiedRef.current?.(arr);
+        if (punchOk === false) {
+          setStatus(tRef.current("employee.faceVerifyRetry"));
+          return false;
+        }
+        scanStoppedRef.current = true;
+        setAutoScanDone(true);
+        return true;
+      } catch {
+        const msg = tRef.current("employee.faceProcessFail");
+        setStatus(msg);
+        onErrorRef.current?.(msg);
+        return false;
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
       }
-    } catch {
-      const msg = t("employee.faceProcessFail");
-      setStatus(msg);
-      onError?.(msg);
-    }
-    setBusy(false);
-  }
+    },
+    [disabled, mode, ready]
+  );
 
-  const title = mode === "enroll" ? t("employee.faceEnrollTitle") : t("employee.faceVerifyTitle");
-  const lead = mode === "enroll" ? t("employee.faceEnrollLead") : t("employee.faceVerifyLead");
+  useEffect(() => {
+    if (!autoVerifyActive || !ready || disabled || cameraError) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const schedule = (ms: number) => {
+      timer = setTimeout(() => void tick(), ms);
+    };
+
+    async function tick() {
+      if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError) return;
+      await runCapture({ silentNoFace: true });
+      if (!cancelled && !scanStoppedRef.current) {
+        schedule(AUTO_SCAN_INTERVAL_MS);
+      }
+    }
+
+    schedule(AUTO_SCAN_INITIAL_DELAY_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [autoVerifyActive, ready, disabled, cameraError, runCapture]);
+
+  const title =
+    mode === "enroll"
+      ? t("employee.faceEnrollTitle")
+      : (verifyTitle ?? t("employee.faceVerifyTitle"));
+  const lead =
+    mode === "enroll" ? t("employee.faceEnrollLead") : (verifyLead ?? t("employee.faceVerifyLead"));
   const buttonLabel =
-    mode === "enroll" ? t("employee.faceEnrollButton") : t("employee.faceVerifyButton");
+    mode === "enroll"
+      ? t("employee.faceEnrollButton")
+      : (verifyButton ?? t("employee.faceVerifyButton"));
+  const showManualButton = !autoVerifyActive || mode === "enroll";
 
   return (
     <div className="overflow-hidden rounded-xl bg-[var(--grouped-bg)] p-3 shadow-sm ring-1 ring-black/[0.04] sm:p-4">
@@ -308,6 +398,11 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
                 : t("employee.faceStartingCamera")}
             </div>
           )}
+          {autoVerifyActive && ready && !cameraError && !autoScanDone && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit max-w-[90%] rounded-full bg-black/55 px-3 py-1 text-center text-[0.6875rem] font-medium text-white">
+              {busy ? t("employee.faceProcessing") : t("employee.faceScanning")}
+            </div>
+          )}
           {needsTap && phase !== "loading-models" && phase !== "starting-camera" && (
             <div className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit max-w-[90%] rounded-full bg-white/85 px-3 py-1 text-center text-[0.6875rem] font-semibold text-[var(--foreground)]">
               {t("employee.faceTapToStart")}
@@ -316,14 +411,16 @@ export function FaceCapture({ mode, disabled, onEnrolled, onVerified, onError }:
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={!ready || busy || disabled || !!cameraError}
-        onClick={() => void capture()}
-        className="mt-3 flex min-h-[3rem] w-full touch-manipulation items-center justify-center rounded-xl bg-[var(--apple-blue)] py-3 text-base font-semibold text-white hover:bg-[#0071e3] active:bg-[#0066cc] disabled:opacity-50"
-      >
-        {busy ? t("employee.faceProcessing") : buttonLabel}
-      </button>
+      {showManualButton && (
+        <button
+          type="button"
+          disabled={!ready || busy || disabled || !!cameraError}
+          onClick={() => void runCapture()}
+          className="mt-3 flex min-h-[3rem] w-full touch-manipulation items-center justify-center rounded-xl bg-[var(--apple-blue)] py-3 text-base font-semibold text-white hover:bg-[#0071e3] active:bg-[#0066cc] disabled:opacity-50"
+        >
+          {busy ? t("employee.faceProcessing") : buttonLabel}
+        </button>
+      )}
       {status && <p className="mt-2 text-center text-sm text-[var(--apple-label-secondary)]">{status}</p>}
     </div>
   );

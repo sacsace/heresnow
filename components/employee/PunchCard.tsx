@@ -77,6 +77,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const [businessTripLocation, setBusinessTripLocation] = useState("");
   const [businessTripReason, setBusinessTripReason] = useState("");
   const [earlyLeaveReason, setEarlyLeaveReason] = useState("");
+  const [checkOutFaceStarted, setCheckOutFaceStarted] = useState(false);
   const [memo, setMemo] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
@@ -145,15 +146,19 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   }, []);
 
   const loadRecords = useCallback(async () => {
-    const r = await fetch("/api/attendance/me?limit=20");
-    const j = await r.json();
-    if (r.ok) {
-      const tz =
-        typeof j.timezone === "string" && j.timezone.trim()
-          ? j.timezone.trim()
-          : DEFAULT_COMPANY_TIMEZONE;
-      setCompanyTimezone(tz);
-      setRecords(j.records ?? []);
+    try {
+      const r = await fetch("/api/attendance/me?limit=20");
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        const tz =
+          typeof j.timezone === "string" && j.timezone.trim()
+            ? j.timezone.trim()
+            : DEFAULT_COMPANY_TIMEZONE;
+        setCompanyTimezone(tz);
+        setRecords(Array.isArray(j.records) ? j.records : []);
+      }
+    } catch (e) {
+      console.error("[PunchCard loadRecords]", e);
     }
   }, []);
 
@@ -161,6 +166,12 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     void loadFaceStatus();
     void loadRecords();
   }, [loadFaceStatus, loadRecords]);
+
+  useEffect(() => {
+    if (!punchStatus?.canCheckOut) {
+      setCheckOutFaceStarted(false);
+    }
+  }, [punchStatus?.canCheckOut]);
 
   useEffect(() => {
     if (!photoFile) {
@@ -224,6 +235,75 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     });
   }
 
+  /** 캐시·저정밀 GPS — 출퇴근 API를 먼저 보낼 때 사용 */
+  function readPositionFast(): Promise<GeolocationPosition | null> {
+    return new Promise((resolve) => {
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        resolve(null);
+        return;
+      }
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(pos),
+        () => resolve(null),
+        {
+          enableHighAccuracy: false,
+          maximumAge: 300_000,
+          timeout: 4000,
+        }
+      );
+    });
+  }
+
+  async function resolveCoordsForPunch(): Promise<{
+    lat: number;
+    lng: number;
+    accuracy?: number;
+    needsRefine: boolean;
+  }> {
+    if (previewCoords) {
+      return {
+        lat: previewCoords.lat,
+        lng: previewCoords.lng,
+        needsRefine: true,
+      };
+    }
+    const fast = await readPositionFast();
+    if (fast) {
+      return {
+        lat: fast.coords.latitude,
+        lng: fast.coords.longitude,
+        accuracy: fast.coords.accuracy,
+        needsRefine: true,
+      };
+    }
+    return { lat: 0, lng: 0, needsRefine: true };
+  }
+
+  async function refineAttendanceLocation(recordId: string) {
+    try {
+      const pos = await readPositionOnce();
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      setPreviewCoords({ lat, lng });
+      await fetch(`/api/attendance/${recordId}/location`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latitude: lat,
+          longitude: lng,
+          accuracy: pos.coords.accuracy,
+        }),
+      });
+      await loadRecords();
+    } catch {
+      // 출퇴근은 이미 저장됨 — 위치 보정만 실패
+    }
+  }
+
   async function fileToDataUrl(f: File): Promise<string | null> {
     if (f.size > 900_000) {
       setMsg(t("employee.photoTooLarge"));
@@ -262,28 +342,27 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     return true;
   }
 
-  async function submitCheckIn(faceDescriptor?: number[]) {
+  async function submitCheckIn(faceDescriptor?: number[]): Promise<boolean> {
     if (!punchStatus?.canCheckIn) {
       setMsg(checkInBlockMessage() ?? t("employee.alreadyCheckedIn"));
-      return;
+      return false;
     }
-    if (!validateBusinessTripFields()) return;
+    if (!validateBusinessTripFields()) return false;
 
     setMsg(null);
     setBusy(true);
     try {
-      const pos = await readPositionOnce();
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const acc = pos.coords.accuracy;
-      setPreviewCoords({ lat, lng });
+      const { lat, lng, accuracy: acc, needsRefine } = await resolveCoordsForPunch();
+      if (lat !== 0 || lng !== 0) {
+        setPreviewCoords({ lat, lng });
+      }
 
       let photoUrl: string | null = null;
       if (photoFile) {
         photoUrl = await fileToDataUrl(photoFile);
         if (!photoUrl) {
           setBusy(false);
-          return;
+          return false;
         }
       }
       const res = await fetch("/api/attendance", {
@@ -315,7 +394,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
               : "저장에 실패했습니다."
         );
         setBusy(false);
-        return;
+        return false;
       }
       setMsg(j.message ?? "저장되었습니다.");
       setMemo("");
@@ -323,33 +402,39 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       setBusinessTripReason("");
       setCheckInMode("normal");
       clearPhoto();
-      await loadRecords();
-      await reloadPunchStatus();
+      const recordId = typeof j.id === "string" ? j.id : null;
+      setBusy(false);
+      void loadRecords();
+      void reloadPunchStatus();
+      if (recordId && needsRefine) {
+        void refineAttendanceLocation(recordId);
+      }
+      return true;
     } catch (e: unknown) {
       if (e && typeof e === "object" && "message" in e) {
         setMsg(String((e as { message?: string }).message));
       } else {
-        setMsg("위치를 가져오지 못했거나 네트워크 오류가 발생했습니다.");
+        setMsg("네트워크 오류가 발생했습니다.");
       }
+      setBusy(false);
+      return false;
     }
-    setBusy(false);
   }
 
-  async function submitCheckOut(faceDescriptor?: number[]) {
+  async function submitCheckOut(faceDescriptor?: number[]): Promise<boolean> {
     // 조퇴(정규 퇴근시각 이전 퇴근) 인 경우 사유 필수 — 클라이언트 선검증으로 즉시 안내
     if (punchStatus?.earlyLeaveExpected && !earlyLeaveReason.trim()) {
       setMsg(t("employee.earlyLeaveReasonRequired"));
-      return;
+      return false;
     }
 
     setMsg(null);
     setBusy(true);
     try {
-      const pos = await readPositionOnce();
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const acc = pos.coords.accuracy;
-      setPreviewCoords({ lat, lng });
+      const { lat, lng, accuracy: acc, needsRefine } = await resolveCoordsForPunch();
+      if (lat !== 0 || lng !== 0) {
+        setPreviewCoords({ lat, lng });
+      }
 
       const res = await fetch("/api/attendance", {
         method: "POST",
@@ -371,7 +456,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
           setMsg(t("employee.earlyLeaveReasonRequired"));
           setBusy(false);
           await reloadPunchStatus();
-          return;
+          return false;
         }
         const err = j.error as unknown;
         setMsg(
@@ -382,21 +467,28 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
               : t("employee.saveFail")
         );
         setBusy(false);
-        return;
+        return false;
       }
       setMsg(j.message ?? t("employee.saved"));
       setMemo("");
       setEarlyLeaveReason("");
-      await loadRecords();
-      await reloadPunchStatus();
+      const recordId = typeof j.id === "string" ? j.id : null;
+      setBusy(false);
+      void loadRecords();
+      void reloadPunchStatus();
+      if (recordId && needsRefine) {
+        void refineAttendanceLocation(recordId);
+      }
+      return true;
     } catch (e: unknown) {
       if (e && typeof e === "object" && "message" in e) {
         setMsg(String((e as { message?: string }).message));
       } else {
         setMsg(t("employee.saveFail"));
       }
+      setBusy(false);
+      return false;
     }
-    setBusy(false);
   }
 
   const faceRequired = faceRecognitionEnabled !== false;
@@ -418,6 +510,12 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     canCheckIn &&
     !punchStatusLoading;
   const checkInNotice = checkInBlockMessage();
+  const checkInFaceDisabled =
+    busy ||
+    (checkInMode === "businessTrip" &&
+      (!businessTripLocation.trim() || !businessTripReason.trim()));
+  const checkOutFaceDisabled =
+    busy || (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim());
 
   return (
     <div className={embedded ? "min-w-0" : "min-w-0 space-y-6 sm:space-y-8"}>
@@ -521,8 +619,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
               <div className="mt-4">
                 <FaceCapture
                   mode="verify"
-                  disabled={busy}
-                  onVerified={(descriptor) => void submitCheckIn(descriptor)}
+                  autoVerify
+                  disabled={checkInFaceDisabled}
+                  onVerified={(descriptor) => submitCheckIn(descriptor)}
                   onError={setMsg}
                 />
               </div>
@@ -663,22 +762,48 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
               </div>
             )}
             {faceRequired ? (
-              <FaceCapture
-                mode="verify"
-                disabled={
-                  busy ||
-                  (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim())
-                }
-                onVerified={(descriptor) => void submitCheckOut(descriptor)}
-                onError={setMsg}
-              />
+              !checkOutFaceStarted ? (
+                <button
+                  type="button"
+                  disabled={checkOutFaceDisabled}
+                  onClick={() => setCheckOutFaceStarted(true)}
+                  className={
+                    btnPrimary + " w-full min-h-[3rem] py-3.5 text-[1.0625rem] sm:min-h-[3.25rem]"
+                  }
+                >
+                  {punchStatus?.earlyLeaveExpected
+                    ? t("employee.earlyLeaveSubmitButton")
+                    : t("employee.checkOutOnly")}
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setCheckOutFaceStarted(false)}
+                    className={`${btnSecondary} w-full sm:w-auto`}
+                  >
+                    {t("common.cancel")}
+                  </button>
+                  <FaceCapture
+                    mode="verify"
+                    disabled={checkOutFaceDisabled}
+                    verifyTitle={t("employee.faceVerifyCheckoutTitle")}
+                    verifyLead={t("employee.faceVerifyCheckoutLead")}
+                    verifyButton={t("employee.faceVerifyCheckoutButton")}
+                    onVerified={async (descriptor) => {
+                      const ok = await submitCheckOut(descriptor);
+                      if (ok) setCheckOutFaceStarted(false);
+                      return ok;
+                    }}
+                    onError={setMsg}
+                  />
+                </div>
+              )
             ) : (
               <button
                 type="button"
-                disabled={
-                  busy ||
-                  (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim())
-                }
+                disabled={checkOutFaceDisabled}
                 onClick={() => void submitCheckOut()}
                 className={btnPrimary + " w-full min-h-[3rem] py-3.5 text-[1.0625rem] sm:min-h-[3.25rem]"}
               >
