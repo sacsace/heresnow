@@ -77,11 +77,21 @@ function todayRange(): { from: string; to: string } {
   return { from: today, to: today };
 }
 
-function shiftMonth(fromDate: string, delta: number): { from: string; to: string } {
-  const [y, m] = fromDate.split("-").map(Number);
-  const base = new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, 1);
+function parseYmd(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, d ?? 1);
+}
+
+function monthRangeFromAnchor(ymd: string): { from: string; to: string } {
+  const d = parseYmd(ymd);
+  return monthRangeFor(d.getFullYear(), d.getMonth());
+}
+
+function shiftCalendarMonth(anchorYmd: string, delta: number): string {
+  const base = parseYmd(anchorYmd);
   base.setMonth(base.getMonth() + delta);
-  return monthRangeFor(base.getFullYear(), base.getMonth());
+  const mm = String(base.getMonth() + 1).padStart(2, "0");
+  return `${base.getFullYear()}-${mm}-01`;
 }
 
 function defaultFilters(): SearchFilters {
@@ -107,6 +117,8 @@ export default function AdminAttendancePage() {
   const [tab, setTab] = useState<AttendanceTab>("daily");
   const [draft, setDraft] = useState<SearchFilters>(() => defaultFilters());
   const [filters, setFilters] = useState<SearchFilters>(() => defaultFilters());
+  /** 월 달력 탭 전용 — 검색 기간(filters)과 분리 */
+  const [calendarMonth, setCalendarMonth] = useState(() => todayYmd());
   const [mapMode, setMapMode] = useState<"single" | "range">("single");
   const [mapDate, setMapDate] = useState<string>(() => todayYmd());
   const [mapFrom, setMapFrom] = useState<string>(() => {
@@ -164,6 +176,15 @@ export default function AdminAttendancePage() {
     download: t("admin.attendanceTabDownloadLead"),
   };
 
+  /** API 조회에 쓰는 기간 — 달력 탭만 월 범위, 나머지는 검색 filters */
+  const fetchFilters = useMemo((): SearchFilters => {
+    if (tab === "calendar") {
+      const range = monthRangeFromAnchor(calendarMonth);
+      return { ...filters, from: range.from, to: range.to };
+    }
+    return filters;
+  }, [tab, filters, calendarMonth]);
+
   const exportHref = useMemo(() => {
     const q = new URLSearchParams();
     q.set("lang", locale);
@@ -178,16 +199,16 @@ export default function AdminAttendancePage() {
   const load = useCallback(async () => {
     setLoading(true);
     const q = new URLSearchParams();
-    if (filters.status) q.set("status", filters.status);
-    if (filters.from) q.set("from", filters.from);
-    if (filters.to) q.set("to", filters.to);
-    if (filters.q) q.set("q", filters.q);
-    if (filters.departmentId) q.set("departmentId", filters.departmentId);
+    if (fetchFilters.status) q.set("status", fetchFilters.status);
+    if (fetchFilters.from) q.set("from", fetchFilters.from);
+    if (fetchFilters.to) q.set("to", fetchFilters.to);
+    if (fetchFilters.q) q.set("q", fetchFilters.q);
+    if (fetchFilters.departmentId) q.set("departmentId", fetchFilters.departmentId);
     const r = await fetch(`/api/admin/attendance?${q.toString()}`);
     const j = await r.json();
     if (r.ok) setRows(j.days ?? []);
     setLoading(false);
-  }, [filters]);
+  }, [fetchFilters]);
 
   useEffect(() => {
     if (tab === "download") {
@@ -208,20 +229,29 @@ export default function AdminAttendancePage() {
     setFilters(next);
   }
 
+  function applyTodaySearch() {
+    const next = todayRange();
+    setDraft((d) => ({ ...d, from: next.from, to: next.to }));
+    setFilters((f) => ({ ...f, from: next.from, to: next.to }));
+  }
+
+  function selectTab(id: AttendanceTab) {
+    if (id === "daily") {
+      applyTodaySearch();
+    }
+    setTab(id);
+  }
+
   const holidayRows = useMemo(() => rows.filter((r) => r.isHolidayWork), [rows]);
   const displayRows = tab === "holiday" ? holidayRows : rows;
   const hasActiveFilters = filtersDifferFromDefault(filters);
 
   function gotoMonth(delta: number) {
-    const next = shiftMonth(filters.from || currentMonthRange().from, delta);
-    setDraft({ ...draft, from: next.from, to: next.to });
-    setFilters({ ...filters, from: next.from, to: next.to });
+    setCalendarMonth((prev) => shiftCalendarMonth(prev, delta));
   }
 
-  function gotoToday() {
-    const next = todayRange();
-    setDraft({ ...draft, from: next.from, to: next.to });
-    setFilters({ ...filters, from: next.from, to: next.to });
+  function gotoCalendarToday() {
+    setCalendarMonth(todayYmd());
   }
 
   function applyMonthRangeForDownload() {
@@ -239,7 +269,7 @@ export default function AdminAttendancePage() {
           <button
             key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
+            onClick={() => selectTab(item.id)}
             className={segmentedBtn(tab === item.id)}
           >
             {item.label}
@@ -430,6 +460,9 @@ export default function AdminAttendancePage() {
                 <button type="submit" className={`${btnPrimary} h-9 px-4`}>
                   {t("admin.attendanceSearchApply")}
                 </button>
+                <button type="button" onClick={applyTodaySearch} className={`${btnSecondary} h-9`}>
+                  {t("admin.attendanceMapToday")}
+                </button>
                 {hasActiveFilters && (
                   <button type="button" onClick={resetSearch} className={`${btnSecondary} h-9`}>
                     {t("admin.attendanceSearchReset")}
@@ -457,11 +490,11 @@ export default function AdminAttendancePage() {
       ) : tab === "calendar" ? (
         <AttendanceCalendarView
           rows={rows}
-          month={filters.from || todayYmd()}
+          month={calendarMonth}
           dateLocale={dateLocale}
           onPrevMonth={() => gotoMonth(-1)}
           onNextMonth={() => gotoMonth(1)}
-          onToday={gotoToday}
+          onToday={gotoCalendarToday}
           onPickDay={(d) => setCalendarDetailDate(d)}
         />
       ) : tab === "chart" ? (
