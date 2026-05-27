@@ -24,8 +24,8 @@ export function AdminNavBar() {
       { href: "/admin/punch", label: t("admin.navMyPunch") },
       { href: "/admin/employees", label: t("admin.navEmployees") },
       { href: "/admin/billing", label: t("admin.navBilling") },
-      { href: "/admin/attendance", label: t("admin.navAttendance") },
       { href: "/admin/exceptions", label: t("admin.navExceptions") },
+      { href: "/admin/attendance", label: t("admin.navAttendance") },
     ];
   }, [t]);
 

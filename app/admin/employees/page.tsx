@@ -434,8 +434,11 @@ export default function AdminEmployeesPage() {
             {noDepartments && (
               <p className={`${bannerWarning} mb-4`}>{t("admin.employeesNoDepartmentsYet")}</p>
             )}
-            <form onSubmit={(e) => void addEmployee(e)} className="grid max-w-xl gap-x-4 gap-y-3.5 sm:grid-cols-2">
-              <div className="sm:col-span-2">
+            <form
+              onSubmit={(e) => void addEmployee(e)}
+              className="grid w-full grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-3"
+            >
+              <div>
                 <label className={label}>
                   {t("admin.employeesEmailLabel")}{" "}
                   <span aria-hidden className="text-[var(--apple-red)]">*</span>
@@ -475,7 +478,7 @@ export default function AdminEmployeesPage() {
                   placeholder={t("admin.employeesPasswordHint")}
                 />
               </div>
-              <div>
+              <div className={canEditRoles ? undefined : "sm:col-span-2"}>
                 <label className={label}>
                   {t("admin.employeesDepartmentLabel")}{" "}
                   <span aria-hidden className="text-[var(--apple-red)]">*</span>
@@ -512,19 +515,20 @@ export default function AdminEmployeesPage() {
                     ))}
                   </select>
                 </div>
-              ) : (
-                <div className="hidden sm:block" aria-hidden />
-              )}
-              {error && <p className={`${errorText} sm:col-span-2`}>{error}</p>}
-              <div className="sm:col-span-2">
+              ) : null}
+              <div>
+                <span className={`${label} invisible`} aria-hidden>
+                  {t("admin.employeesAddButton")}
+                </span>
                 <button
                   type="submit"
-                  className={`${btnPrimary} w-full sm:w-auto`}
+                  className={`${btnPrimary} mt-1.5 w-full`}
                   disabled={noDepartments}
                 >
                   {t("admin.employeesAddButton")}
                 </button>
               </div>
+              {error && <p className={`${errorText} sm:col-span-3`}>{error}</p>}
             </form>
           </div>
         </div>
