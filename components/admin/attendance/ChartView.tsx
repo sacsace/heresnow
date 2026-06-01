@@ -2,7 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
-import { cardBody, groupedCard, sectionLabel } from "@/lib/uiStyles";
+import { cardBody, cardBodyCompact, groupedCard, sectionLabel, sectionLabelCompact, statCardCompact } from "@/lib/uiStyles";
 import { useMemo } from "react";
 
 type Props = {
@@ -10,6 +10,8 @@ type Props = {
   fromDate?: string;
   toDate?: string;
   dateLocale?: string;
+  /** 요약·차트 패딩·간격 축소 */
+  compact?: boolean;
 };
 
 type StatTone = "neutral" | "positive" | "warning" | "danger" | "info";
@@ -19,11 +21,13 @@ function StatCard({
   value,
   tone = "neutral",
   hint,
+  compact = false,
 }: {
   label: string;
   value: string | number;
   tone?: StatTone;
   hint?: string;
+  compact?: boolean;
 }) {
   const valueColor =
     tone === "positive"
@@ -35,6 +39,25 @@ function StatCard({
           : tone === "info"
             ? "text-[var(--apple-blue)]"
             : "text-[var(--foreground)]";
+
+  if (compact) {
+    return (
+      <div className={statCardCompact}>
+        <div className="flex min-w-0 items-baseline justify-between gap-2">
+          <p className="min-w-0 truncate text-[0.6875rem] font-medium leading-tight text-[var(--apple-label-secondary)] sm:text-[0.75rem]">
+            {label}
+          </p>
+          <p className={`shrink-0 text-[1.0625rem] font-semibold tabular-nums leading-none sm:text-[1.125rem] ${valueColor}`}>
+            {value}
+          </p>
+        </div>
+        {hint && (
+          <p className="mt-0.5 truncate text-[0.6875rem] text-[var(--apple-label-tertiary)]">{hint}</p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={`${groupedCard} ${cardBody} min-w-0`}>
       <p className="truncate text-[0.75rem] font-medium uppercase tracking-[0.04em] text-[var(--apple-label-secondary)] sm:text-[0.8125rem]">
@@ -78,9 +101,15 @@ function buildDailyRange(fromDate: string, toDate: string): string[] {
   return out;
 }
 
-export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Props) {
+export function AttendanceChartView({ rows, fromDate, toDate, dateLocale, compact = false }: Props) {
   const { t, locale } = useI18n();
   const dl = dateLocale ?? (locale === "en" ? "en-US" : "ko-KR");
+  const sectionCls = compact ? sectionLabelCompact : sectionLabel;
+  const bodyCls = compact ? cardBodyCompact : cardBody;
+  const stackGap = compact ? "space-y-4" : "space-y-7";
+  const statGridCls = compact
+    ? "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+    : "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
 
   // ---------- 요약 카드 ----------
   const stats = useMemo(() => {
@@ -221,45 +250,50 @@ export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Prop
   const labelStride = dailySeries.length > 21 ? Math.ceil(dailySeries.length / 14) : 1;
 
   return (
-    <div className="space-y-7">
+    <div className={stackGap}>
       {/* ---------- 요약 카드 (반응형 그리드) ---------- */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <StatCard label={t("admin.statCheckIns")} value={stats.checkIns} />
-        <StatCard label={t("admin.statComplete")} value={stats.complete} tone="positive" />
+      <div className={statGridCls}>
+        <StatCard compact={compact} label={t("admin.statCheckIns")} value={stats.checkIns} />
+        <StatCard compact={compact} label={t("admin.statComplete")} value={stats.complete} tone="positive" />
         <StatCard
+          compact={compact}
           label={t("admin.statCompletionRate")}
           value={`${stats.completionRate}%`}
           tone={stats.completionRate >= 90 ? "positive" : stats.completionRate >= 70 ? "neutral" : "warning"}
         />
         <StatCard
+          compact={compact}
           label={t("admin.statPunctualityRate")}
           value={`${stats.punctualityRate}%`}
           tone={stats.punctualityRate >= 95 ? "positive" : stats.punctualityRate >= 80 ? "neutral" : "warning"}
         />
         <StatCard
+          compact={compact}
           label={t("admin.statLate")}
           value={stats.late}
           tone={stats.late > 0 ? "warning" : "neutral"}
         />
         <StatCard
+          compact={compact}
           label={t("admin.statEarlyLeave")}
           value={stats.early}
           tone={stats.early > 0 ? "warning" : "neutral"}
         />
         <StatCard
+          compact={compact}
           label={t("admin.statIncomplete")}
           value={stats.incomplete}
           tone={stats.incomplete > 0 ? "danger" : "neutral"}
         />
-        <StatCard label={t("admin.statHoliday")} value={stats.holiday} tone={stats.holiday > 0 ? "info" : "neutral"} />
-        <StatCard label={t("admin.statOvertime")} value={stats.overtime} tone={stats.overtime > 0 ? "info" : "neutral"} />
-        <StatCard label={t("admin.statEmployees")} value={stats.employees} />
+        <StatCard compact={compact} label={t("admin.statHoliday")} value={stats.holiday} tone={stats.holiday > 0 ? "info" : "neutral"} />
+        <StatCard compact={compact} label={t("admin.statOvertime")} value={stats.overtime} tone={stats.overtime > 0 ? "info" : "neutral"} />
+        <StatCard compact={compact} label={t("admin.statEmployees")} value={stats.employees} />
       </div>
 
       {/* ---------- 상태 분포 (가로 누적 막대) ---------- */}
       <section>
-        <p className={sectionLabel}>{t("admin.statStatusBreakdown")}</p>
-        <div className={`${groupedCard} ${cardBody} space-y-3`}>
+        <p className={sectionCls}>{t("admin.statStatusBreakdown")}</p>
+        <div className={`${groupedCard} ${bodyCls} space-y-2.5`}>
           {statusBreakdown.total === 0 ? (
             <p className="text-[0.9375rem] text-[var(--apple-label-tertiary)]">
               {t("admin.statNoData")}
@@ -347,8 +381,8 @@ export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Prop
 
       {/* ---------- 일별 추이 ---------- */}
       <section>
-        <p className={sectionLabel}>{t("admin.statDailyTrend")}</p>
-        <div className={`${groupedCard} ${cardBody}`}>
+        <p className={sectionCls}>{t("admin.statDailyTrend")}</p>
+        <div className={`${groupedCard} ${bodyCls}`}>
           {dailySeries.length === 0 ? (
             <p className="text-[0.9375rem] text-[var(--apple-label-tertiary)]">
               {t("admin.statNoData")}
@@ -356,7 +390,7 @@ export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Prop
           ) : (
             <div className="overflow-x-auto">
               <div
-                className="flex h-44 items-end gap-1 sm:gap-1.5"
+                className={`flex items-end gap-1 ${compact ? "h-36" : "h-44"} sm:gap-1.5`}
                 style={{ minWidth: `${Math.max(dailySeries.length * 28, 100)}px` }}
               >
                 {dailySeries.map((s, i) => {
@@ -415,14 +449,14 @@ export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Prop
 
       {/* ---------- 요일별 출근 ---------- */}
       <section>
-        <p className={sectionLabel}>{t("admin.statByDow")}</p>
-        <div className={`${groupedCard} ${cardBody}`}>
+        <p className={sectionCls}>{t("admin.statByDow")}</p>
+        <div className={`${groupedCard} ${bodyCls}`}>
           {stats.checkIns === 0 ? (
             <p className="text-[0.9375rem] text-[var(--apple-label-tertiary)]">
               {t("admin.statNoData")}
             </p>
           ) : (
-            <div className="grid grid-cols-7 gap-2 sm:gap-3">
+            <div className={`grid grid-cols-7 ${compact ? "gap-1.5" : "gap-2 sm:gap-3"}`}>
               {dowDistribution.map((d) => {
                 const isSun = d.dow === 0;
                 const isSat = d.dow === 6;
@@ -430,13 +464,13 @@ export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Prop
                 return (
                   <div
                     key={d.dow}
-                    className="flex flex-col items-center gap-1"
+                    className="flex flex-col items-center gap-0.5"
                     title={`${d.label}: ${d.count}${countSuffix}`}
                   >
                     <span className="text-[0.6875rem] font-medium tabular-nums text-[var(--apple-label-secondary)] sm:text-[0.75rem]">
                       {d.count}
                     </span>
-                    <div className="flex h-24 w-full items-end justify-center sm:h-28">
+                    <div className={`flex w-full items-end justify-center ${compact ? "h-20" : "h-24 sm:h-28"}`}>
                       <div
                         className={`w-full max-w-[2rem] rounded-md ${
                           isSun
@@ -469,8 +503,8 @@ export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Prop
 
       {/* ---------- 직원별 출근 (상위 10명) ---------- */}
       <section>
-        <p className={sectionLabel}>{t("admin.statByEmployee")}</p>
-        <div className={`${groupedCard} ${cardBody} space-y-3`}>
+        <p className={sectionCls}>{t("admin.statByEmployee")}</p>
+        <div className={`${groupedCard} ${bodyCls} ${compact ? "space-y-2" : "space-y-3"}`}>
           {employeeBars.length === 0 ? (
             <p className="text-[0.9375rem] text-[var(--apple-label-tertiary)]">
               {t("admin.statNoData")}
@@ -482,7 +516,7 @@ export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Prop
                 return (
                   <div
                     key={e.id}
-                    className="grid grid-cols-[6rem_1fr_4rem] items-center gap-3 sm:grid-cols-[10rem_1fr_5rem]"
+                    className={`grid grid-cols-[6rem_1fr_4rem] items-center ${compact ? "gap-2" : "gap-3"} sm:grid-cols-[10rem_1fr_5rem]`}
                     title={`${e.name}: ${e.count}${countSuffix}${e.late > 0 ? ` · ${t("admin.attendanceFlagLate")} ${e.late}` : ""}`}
                   >
                     <span className="truncate text-[0.875rem] font-medium text-[var(--foreground)]">
@@ -510,10 +544,26 @@ export function AttendanceChartView({ rows, fromDate, toDate, dateLocale }: Prop
                 );
               })
           )}
-          {employeeBars.some((e) => e.late > 0) && (
-            <p className="pt-1 text-[0.75rem] text-[var(--apple-label-tertiary)]">
-              {t("admin.statByEmployeeLegend")}
-            </p>
+          {employeeBars.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--separator)] pt-2.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--apple-blue)]"
+                  aria-hidden
+                />
+                {t("admin.statByEmployeeLegendOnTime")}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--apple-orange)]"
+                  aria-hidden
+                />
+                {t("admin.statByEmployeeLegendLate")}
+              </span>
+              <span className="text-[var(--apple-label-tertiary)]">
+                {t("admin.statByEmployeeLegendCount")}
+              </span>
+            </div>
           )}
         </div>
       </section>

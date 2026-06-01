@@ -107,6 +107,8 @@ export const pageSubtitle =
 /** Section label above grouped content */
 export const sectionLabel =
   "mb-3 px-1 text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-[var(--apple-label-secondary)] sm:text-[0.875rem]";
+export const sectionLabelCompact =
+  "mb-2 px-1 text-[0.75rem] font-semibold tracking-[0.01em] text-[var(--apple-label-secondary)] sm:text-[0.8125rem]";
 
 /** Grouped inset list container (Settings-style) */
 export const groupedCard =
@@ -123,6 +125,7 @@ export const groupedRowInsetDivider =
 export const card = groupedCard;
 export const cardHeader = "border-b border-[var(--separator)] px-5 py-4 sm:px-6";
 export const cardBody = "px-5 py-5 sm:px-6 sm:py-6";
+export const cardBodyCompact = "px-3.5 py-3 sm:px-4 sm:py-3.5";
 export const cardFooter = "border-t border-[var(--separator)] px-5 py-4 sm:px-6";
 
 export const hairline = "border-[var(--separator)]";
@@ -436,6 +439,9 @@ export const statGrid = "grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4";
 
 export const statCard =
   "rounded-2xl bg-[var(--grouped-bg)] px-5 py-4 shadow-sm ring-1 ring-black/[0.04] sm:px-6 sm:py-5";
+
+export const statCardCompact =
+  "min-w-0 rounded-xl bg-[var(--grouped-bg)] px-3 py-2.5 shadow-sm ring-1 ring-black/[0.04] sm:px-3.5 sm:py-3";
 
 export const statValue =
   "text-[1.375rem] font-semibold tabular-nums tracking-tight text-[var(--foreground)] sm:text-[1.5rem]";

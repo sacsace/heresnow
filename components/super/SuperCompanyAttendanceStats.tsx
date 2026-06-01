@@ -3,7 +3,7 @@
 import { AttendanceChartView } from "@/components/admin/attendance/ChartView";
 import { useI18n } from "@/components/LanguageProvider";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
-import { emptyState, inputCompact, label, pageSubtitle, sectionLabel } from "@/lib/uiStyles";
+import { emptyState, inputCompact, label, sectionLabelCompact } from "@/lib/uiStyles";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
@@ -73,56 +73,62 @@ export function SuperCompanyAttendanceStats({ companyId }: Props) {
   }
 
   return (
-    <section className="space-y-4">
-      <div className="px-1">
-        <p className={sectionLabel}>{t("super.statsTitle")}</p>
-        <p className={pageSubtitle}>{t("super.statsLead")}</p>
+    <section className="space-y-3">
+      <div>
+        <p className={sectionLabelCompact}>{t("super.statsTitle")}</p>
+        <p className="mt-0.5 max-w-3xl text-[0.75rem] leading-snug text-[var(--apple-label-secondary)] sm:text-[0.8125rem]">
+          {t("super.statsLead")}
+        </p>
       </div>
 
       <form
         onSubmit={applyRange}
-        className="flex flex-wrap items-end gap-3 rounded-2xl bg-[var(--grouped-bg)] p-4 ring-1 ring-black/[0.05] sm:p-5"
+        className="flex flex-wrap items-end gap-2 rounded-xl bg-[var(--grouped-bg)] p-3 ring-1 ring-black/[0.05] sm:gap-3 sm:p-3.5"
       >
         <div className="min-w-0">
-          <label className={label} htmlFor="super-stats-from">
+          <label className={`${label} !text-[0.75rem]`} htmlFor="super-stats-from">
             {t("admin.attendanceDateFrom")}
           </label>
           <input
             id="super-stats-from"
             type="date"
             lang={dateLocale}
-            className={`${inputCompact} mt-1.5 sm:min-w-[10rem]`}
+            className={`${inputCompact} mt-1 sm:min-w-[9.5rem]`}
             value={draft.from}
             onChange={(e) => setDraft((prev) => ({ ...prev, from: e.target.value }))}
           />
         </div>
         <div className="min-w-0">
-          <label className={label} htmlFor="super-stats-to">
+          <label className={`${label} !text-[0.75rem]`} htmlFor="super-stats-to">
             {t("admin.attendanceDateTo")}
           </label>
           <input
             id="super-stats-to"
             type="date"
             lang={dateLocale}
-            className={`${inputCompact} mt-1.5 sm:min-w-[10rem]`}
+            className={`${inputCompact} mt-1 sm:min-w-[9.5rem]`}
             value={draft.to}
             onChange={(e) => setDraft((prev) => ({ ...prev, to: e.target.value }))}
           />
         </div>
         <button
           type="submit"
-          className="inline-flex h-9 min-h-[2.25rem] touch-manipulation items-center justify-center rounded-[0.625rem] bg-[var(--apple-blue)] px-4 text-[0.875rem] font-semibold text-white transition-colors hover:bg-[#0071e3] active:bg-[#0066cc] disabled:opacity-40"
+          className="inline-flex h-8 min-h-[2rem] touch-manipulation items-center justify-center rounded-[0.625rem] bg-[var(--apple-blue)] px-3.5 text-[0.8125rem] font-semibold text-white transition-colors hover:bg-[#0071e3] active:bg-[#0066cc] disabled:opacity-40"
         >
           {t("admin.attendanceSearchApply")}
         </button>
       </form>
 
-      {loading && <p className="px-1 text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>}
+      {loading && (
+        <p className="text-[0.8125rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
+      )}
       {!loading && error && <p className="px-1 text-sm text-[var(--apple-red)]">{error}</p>}
       {!loading && !error && rows.length === 0 && (
         <p className={emptyState}>{t("admin.attendanceEmpty")}</p>
       )}
-      {!loading && !error && rows.length > 0 && <AttendanceChartView rows={rows} />}
+      {!loading && !error && rows.length > 0 && (
+        <AttendanceChartView rows={rows} fromDate={range.from} toDate={range.to} compact />
+      )}
     </section>
   );
 }
