@@ -10,6 +10,7 @@
  */
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { MIN_PASSWORD_LENGTH } from "../lib/passwordPolicy";
 
 const prisma = new PrismaClient();
 
@@ -39,8 +40,10 @@ async function main() {
       "SEED_SUPER_ADMIN_EMAIL 와 SEED_SUPER_ADMIN_PASSWORD 는 함께 설정해야 합니다."
     );
   }
-  if (password.length < 8) {
-    throw new Error("SEED_SUPER_ADMIN_PASSWORD 는 최소 8자 이상이어야 합니다.");
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(
+      `SEED_SUPER_ADMIN_PASSWORD 는 최소 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`
+    );
   }
   const email = rawEmail.toLowerCase();
   const rotate =

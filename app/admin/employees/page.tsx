@@ -19,6 +19,7 @@ import {
   type ShiftPresetsMap,
 } from "@/lib/shiftPresets";
 import { useI18n } from "@/components/LanguageProvider";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   bannerWarning,
@@ -388,7 +389,7 @@ export default function AdminEmployeesPage() {
 
   async function savePassword(empId: string): Promise<boolean> {
     const pwd = passwordDraft.trim();
-    if (pwd.length < 8) {
+    if (pwd.length < MIN_PASSWORD_LENGTH) {
       setRowError(t("admin.employeesPasswordHint"));
       return false;
     }
@@ -408,7 +409,7 @@ export default function AdminEmployeesPage() {
       setPasswordDraft("");
       return;
     }
-    if (pwd.length < 8) {
+    if (pwd.length < MIN_PASSWORD_LENGTH) {
       setRowError(t("admin.employeesPasswordHint"));
       return;
     }
@@ -615,7 +616,7 @@ export default function AdminEmployeesPage() {
                 <input
                   required
                   type="password"
-                  minLength={8}
+                  minLength={MIN_PASSWORD_LENGTH}
                   className={`${input} mt-1.5`}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

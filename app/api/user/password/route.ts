@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 
 const Body = z.object({
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(8).max(200),
+  newPassword: z.string().min(MIN_PASSWORD_LENGTH).max(200),
 });
 
 export async function PATCH(req: Request) {

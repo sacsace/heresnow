@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { employeeScheduleSummary } from "@/lib/employeeWorkSchedule";
 import { normalizeWorkScheduleByDay } from "@/lib/companyWorkSchedule";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import { isShiftCode } from "@/lib/employeeWorkSchedule";
 import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
@@ -32,7 +33,7 @@ const patchSchema = z.object({
   departmentId: z.string().min(1).max(40).nullable().optional(),
   name: z.string().trim().min(1).max(120).optional(),
   email: z.string().email().transform((e) => e.toLowerCase().trim()).optional(),
-  password: z.string().min(8).max(200).optional(),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(200).optional(),
   role: z.enum(COMPANY_ROLES).optional(),
   workScheduleType: z.enum(["COMPANY", "SHIFT", "CUSTOM"]).optional(),
   shiftCode: z.enum(["A", "B", "C"]).nullable().optional(),

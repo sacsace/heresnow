@@ -19,6 +19,7 @@ import {
   authTitle,
 } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { formatTierPrice } from "@/lib/pricing";
 import { segmentedBtn, segmentedWrap } from "@/lib/uiStyles";
 import type { BillingPeriod } from "@prisma/client";
@@ -215,7 +216,7 @@ export default function SignupPage() {
               value={adminPassword}
               onChange={(e) => setAdminPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
             />
             <p className={authHint}>{t("signup.adminIsCompanyAdmin")}</p>
           </div>

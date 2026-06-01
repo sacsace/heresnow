@@ -6,6 +6,7 @@ import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceO
 import { SuperCompanyAttendanceStats } from "@/components/super/SuperCompanyAttendanceStats";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import {
   btnDestructive,
   btnPrimaryLg,
@@ -16,20 +17,21 @@ import {
   formGridLg,
   groupedCardLg,
   inputLg,
-  inputTableLabelLg,
+  inputTableLabelCompactLg,
   labelLg,
   linkBackLg,
   pageStackDetailLg,
   sectionLabelLg,
+  selectCompactLg,
   selectLg,
   tableHeadLg,
-  tableLg,
+  tableLgCompact,
   tableRow,
   tableWrapLg,
-  tdEmailLg,
-  tdNameLg,
-  tdStatusLg,
-  thLg,
+  tdEmailCompactLg,
+  tdNameCompactLg,
+  tdStatusCompactLg,
+  thCompactLg,
 } from "@/lib/uiStyles";
 import { statusBadge } from "@/lib/statusBadge";
 import Link from "next/link";
@@ -363,7 +365,7 @@ export default function SuperCompanyUsersPage() {
                 <input
                   type="password"
                   required
-                  minLength={8}
+                  minLength={MIN_PASSWORD_LENGTH}
                   autoComplete="new-password"
                   className={`${inputLg} mt-1.5`}
                   value={password}
@@ -395,14 +397,14 @@ export default function SuperCompanyUsersPage() {
         {roleError && <p className={`mb-3 ${errorText}`}>{roleError}</p>}
         {deleteError && <p className={`mb-3 ${errorText}`}>{deleteError}</p>}
         <div className={tableWrapLg}>
-          <table className={tableLg}>
+          <table className={tableLgCompact}>
             <thead className={tableHeadLg}>
               <tr>
-                <th className={`${thLg} w-[32%]`}>{t("super.listEmail")}</th>
-                <th className={`${thLg} w-[20%]`}>{t("super.listName")}</th>
-                <th className={`${thLg} w-[18%]`}>{t("super.listRole")}</th>
-                <th className={`${thLg} w-[14%]`}>{t("super.listConsent")}</th>
-                <th className={`${thLg} w-[16%] text-right`}>
+                <th className={`${thCompactLg} w-[32%]`}>{t("super.listEmail")}</th>
+                <th className={`${thCompactLg} w-[20%]`}>{t("super.listName")}</th>
+                <th className={`${thCompactLg} w-[18%]`}>{t("super.listRole")}</th>
+                <th className={`${thCompactLg} w-[14%]`}>{t("super.listConsent")}</th>
+                <th className={`${thCompactLg} w-[16%] text-right`}>
                   {t("super.listActions")}
                 </th>
               </tr>
@@ -417,15 +419,15 @@ export default function SuperCompanyUsersPage() {
               ) : (
                 users.map((u) => (
                   <tr key={u.id} className={tableRow}>
-                    <td className={tdEmailLg}>
+                    <td className={tdEmailCompactLg}>
                       <span className="block truncate" title={u.email}>
                         {u.email}
                       </span>
                     </td>
-                    <td className={tdNameLg}>
+                    <td className={tdNameCompactLg}>
                       {u.employee ? (
                         <input
-                          className={inputTableLabelLg}
+                          className={inputTableLabelCompactLg}
                           value={nameDraft[u.id] ?? u.employee.name}
                           disabled={savingNameId === u.id}
                           aria-label={t("super.listName")}
@@ -450,13 +452,13 @@ export default function SuperCompanyUsersPage() {
                         "—"
                       )}
                     </td>
-                    <td className={tdStatusLg}>
+                    <td className={tdStatusCompactLg}>
                       <label className="sr-only" htmlFor={`super-user-role-${u.id}`}>
                         {t("super.listRole")}
                       </label>
                       <select
                         id={`super-user-role-${u.id}`}
-                        className={`${selectLg} !py-1.5 text-[0.8125rem]`}
+                        className={selectCompactLg}
                         value={u.role}
                         onChange={(e) =>
                           void changeRole(
@@ -474,12 +476,12 @@ export default function SuperCompanyUsersPage() {
                         ))}
                       </select>
                     </td>
-                    <td className={tdStatusLg}>
+                    <td className={tdStatusCompactLg}>
                       <span className={statusBadge(u.consentGivenAt ? "APPROVED" : "PENDING")}>
                         {u.consentGivenAt ? t("super.consentDone") : t("super.consentPending")}
                       </span>
                     </td>
-                    <td className={`${tdStatusLg} text-right`}>
+                    <td className={`${tdStatusCompactLg} text-right`}>
                       <button
                         type="button"
                         className={btnDestructive}

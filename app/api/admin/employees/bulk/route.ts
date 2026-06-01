@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { createCompanyEmployee } from "@/lib/employeeCreate";
 import { parseEmployeeBulkWorkbook, parseEmployeeRole } from "@/lib/employeeBulkExcel";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
 import { NextResponse } from "next/server";
@@ -94,8 +95,12 @@ export async function POST(req: Request) {
       failures.push({ row: row.rowNumber, email, error: "이메일 형식이 올바르지 않습니다." });
       continue;
     }
-    if (password.length < 8) {
-      failures.push({ row: row.rowNumber, email, error: "비밀번호는 8자 이상이어야 합니다." });
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      failures.push({
+        row: row.rowNumber,
+        email,
+        error: `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`,
+      });
       continue;
     }
     if (seenEmails.has(email)) {

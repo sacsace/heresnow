@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import { normalizeShiftPresets } from "@/lib/shiftPresets";
 import { canAssignRole } from "@/lib/roleHierarchy";
@@ -98,7 +99,7 @@ export async function GET(req: Request) {
 const postSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase().trim()),
   name: z.string().min(1).max(120),
-  password: z.string().min(8).max(200),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(200),
   departmentId: z.string().min(1).max(40).optional().nullable(),
   role: z.enum(COMPANY_ROLES).optional(),
 });

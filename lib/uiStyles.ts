@@ -407,6 +407,21 @@ export const tdStatusLg = `${tdLg} whitespace-nowrap`;
 export const emptyStateLg =
   "px-5 py-10 text-center text-[0.875rem] text-[var(--apple-label-tertiary)] sm:px-6 sm:text-[0.9375rem]";
 
+/** 상세·슈퍼 사용자 목록 등 — 행 간격 압축 */
+export const tableLgCompact = "min-w-full text-left text-[0.875rem] sm:text-[0.9375rem]";
+export const thCompactLg =
+  "px-5 py-2 whitespace-nowrap font-medium text-[var(--apple-label-secondary)] sm:px-6";
+export const tdCompactLg =
+  "px-5 py-1.5 align-middle text-[var(--foreground)] sm:px-6 sm:py-2";
+export const tdEmailCompactLg =
+  `${tdCompactLg} font-mono text-[0.8125rem] tracking-tight text-[var(--apple-label-secondary)] sm:text-[0.875rem]`;
+export const tdNameCompactLg = `${tdCompactLg} text-[0.875rem] font-medium sm:text-[0.9375rem]`;
+export const tdStatusCompactLg = `${tdCompactLg} whitespace-nowrap`;
+export const inputTableLabelCompactLg =
+  "w-full min-w-0 rounded-md border-0 bg-transparent px-2 py-1 text-[0.875rem] font-medium text-[var(--foreground)] outline-none transition-[background-color,box-shadow] hover:bg-[var(--fill-secondary)]/70 focus:bg-[var(--fill-secondary)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60 sm:text-[0.9375rem]";
+export const selectCompactLg =
+  "auth-select-field w-full min-h-[2rem] rounded-[0.625rem] border-0 px-2.5 py-1 pr-8 text-[0.8125rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 sm:text-[0.875rem]";
+
 export const linkBackLg =
   "inline-flex min-h-[2.75rem] items-center text-[0.9375rem] font-semibold text-[var(--apple-blue)] hover:text-[#0071e3] sm:text-[1rem]";
 

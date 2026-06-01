@@ -1,3 +1,4 @@
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import { subscriptionEndsAtForTier } from "@/lib/pricing";
 import { Role } from "@prisma/client";
@@ -11,7 +12,7 @@ const bodySchema = z.object({
   companyName: z.string().min(1).max(200),
   timezone: z.literal(ALLOWED_SIGNUP_TIMEZONE),
   adminEmail: z.string().email().transform((e) => e.toLowerCase().trim()),
-  adminPassword: z.string().min(8).max(200),
+  adminPassword: z.string().min(MIN_PASSWORD_LENGTH).max(200),
   pricingTierId: z.string().min(1),
   adminName: z.string().min(1).max(120).optional(),
 });

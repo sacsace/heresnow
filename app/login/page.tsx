@@ -18,6 +18,7 @@ import {
   authSubtitleLogin,
 } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -59,6 +60,10 @@ function LoginForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(t("login.errorPasswordMinLength"));
+      return;
+    }
     setLoading(true);
     const res = await signIn("credentials", {
       email: email.trim().toLowerCase(),
@@ -111,8 +116,12 @@ function LoginForm() {
               className={authInput}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              minLength={MIN_PASSWORD_LENGTH}
               required
             />
+            <p className="mt-1 text-[0.75rem] text-[var(--apple-label-secondary)]">
+              {t("login.passwordHint")}
+            </p>
           </div>
           {error && <p className={authError}>{error}</p>}
           <button type="submit" disabled={loading} className={authButtonPrimary}>

@@ -2,6 +2,7 @@
 
 import type { Department } from "@/components/admin/DepartmentManagerModal";
 import { useI18n } from "@/components/LanguageProvider";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
 import { btnDanger, emptyStateCompact, table, tableHead, tableWrap, td, th, trDivider } from "@/lib/uiStyles";
 import type { Role } from "@prisma/client";
@@ -408,7 +409,7 @@ export function EmployeeListTable({
                     editingPassword ? (
                       <input
                         type="password"
-                        minLength={8}
+                        minLength={MIN_PASSWORD_LENGTH}
                         autoComplete="new-password"
                         autoFocus
                         className={rowInput}
