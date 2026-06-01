@@ -1,8 +1,9 @@
 import { auth } from "@/auth";
 import {
   checkInErrorMessage,
+  checkOutWindowErrorMessage,
   evaluatePunchEligibility,
-  TWENTY_FOUR_H_MS,
+  FORTY_EIGHT_H_MS,
 } from "@/lib/attendancePunchRules";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { evaluateAttendanceWorkFlags } from "@/lib/companyWorkSchedule";
@@ -39,6 +40,8 @@ const bodySchema = z
     businessTripReason: z.string().trim().min(1).max(2000).optional(),
     /** 정규 퇴근 시각 이전 퇴근 시 필수 — 관리자 승인 대상 */
     earlyLeaveReason: z.string().trim().min(1).max(2000).optional(),
+    /** 퇴근 후 4시간 이내 재출근 시 필수 — 관리자 승인 대상 */
+    reCheckInReason: z.string().trim().min(1).max(2000).optional(),
     photoUrl: z.string().max(2_000_000).optional().nullable(),
     deviceInfo: z.string().max(500).optional(),
     /** 출근 시 필수: 등록 얼굴과 일치 검증 */
@@ -93,6 +96,7 @@ export async function POST(req: Request) {
     businessTripLocation,
     businessTripReason,
     earlyLeaveReason,
+    reCheckInReason,
     photoUrl,
     deviceInfo,
     faceDescriptor,
@@ -199,13 +203,12 @@ export async function POST(req: Request) {
     faceMatched = true;
   }
 
-  if (type === "CHECK_IN") {
-    const eligibility = evaluatePunchEligibility(
-      now,
-      tz,
-      lastRecord ? { type: lastRecord.type, timestamp: lastRecord.timestamp } : null
-    );
+  const lastPunch = lastRecord
+    ? { type: lastRecord.type, timestamp: lastRecord.timestamp }
+    : null;
+  const eligibility = evaluatePunchEligibility(now, tz, lastPunch);
 
+  if (type === "CHECK_IN") {
     if (!eligibility.canCheckIn) {
       const msg = checkInErrorMessage(eligibility.checkInBlock) ?? "출근할 수 없습니다.";
       return NextResponse.json({ error: msg }, { status: 400 });
@@ -215,9 +218,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "먼저 출근해 주세요." }, { status: 400 });
     }
     const elapsed = now.getTime() - lastRecord.timestamp.getTime();
-    if (elapsed > TWENTY_FOUR_H_MS) {
+    if (elapsed > FORTY_EIGHT_H_MS) {
       return NextResponse.json(
-        { error: "출근 시점부터 24시간이 지나 퇴근할 수 없습니다. 관리자에게 문의해 주세요." },
+        { error: checkOutWindowErrorMessage() },
         { status: 400 }
       );
     }
@@ -295,6 +298,26 @@ export async function POST(req: Request) {
     );
   }
 
+  // 퇴근 후 4시간 이내 재출근 — 사유 필수 + 관리자 승인
+  const reCheckInPending = type === "CHECK_IN" && eligibility.reCheckInApprovalRequired;
+  const trimmedReCheckInReason = reCheckInReason?.trim() || null;
+  if (reCheckInPending && !trimmedReCheckInReason) {
+    return NextResponse.json(
+      {
+        error: "재출근 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
+        code: "RECHECK_IN_REASON_REQUIRED",
+      },
+      { status: 400 }
+    );
+  }
+
+  const pendingApproval = earlyLeavePending || reCheckInPending;
+  const pendingReason = earlyLeavePending
+    ? trimmedEarlyReason
+    : reCheckInPending
+      ? trimmedReCheckInReason
+      : null;
+
   const result = await prisma.$transaction(async (tx) => {
     const record = await tx.attendanceRecord.create({
       data: {
@@ -307,8 +330,8 @@ export async function POST(req: Request) {
         accuracy: accuracy ?? null,
         distanceFromSite,
         outsideGeofence,
-        // 조퇴 시 PENDING — 관리자 승인 후 APPROVED 로 전환
-        status: earlyLeavePending ? "PENDING" : "APPROVED",
+        // 조퇴·단기 재출근 시 PENDING — 관리자 승인 후 APPROVED 로 전환
+        status: pendingApproval ? "PENDING" : "APPROVED",
         memo: memo?.trim() || null,
         isBusinessTrip: type === "CHECK_IN" ? isBusinessTrip : false,
         businessTripLocation:
@@ -329,12 +352,12 @@ export async function POST(req: Request) {
     });
 
     let exceptionId: string | null = null;
-    if (earlyLeavePending && trimmedEarlyReason) {
+    if (pendingApproval && pendingReason) {
       const ex = await tx.attendanceException.create({
         data: {
           companyId: session.user.companyId!,
           attendanceId: record.id,
-          reason: trimmedEarlyReason,
+          reason: pendingReason,
           status: "PENDING",
         },
         select: { id: true },
@@ -366,11 +389,13 @@ export async function POST(req: Request) {
     lateMinutes: result.record.lateMinutes,
     overtimeMinutes: result.record.overtimeMinutes,
     exceptionId: result.exceptionId,
-    pendingApproval: earlyLeavePending,
+    pendingApproval,
     message: earlyLeavePending
       ? "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
-      : outsideGeofence
-        ? "근무지 반경 밖에서 기록되었습니다."
-        : "정상 처리되었습니다.",
+      : reCheckInPending
+        ? "재출근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+        : outsideGeofence
+          ? "근무지 반경 밖에서 기록되었습니다."
+          : "정상 처리되었습니다.",
   });
 }

@@ -1,6 +1,12 @@
 "use client";
 
 import {
+  buildCameraConstraintAttempts,
+  getFaceDeviceProfile,
+  hasCameraApi,
+  isSecureForCamera,
+} from "@/lib/faceDeviceProfile";
+import {
   descriptorToArray,
   extractFaceDescriptor,
   loadFaceModels,
@@ -23,10 +29,26 @@ type Props = {
   onError?: (message: string) => void;
 };
 
-type InitPhase = "idle" | "loading-models" | "starting-camera" | "ready" | "error";
+type InitPhase = "idle" | "loading" | "ready" | "error";
 
-const AUTO_SCAN_INTERVAL_MS = 1_100;
-const AUTO_SCAN_INITIAL_DELAY_MS = 500;
+/** 폴백 스캔 간격 (requestVideoFrameCallback 미지원 기기) */
+const AUTO_SCAN_INTERVAL_MS = 650;
+const AUTO_SCAN_INITIAL_DELAY_MS = 280;
+/** rVFC 사용 시 N 프레임마다 1회 감지 (과부하 방지) */
+const SCAN_EVERY_N_FRAMES = 2;
+
+async function openCamera(): Promise<MediaStream> {
+  const attempts = buildCameraConstraintAttempts(getFaceDeviceProfile());
+  let lastErr: unknown;
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr ?? new Error("CAMERA_UNAVAILABLE");
+}
 
 export function FaceCapture({
   mode,
@@ -73,35 +95,13 @@ export function FaceCapture({
   useEffect(() => {
     let cancelled = false;
     const tx = tRef.current;
-
-    function isIosInAppBrowser(): boolean {
-      if (typeof navigator === "undefined") return false;
-      const ua = navigator.userAgent || "";
-      const ios =
-        /iPad|iPhone|iPod/.test(ua) ||
-        (navigator.platform === "MacIntel" &&
-          (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints !== undefined &&
-          ((navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0) > 1);
-      if (!ios) return false;
-      return (
-        /KAKAOTALK|NAVER|Line\//i.test(ua) ||
-        /Instagram|FBAN|FBAV|FB_IAB|Snapchat|Twitter|TikTok|wv\)/i.test(ua) ||
-        (!/Safari\//.test(ua) && !/CriOS\/|FxiOS\/|EdgiOS\//.test(ua))
-      );
-    }
+    const profile = getFaceDeviceProfile();
 
     function deriveErrorMessage(err: unknown): string {
-      if (typeof window !== "undefined" && !window.isSecureContext) {
+      if (!isSecureForCamera()) {
         return tx("employee.faceInsecureContext");
       }
-      if (isIosInAppBrowser()) {
-        return tx("employee.faceInAppBrowser");
-      }
-      if (
-        typeof navigator === "undefined" ||
-        !navigator.mediaDevices ||
-        typeof navigator.mediaDevices.getUserMedia !== "function"
-      ) {
+      if (!hasCameraApi()) {
         return tx("employee.faceUnsupportedBrowser");
       }
       if (err instanceof Error) {
@@ -111,43 +111,35 @@ export function FaceCapture({
         if (err.message === "FACE_BACKEND_UNAVAILABLE") {
           return tx("employee.faceBackendUnavailable");
         }
-        switch (err.name) {
-          case "NotAllowedError":
-          case "SecurityError":
-            return tx("employee.faceCameraDenied");
-          case "NotFoundError":
-          case "OverconstrainedError":
-            return tx("employee.faceNoCamera");
-          case "NotReadableError":
-          case "AbortError":
-            return tx("employee.faceCameraInUse");
-          case "TypeError":
-            return tx("employee.faceUnsupportedBrowser");
+      }
+      const name = err instanceof Error ? err.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        if (profile.likelyInAppBrowser) {
+          return tx("employee.faceInAppBrowser");
         }
+        return tx("employee.faceCameraDenied");
+      }
+      if (name === "NotFoundError" || name === "OverconstrainedError") {
+        return tx("employee.faceNoCamera");
+      }
+      if (name === "NotReadableError" || name === "AbortError") {
+        return tx("employee.faceCameraInUse");
+      }
+      if (profile.likelyInAppBrowser) {
+        return tx("employee.faceInAppBrowser");
       }
       return tx("employee.faceCameraDenied");
     }
 
     async function init() {
-      if (typeof window !== "undefined" && !window.isSecureContext) {
+      if (!isSecureForCamera()) {
         if (!cancelled) {
           setCameraError(tx("employee.faceInsecureContext"));
           setPhase("error");
         }
         return;
       }
-      if (isIosInAppBrowser()) {
-        if (!cancelled) {
-          setCameraError(tx("employee.faceInAppBrowser"));
-          setPhase("error");
-        }
-        return;
-      }
-      if (
-        typeof navigator === "undefined" ||
-        !navigator.mediaDevices ||
-        typeof navigator.mediaDevices.getUserMedia !== "function"
-      ) {
+      if (!hasCameraApi()) {
         if (!cancelled) {
           setCameraError(tx("employee.faceUnsupportedBrowser"));
           setPhase("error");
@@ -155,15 +147,10 @@ export function FaceCapture({
         return;
       }
 
+      if (!cancelled) setPhase("loading");
+
       try {
-        if (!cancelled) setPhase("loading-models");
-        await loadFaceModels();
-        if (cancelled) return;
-        if (!cancelled) setPhase("starting-camera");
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
-        });
+        const [, stream] = await Promise.all([loadFaceModels(), openCamera()]);
         if (cancelled) {
           stream.getTracks().forEach((tr) => tr.stop());
           return;
@@ -172,12 +159,14 @@ export function FaceCapture({
         const video = videoRef.current;
         if (video) {
           video.srcObject = stream;
+          video.setAttribute("playsinline", "true");
+          video.setAttribute("webkit-playsinline", "true");
+          video.muted = true;
           video.play().then(
             () => {
               if (!cancelled) setNeedsTap(false);
             },
-            (e) => {
-              console.warn("[face] video.play() rejected (will retry on user gesture)", e);
+            () => {
               if (!cancelled) setNeedsTap(true);
             }
           );
@@ -218,11 +207,10 @@ export function FaceCapture({
       if (Date.now() - start > 5000) {
         window.clearInterval(id);
       }
-    }, 250);
+    }, 200);
     return () => window.clearInterval(id);
   }, [ready, cameraError]);
 
-  /** 출퇴근 API 실패 후 다시 자동 인식 재개 */
   useEffect(() => {
     if (!autoVerifyActive) return;
     if (disabled) return;
@@ -245,8 +233,8 @@ export function FaceCapture({
           try {
             await v.play();
             setNeedsTap(false);
-          } catch (e) {
-            console.warn("[face] play() on capture failed", e);
+          } catch {
+            /* user gesture may be required */
           }
         }
         const desc = await extractFaceDescriptor(v);
@@ -321,24 +309,51 @@ export function FaceCapture({
     if (!autoVerifyActive || !ready || disabled || cameraError) return;
 
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let frameCounter = 0;
 
-    const schedule = (ms: number) => {
-      timer = setTimeout(() => void tick(), ms);
+    type VideoWithRvf = HTMLVideoElement & {
+      requestVideoFrameCallback?: (cb: () => void) => number;
+    };
+
+    const scheduleInterval = () => {
+      timer = setTimeout(() => void tick(), AUTO_SCAN_INTERVAL_MS);
     };
 
     async function tick() {
       if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError) return;
       await runCapture({ silentNoFace: true });
       if (!cancelled && !scanStoppedRef.current) {
-        schedule(AUTO_SCAN_INTERVAL_MS);
+        scheduleInterval();
       }
     }
 
-    schedule(AUTO_SCAN_INITIAL_DELAY_MS);
+    function onFrame() {
+      if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError) return;
+      frameCounter += 1;
+      if (frameCounter % SCAN_EVERY_N_FRAMES === 0 && !busyRef.current) {
+        void runCapture({ silentNoFace: true });
+      }
+      const v = videoRef.current as VideoWithRvf | null;
+      if (v?.requestVideoFrameCallback && !cancelled && !scanStoppedRef.current) {
+        v.requestVideoFrameCallback(onFrame);
+      }
+    }
+
+    const initial = setTimeout(() => {
+      if (cancelled) return;
+      const v = videoRef.current as VideoWithRvf | null;
+      if (v?.requestVideoFrameCallback) {
+        v.requestVideoFrameCallback(onFrame);
+      } else {
+        void tick();
+      }
+    }, AUTO_SCAN_INITIAL_DELAY_MS);
+
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      clearTimeout(initial);
+      if (timer) clearTimeout(timer);
     };
   }, [autoVerifyActive, ready, disabled, cameraError, runCapture]);
 
@@ -391,11 +406,9 @@ export function FaceCapture({
             className="pointer-events-none absolute inset-8 rounded-[50%] border-2 border-dashed border-white/70"
             aria-hidden
           />
-          {(phase === "loading-models" || phase === "starting-camera") && (
+          {phase === "loading" && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white">
-              {phase === "loading-models"
-                ? t("employee.faceLoadingModels")
-                : t("employee.faceStartingCamera")}
+              {t("employee.faceLoadingModels")}
             </div>
           )}
           {autoVerifyActive && ready && !cameraError && !autoScanDone && (
@@ -403,7 +416,7 @@ export function FaceCapture({
               {busy ? t("employee.faceProcessing") : t("employee.faceScanning")}
             </div>
           )}
-          {needsTap && phase !== "loading-models" && phase !== "starting-camera" && (
+          {needsTap && phase !== "loading" && (
             <div className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit max-w-[90%] rounded-full bg-white/85 px-3 py-1 text-center text-[0.6875rem] font-semibold text-[var(--foreground)]">
               {t("employee.faceTapToStart")}
             </div>

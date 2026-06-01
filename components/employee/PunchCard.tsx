@@ -1,6 +1,7 @@
 "use client";
 
 import { FaceCapture } from "@/components/employee/FaceCapture";
+import { loadFaceModels } from "@/lib/faceRecognitionClient";
 import { StaticMap } from "@/components/admin/StaticMap";
 import { AttendanceTrustHero } from "@/components/ui/AttendanceTrustHero";
 import { useI18n } from "@/components/LanguageProvider";
@@ -77,6 +78,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const [businessTripLocation, setBusinessTripLocation] = useState("");
   const [businessTripReason, setBusinessTripReason] = useState("");
   const [earlyLeaveReason, setEarlyLeaveReason] = useState("");
+  const [reCheckInReason, setReCheckInReason] = useState("");
   const [checkOutFaceStarted, setCheckOutFaceStarted] = useState(false);
   const [memo, setMemo] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -139,6 +141,11 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       setFaceEnrolled(
         enabled ? Boolean((j as { enrolled?: boolean }).enrolled) : true
       );
+      if (enabled) {
+        void loadFaceModels().catch(() => {
+          /* FaceCapture 에서 재시도 */
+        });
+      }
     } else {
       setFaceRecognitionEnabled(true);
       setFaceEnrolled(false);
@@ -377,6 +384,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       if (j.code === "EARLY_LEAVE_REASON_REQUIRED") {
         return { ok: false, message: t("employee.earlyLeaveReasonRequired") };
       }
+      if (j.code === "RECHECK_IN_REASON_REQUIRED") {
+        return { ok: false, message: t("employee.reCheckInReasonRequired") };
+      }
       const err = j.error as unknown;
       return {
         ok: false,
@@ -398,6 +408,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       return false;
     }
     if (!validateBusinessTripFields()) return false;
+    if (punchStatus?.reCheckInApprovalRequired && !reCheckInReason.trim()) {
+      setMsg(t("employee.reCheckInReasonRequired"));
+      return false;
+    }
 
     setMsg(null);
     setBusy(true);
@@ -426,6 +440,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         businessTripReason:
           checkInMode === "businessTrip" ? businessTripReason.trim() : undefined,
         memo: checkInMode === "normal" ? memo.trim() || undefined : undefined,
+        reCheckInReason: reCheckInReason.trim() || undefined,
         photoUrl: photoUrl || undefined,
         ...(faceDescriptor ? { faceDescriptor } : {}),
       });
@@ -439,6 +454,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       setMemo("");
       setBusinessTripLocation("");
       setBusinessTripReason("");
+      setReCheckInReason("");
       setCheckInMode("normal");
       clearPhoto();
       const recordId = typeof j.id === "string" ? j.id : null;
@@ -536,6 +552,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const checkInNotice = checkInBlockMessage();
   const checkInFaceDisabled =
     busy ||
+    (Boolean(punchStatus?.reCheckInApprovalRequired) && !reCheckInReason.trim()) ||
     (checkInMode === "businessTrip" &&
       (!businessTripLocation.trim() || !businessTripReason.trim()));
   const checkOutFaceDisabled =
@@ -639,6 +656,27 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
               </div>
             )}
 
+            {punchStatus?.reCheckInApprovalRequired && checkInMode === "normal" && (
+              <div className={`mt-4 space-y-3 border-t border-[var(--separator)] pt-4 ${bannerWarning}`}>
+                <p className="!bg-transparent !p-0 text-[0.8125rem]">
+                  {t("employee.reCheckInNotice")}
+                </p>
+                <label className={label}>
+                  {t("employee.reCheckInReasonLabel")}
+                  <span className="text-[var(--apple-red)]"> *</span>
+                </label>
+                <textarea
+                  className={`${input} min-h-[5rem]`}
+                  rows={3}
+                  value={reCheckInReason}
+                  onChange={(e) => setReCheckInReason(e.target.value)}
+                  placeholder={t("employee.reCheckInReasonPlaceholder")}
+                  maxLength={2000}
+                  disabled={busy}
+                />
+              </div>
+            )}
+
             {faceRequired ? (
               <div className="mt-4">
                 <FaceCapture
@@ -657,7 +695,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                   onClick={() => void submitCheckIn()}
                   className={btnSuccessFull}
                 >
-                  {t("employee.checkInButton")}
+                  {punchStatus?.reCheckInApprovalRequired
+                    ? t("employee.reCheckInSubmitButton")
+                    : t("employee.checkInButton")}
                 </button>
               </div>
             )}

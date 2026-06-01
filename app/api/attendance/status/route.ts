@@ -75,6 +75,7 @@ export async function GET() {
     lastTimestamp: lastRecord?.timestamp.toISOString() ?? null,
     today: calendarDayInTz(now, tz),
     earlyLeaveExpected,
+    reCheckInApprovalRequired: eligibility.reCheckInApprovalRequired,
     workEndTime: effectiveSchedule.workEndTime ?? company.workEndTime,
   });
 }

@@ -288,7 +288,7 @@ export const ko = {
     settingsPageTitle: "설정",
     settingsPageLead: "근무지(내 회사) 등록, 회사 근무 시간·안면 인식, MVS 연동 등 운영 설정을 관리합니다.",
     punchSection: "내 출퇴근",
-    punchLead: "출근·퇴근 버튼을 누르면 현재 위치(GPS)와 시간이 저장됩니다. 어디서든 출근할 수 있으며, 퇴근 후 6시간이 지나거나 자정이 지나야 다시 출근할 수 있습니다.",
+    punchLead: "출근·퇴근 버튼을 누르면 현재 위치(GPS)와 시간이 저장됩니다. 퇴근 후 4시간 이내 재출근은 관리자 승인이 필요하며, 4시간 경과 또는 자정 이후에는 승인 없이 출근할 수 있습니다. 출근 후 48시간 이내 퇴근할 수 있습니다.",
     navCheckIn: "출근하기",
     navCheckOut: "퇴근하기",
     punchNoProfile: "출퇴근하려면 직원 프로필(표시 이름)이 필요합니다. 슈퍼관리자에게 문의하세요.",
@@ -684,9 +684,9 @@ export const ko = {
     faceInsecureContext:
       "보안 연결(HTTPS)에서만 카메라를 사용할 수 있습니다. https:// 주소로 접속해 주세요.",
     faceUnsupportedBrowser:
-      "이 브라우저는 카메라를 지원하지 않습니다. Chrome 또는 Safari로 다시 열어 주세요. (인앱 브라우저는 외부 브라우저로 열기를 사용하세요.)",
+      "이 브라우저는 카메라 API를 지원하지 않습니다. Chrome·Safari·Edge 최신 버전을 사용해 주세요.",
     faceInAppBrowser:
-      "카카오톡·인스타그램·라인 등 인앱 브라우저에서는 카메라가 차단됩니다. 우측 상단 메뉴에서 'Safari로 열기'를 선택해 주세요.",
+      "카메라를 열 수 없습니다. 카카오톡·인스타 등 인앱 브라우저라면 ⋯ 메뉴에서 Safari/Chrome으로 열기를 시도해 주세요.",
     faceNoCamera: "카메라를 찾을 수 없습니다. 기기에 카메라가 있는지 확인해 주세요.",
     faceCameraInUse:
       "다른 앱에서 카메라를 사용 중입니다. 다른 앱(영상 통화·줌 등)을 닫고 다시 시도해 주세요.",
@@ -722,10 +722,17 @@ export const ko = {
     earlyLeaveReasonRequired: "조퇴 사유를 입력해 주세요.",
     earlyLeaveSubmitButton: "조퇴 요청 (승인 필요)",
     alreadyCheckedIn: "이미 출근하였습니다. 먼저 퇴근해 주세요.",
-    cooldownBlocked: "퇴근 후 6시간이 지나거나 자정이 지나야 다시 출근할 수 있습니다.",
+    cooldownBlocked: "퇴근 후 4시간이 지나거나 자정이 지나야 승인 없이 다시 출근할 수 있습니다.",
+    reCheckInNotice:
+      "퇴근 후 4시간 이내입니다. 재출근하려면 사유를 입력하고 관리자 승인이 필요합니다.",
+    reCheckInReasonLabel: "재출근 사유",
+    reCheckInReasonPlaceholder: "예: 추가 근무, 긴급 업무, 교대 재투입 등",
+    reCheckInReasonRequired: "재출근 사유를 입력해 주세요.",
+    reCheckInSubmitButton: "재출근 요청 (승인 필요)",
     checkInLeadWithFace:
-      "출근은 등록된 본인 얼굴 인식 후에만 가능합니다(대리 출근 방지). 퇴근 후 6시간 또는 자정이 지나면 다시 출근할 수 있습니다.",
-    checkInLeadNoFace: "출근·퇴근 시 현재 위치(GPS)가 저장됩니다. 퇴근 후 6시간 또는 자정이 지나면 다시 출근할 수 있습니다.",
+      "출근은 등록된 본인 얼굴 인식 후에만 가능합니다(대리 출근 방지). 퇴근 후 4시간 이내 재출근은 승인이 필요합니다.",
+    checkInLeadNoFace:
+      "출근·퇴근 시 현재 위치(GPS)가 저장됩니다. 퇴근 후 4시간 이내 재출근은 승인이 필요하며, 출근 후 48시간 이내 퇴근할 수 있습니다.",
     checkInModeNormal: "일반 출근",
     checkInModeBusinessTrip: "출장 출근",
     businessTripLocationLabel: "출장 지역",
@@ -1059,7 +1066,7 @@ export const en = {
     settingsPageLead:
       "Register your worksite and manage work hours, face recognition, MVS integration, and other company settings.",
     punchSection: "My attendance",
-    punchLead: "Check-in and check-out save your GPS location and timestamp. You may check in from anywhere; the next check-in is allowed once 6 hours have passed since check-out, or after midnight in the company time zone.",
+    punchLead: "Check-in and check-out save your GPS location and timestamp. Re-check-in within 4 hours of check-out needs manager approval; after 4 hours or midnight, no approval is required. Check-out is allowed within 48 hours of check-in.",
     navCheckIn: "Check in",
     navCheckOut: "Check out",
     punchNoProfile: "An employee profile (display name) is required to check in. Contact your super admin.",
@@ -1456,9 +1463,9 @@ export const en = {
     faceInsecureContext:
       "Camera works only over a secure connection (HTTPS). Please open the site via https://.",
     faceUnsupportedBrowser:
-      "This browser does not support the camera API. Open the site in Chrome or Safari (use 'Open in browser' from in-app browsers).",
+      "This browser does not support the camera API. Use the latest Chrome, Safari, or Edge.",
     faceInAppBrowser:
-      "In-app browsers (KakaoTalk, Instagram, Line, etc.) block the camera on iPhone. Tap the menu and choose 'Open in Safari'.",
+      "Could not open the camera. If you are in an in-app browser (KakaoTalk, Instagram, etc.), try “Open in Safari/Chrome” from the menu.",
     faceNoCamera: "No camera found on this device.",
     faceCameraInUse:
       "Another app is using the camera. Close other apps (video calls, etc.) and try again.",
@@ -1498,11 +1505,17 @@ export const en = {
     earlyLeaveSubmitButton: "Submit early-leave (needs approval)",
     alreadyCheckedIn: "You are already checked in. Please check out first.",
     cooldownBlocked:
-      "You can check in again 6 hours after your last check-out, or after midnight in the company time zone.",
+      "You can check in again without approval after 4 hours since check-out or after midnight (company time zone).",
+    reCheckInNotice:
+      "Less than 4 hours since check-out. Re-check-in requires a reason and manager approval.",
+    reCheckInReasonLabel: "Re-check-in reason",
+    reCheckInReasonPlaceholder: "e.g. extra shift, urgent task, return to work",
+    reCheckInReasonRequired: "Please enter a reason for re-check-in.",
+    reCheckInSubmitButton: "Submit re-check-in (needs approval)",
     checkInLeadWithFace:
-      "Check-in requires face verification after enrollment. The next check-in is allowed 6 hours after check-out or once midnight passes.",
+      "Check-in requires face verification after enrollment. Re-check-in within 4 hours of check-out requires manager approval.",
     checkInLeadNoFace:
-      "Check-in/out saves your GPS at tap time. The next check-in is allowed 6 hours after check-out or once midnight passes.",
+      "Check-in/out saves your GPS at tap time. Re-check-in within 4 hours needs approval; check-out within 48 hours of check-in.",
     checkInModeNormal: "Regular check-in",
     checkInModeBusinessTrip: "Business trip check-in",
     businessTripLocationLabel: "Trip location",

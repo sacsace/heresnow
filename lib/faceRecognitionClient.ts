@@ -1,6 +1,7 @@
 "use client";
 
 import { FACE_DESCRIPTOR_LENGTH } from "@/lib/faceMatch";
+import { getFaceDeviceProfile } from "@/lib/faceDeviceProfile";
 
 export type FaceApiModule = typeof import("@vladmandic/face-api");
 
@@ -8,47 +9,47 @@ let faceApiMod: FaceApiModule | null = null;
 let modelsReady = false;
 let loadPromise: Promise<void> | null = null;
 let activeBackend: "webgl" | "wasm" | "cpu" | null = null;
+let warmupDone = false;
 
 export function getActiveFaceBackend(): "webgl" | "wasm" | "cpu" | null {
   return activeBackend;
 }
 
-/**
- * iOS / iPadOS Safari WebKit 감지.
- * iOS WebKit은 WebGL을 "지원"하지만 fp16 텍스처 정밀도가 낮아
- * tinyFaceDetector의 descriptor 가 잘못 추출되는 알려진 이슈가 있다.
- * 이 환경에서는 WebGL을 건너뛰고 WASM을 우선 사용한다.
- *
- * 참고: iOS의 Chrome(CriOS)/Firefox(FxiOS)/Edge(EdgiOS)/모든 인앱 WebView 도
- * 내부적으로 WebKit이므로 동일하게 처리한다.
- */
-function isIosWebKit(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  if (/iPad|iPhone|iPod/.test(ua)) return true;
-  // iPadOS 13+ 는 데스크톱 모드에서 MacIntel 로 위장 — touch points 로 식별
-  const nav = navigator as Navigator & { maxTouchPoints?: number };
-  return navigator.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1;
+export function isFaceModelsReady(): boolean {
+  return modelsReady;
+}
+
+/** HTTPS·카메라 API 등 선행 조건 (모델 로드 전 빠른 검사) */
+export function canAttemptFaceRecognition(): {
+  ok: boolean;
+  reason?: "insecure" | "no_camera_api";
+} {
+  if (typeof window === "undefined") return { ok: false, reason: "no_camera_api" };
+  if (!window.isSecureContext) return { ok: false, reason: "insecure" };
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices?.getUserMedia
+  ) {
+    return { ok: false, reason: "no_camera_api" };
+  }
+  return { ok: true };
 }
 
 /**
- * 다양한 환경에서 안정적으로 동작하도록 백엔드를 선택한다.
- *
- * - iOS WebKit (Safari 등): WASM → CPU (WebGL 정밀도 이슈 회피)
- * - 기타 환경:               WebGL → WASM → CPU
+ * WASM 바이너리는 CDN 대신 /public/tfjs-wasm 에 자체 호스팅 (CSP·오프라인·인앱 대응).
+ * iOS WebKit 은 WebGL fp16 이슈로 WASM 우선, Android/데스크톱 은 WebGL 우선.
  */
 export async function loadFaceModels(): Promise<void> {
   if (modelsReady) return;
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
+    const profile = getFaceDeviceProfile();
     const tf = await import("@tensorflow/tfjs-core");
 
     let backendOk = false;
-    const preferWasm = isIosWebKit();
 
-    // 1) WebGL — iOS WebKit 이 아닐 때만 시도
-    if (!preferWasm) {
+    if (!profile.preferWasmBackend) {
       try {
         await import("@tensorflow/tfjs-backend-webgl");
         await tf.setBackend("webgl");
@@ -60,14 +61,10 @@ export async function loadFaceModels(): Promise<void> {
       }
     }
 
-    // 2) WASM 폴백 (iOS Safari 1순위 / 그 외 2순위)
     if (!backendOk) {
       try {
         const wasm = await import("@tensorflow/tfjs-backend-wasm");
-        // CDN에서 WASM 바이너리 로드 — 번들에 .wasm을 끼워넣지 않아도 됨
-        wasm.setWasmPaths(
-          "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/"
-        );
+        wasm.setWasmPaths("/tfjs-wasm/");
         await tf.setBackend("wasm");
         await tf.ready();
         activeBackend = "wasm";
@@ -77,7 +74,6 @@ export async function loadFaceModels(): Promise<void> {
       }
     }
 
-    // 3) CPU 최후 폴백
     if (!backendOk) {
       try {
         await tf.setBackend("cpu");
@@ -89,11 +85,6 @@ export async function loadFaceModels(): Promise<void> {
         loadPromise = null;
         throw new Error("FACE_BACKEND_UNAVAILABLE");
       }
-    }
-
-    if (!backendOk) {
-      loadPromise = null;
-      throw new Error("FACE_BACKEND_UNAVAILABLE");
     }
 
     faceApiMod = await import("@vladmandic/face-api");
@@ -109,8 +100,20 @@ export async function loadFaceModels(): Promise<void> {
       const detail = e instanceof Error ? e.message : String(e);
       throw new Error(`FACE_MODELS_FAILED:${detail}`);
     }
+
+    if (!warmupDone) {
+      try {
+        await tf.ready();
+        warmupDone = true;
+      } catch {
+        /* warm-up optional */
+      }
+    }
+
     modelsReady = true;
-    console.info(`[face] ready on backend=${activeBackend}`);
+    console.info(
+      `[face] ready backend=${activeBackend} inputSize=${profile.detectorInputSize}`
+    );
   })();
 
   return loadPromise;
@@ -123,15 +126,22 @@ function getFaceApi(): FaceApiModule {
   return faceApiMod;
 }
 
+function detectorOptions(faceapi: FaceApiModule) {
+  const profile = getFaceDeviceProfile();
+  return new faceapi.TinyFaceDetectorOptions({
+    inputSize: profile.detectorInputSize,
+    scoreThreshold: profile.detectorScoreThreshold,
+  });
+}
+
 /** 비디오/이미지에서 단일 얼굴 descriptor 추출 */
 export async function extractFaceDescriptor(
   input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement
 ): Promise<Float32Array | null> {
   await loadFaceModels();
   const faceapi = getFaceApi();
-  const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
   const result = await faceapi
-    .detectSingleFace(input, opts)
+    .detectSingleFace(input, detectorOptions(faceapi))
     .withFaceLandmarks(true)
     .withFaceDescriptor();
 

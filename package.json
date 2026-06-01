@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && cross-env NODE_ENV=production next build",
+    "build": "prisma generate && node scripts/copy-face-models.mjs && cross-env NODE_ENV=production next build",
     "start": "next start -H 0.0.0.0",
     "db:migrate:deploy": "prisma migrate deploy",
     "lint": "next lint",

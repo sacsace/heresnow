@@ -10,6 +10,7 @@
 # next.js
 /.next/
 /public/models/
+/public/tfjs-wasm/
 /out/
 
 # production
