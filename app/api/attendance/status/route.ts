@@ -3,6 +3,7 @@ import {
   calendarDayInTz,
   checkInErrorMessage,
   evaluatePunchEligibility,
+  isCheckOutPastWindow,
 } from "@/lib/attendancePunchRules";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { isCheckOutEarly } from "@/lib/companyWorkSchedule";
@@ -68,6 +69,11 @@ export async function GET() {
     eligibility.canCheckOut &&
     isCheckOutEarly(now, tz, effectiveSchedule);
 
+  const lateCheckOutApprovalRequired =
+    eligibility.canCheckOut &&
+    lastRecord?.type === "CHECK_IN" &&
+    isCheckOutPastWindow(lastRecord.timestamp, now);
+
   return NextResponse.json({
     ...eligibility,
     checkInMessage: checkInErrorMessage(eligibility.checkInBlock),
@@ -75,6 +81,7 @@ export async function GET() {
     lastTimestamp: lastRecord?.timestamp.toISOString() ?? null,
     today: calendarDayInTz(now, tz),
     earlyLeaveExpected,
+    lateCheckOutApprovalRequired,
     reCheckInApprovalRequired: eligibility.reCheckInApprovalRequired,
     workEndTime: effectiveSchedule.workEndTime ?? company.workEndTime,
   });

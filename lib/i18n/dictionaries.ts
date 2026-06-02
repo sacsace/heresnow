@@ -290,7 +290,7 @@ export const ko = {
     settingsPageTitle: "설정",
     settingsPageLead: "근무지(내 회사) 등록, 회사 근무 시간·안면 인식, MVS 연동 등 운영 설정을 관리합니다.",
     punchSection: "내 출퇴근",
-    punchLead: "출근·퇴근 버튼을 누르면 현재 위치(GPS)와 시간이 저장됩니다. 퇴근 후 4시간 이내 재출근은 관리자 승인이 필요하며, 4시간 경과 또는 자정 이후에는 승인 없이 출근할 수 있습니다. 출근 후 48시간 이내 퇴근할 수 있습니다.",
+    punchLead: "출근·퇴근 버튼을 누르면 현재 위치(GPS)와 시간이 저장됩니다. 퇴근 후 4시간 이내 재출근은 관리자 승인이 필요하며, 4시간 경과 또는 자정 이후에는 승인 없이 출근할 수 있습니다. 출근 후 48시간이 지나도 퇴근 사유·승인으로 퇴근할 수 있습니다.",
     navCheckIn: "출근하기",
     navCheckOut: "퇴근하기",
     punchNoProfile: "출퇴근하려면 직원 프로필(표시 이름)이 필요합니다. 슈퍼관리자에게 문의하세요.",
@@ -725,6 +725,12 @@ export const ko = {
     earlyLeaveReasonPlaceholder: "예: 병원 진료, 가족 비상, 외부 미팅 등",
     earlyLeaveReasonRequired: "조퇴 사유를 입력해 주세요.",
     earlyLeaveSubmitButton: "조퇴 요청 (승인 필요)",
+    lateCheckOutNotice:
+      "출근 후 48시간이 지났습니다. 퇴근하려면 사유를 입력하고 관리자 승인이 필요합니다.",
+    lateCheckOutReasonLabel: "지연 퇴근 사유",
+    lateCheckOutReasonPlaceholder: "예: 철야 근무 종료 지연, 시스템 미처리, 긴급 대응 등",
+    lateCheckOutReasonRequired: "지연 퇴근 사유를 입력해 주세요.",
+    lateCheckOutSubmitButton: "지연 퇴근 요청 (승인 필요)",
     alreadyCheckedIn: "이미 출근하였습니다. 먼저 퇴근해 주세요.",
     cooldownBlocked: "퇴근 후 4시간이 지나거나 자정이 지나야 승인 없이 다시 출근할 수 있습니다.",
     reCheckInNotice:
@@ -736,7 +742,7 @@ export const ko = {
     checkInLeadWithFace:
       "출근은 등록된 본인 얼굴 인식 후에만 가능합니다(대리 출근 방지). 퇴근 후 4시간 이내 재출근은 승인이 필요합니다.",
     checkInLeadNoFace:
-      "출근·퇴근 시 현재 위치(GPS)가 저장됩니다. 퇴근 후 4시간 이내 재출근은 승인이 필요하며, 출근 후 48시간 이내 퇴근할 수 있습니다.",
+      "출근·퇴근 시 현재 위치(GPS)가 저장됩니다. 퇴근 후 4시간 이내 재출근은 승인이 필요하며, 48시간 초과 퇴근은 사유·승인이 필요합니다.",
     checkInModeNormal: "일반 출근",
     checkInModeBusinessTrip: "출장 출근",
     businessTripLocationLabel: "출장 지역",
@@ -1072,7 +1078,7 @@ export const en = {
     settingsPageLead:
       "Register your worksite and manage work hours, face recognition, MVS integration, and other company settings.",
     punchSection: "My attendance",
-    punchLead: "Check-in and check-out save your GPS location and timestamp. Re-check-in within 4 hours of check-out needs manager approval; after 4 hours or midnight, no approval is required. Check-out is allowed within 48 hours of check-in.",
+    punchLead: "Check-in and check-out save your GPS location and timestamp. Re-check-in within 4 hours of check-out needs manager approval; after 4 hours or midnight, no approval is required. After 48 hours from check-in, check-out still works with a reason and manager approval.",
     navCheckIn: "Check in",
     navCheckOut: "Check out",
     punchNoProfile: "An employee profile (display name) is required to check in. Contact your super admin.",
@@ -1511,6 +1517,12 @@ export const en = {
     earlyLeaveReasonPlaceholder: "e.g. medical appointment, family emergency, external meeting",
     earlyLeaveReasonRequired: "Please enter a reason for leaving early.",
     earlyLeaveSubmitButton: "Submit early-leave (needs approval)",
+    lateCheckOutNotice:
+      "More than 48 hours since check-in. Check-out requires a reason and manager approval.",
+    lateCheckOutReasonLabel: "Late check-out reason",
+    lateCheckOutReasonPlaceholder: "e.g. delayed night shift end, system not processed, emergency",
+    lateCheckOutReasonRequired: "Please enter a reason for late check-out.",
+    lateCheckOutSubmitButton: "Submit late check-out (needs approval)",
     alreadyCheckedIn: "You are already checked in. Please check out first.",
     cooldownBlocked:
       "You can check in again without approval after 4 hours since check-out or after midnight (company time zone).",
@@ -1523,7 +1535,7 @@ export const en = {
     checkInLeadWithFace:
       "Check-in requires face verification after enrollment. Re-check-in within 4 hours of check-out requires manager approval.",
     checkInLeadNoFace:
-      "Check-in/out saves your GPS at tap time. Re-check-in within 4 hours needs approval; check-out within 48 hours of check-in.",
+      "Check-in/out saves your GPS at tap time. Re-check-in within 4 hours needs approval; check-out after 48 hours needs a reason and approval.",
     checkInModeNormal: "Regular check-in",
     checkInModeBusinessTrip: "Business trip check-in",
     businessTripLocationLabel: "Trip location",

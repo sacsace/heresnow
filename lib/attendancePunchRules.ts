@@ -126,5 +126,10 @@ export function checkInErrorMessage(
 }
 
 export function checkOutWindowErrorMessage(): string {
-  return "출근 시점부터 48시간이 지나 퇴근할 수 없습니다. 관리자에게 문의해 주세요.";
+  return "출근 시점부터 48시간이 지나 퇴근할 수 없습니다. 사유를 입력해 예외 승인을 요청해 주세요.";
+}
+
+/** 출근 후 48시간 초과 여부 */
+export function isCheckOutPastWindow(checkInAt: Date, now: Date): boolean {
+  return now.getTime() - checkInAt.getTime() > FORTY_EIGHT_H_MS;
 }

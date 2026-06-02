@@ -78,6 +78,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const [businessTripLocation, setBusinessTripLocation] = useState("");
   const [businessTripReason, setBusinessTripReason] = useState("");
   const [earlyLeaveReason, setEarlyLeaveReason] = useState("");
+  const [lateCheckOutReason, setLateCheckOutReason] = useState("");
   const [reCheckInReason, setReCheckInReason] = useState("");
   const [checkOutFaceStarted, setCheckOutFaceStarted] = useState(false);
   const [memo, setMemo] = useState("");
@@ -387,6 +388,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       if (j.code === "RECHECK_IN_REASON_REQUIRED") {
         return { ok: false, message: t("employee.reCheckInReasonRequired") };
       }
+      if (j.code === "LATE_CHECKOUT_REASON_REQUIRED") {
+        return { ok: false, message: t("employee.lateCheckOutReasonRequired") };
+      }
       const err = j.error as unknown;
       return {
         ok: false,
@@ -477,7 +481,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   }
 
   async function submitCheckOut(faceDescriptor?: number[]): Promise<boolean> {
-    // 조퇴(정규 퇴근시각 이전 퇴근) 인 경우 사유 필수 — 클라이언트 선검증으로 즉시 안내
+    if (punchStatus?.lateCheckOutApprovalRequired && !lateCheckOutReason.trim()) {
+      setMsg(t("employee.lateCheckOutReasonRequired"));
+      return false;
+    }
     if (punchStatus?.earlyLeaveExpected && !earlyLeaveReason.trim()) {
       setMsg(t("employee.earlyLeaveReasonRequired"));
       return false;
@@ -498,6 +505,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         accuracy: acc,
         memo: memo.trim() || undefined,
         earlyLeaveReason: earlyLeaveReason.trim() || undefined,
+        lateCheckOutReason: lateCheckOutReason.trim() || undefined,
         ...(faceDescriptor ? { faceDescriptor } : {}),
       });
       if (!result.ok) {
@@ -512,6 +520,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       setMsg(typeof j.message === "string" ? j.message : t("employee.saved"));
       setMemo("");
       setEarlyLeaveReason("");
+      setLateCheckOutReason("");
       const recordId = typeof j.id === "string" ? j.id : null;
       setBusy(false);
       void loadRecords();
@@ -555,8 +564,15 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     (Boolean(punchStatus?.reCheckInApprovalRequired) && !reCheckInReason.trim()) ||
     (checkInMode === "businessTrip" &&
       (!businessTripLocation.trim() || !businessTripReason.trim()));
+  const checkOutSubmitLabel = punchStatus?.lateCheckOutApprovalRequired
+    ? t("employee.lateCheckOutSubmitButton")
+    : punchStatus?.earlyLeaveExpected
+      ? t("employee.earlyLeaveSubmitButton")
+      : t("employee.checkOutOnly");
   const checkOutFaceDisabled =
-    busy || (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim());
+    busy ||
+    (Boolean(punchStatus?.lateCheckOutApprovalRequired) && !lateCheckOutReason.trim()) ||
+    (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim());
 
   return (
     <div className={embedded ? "min-w-0" : "min-w-0 space-y-6 sm:space-y-8"}>
@@ -800,7 +816,27 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
 
         {canCheckOut && !punchStatusLoading && (
           <div className="mt-6 border-t border-[var(--separator)] pt-5">
-            {punchStatus?.earlyLeaveExpected && (
+            {punchStatus?.lateCheckOutApprovalRequired && (
+              <div className={`${bannerWarning} mb-3 space-y-2`}>
+                <p className="!bg-transparent !p-0 text-[0.8125rem] font-semibold">
+                  {t("employee.lateCheckOutNotice")}
+                </p>
+                <label className={label}>
+                  {t("employee.lateCheckOutReasonLabel")}
+                  <span className="text-[var(--apple-red)]"> *</span>
+                </label>
+                <textarea
+                  className={`${input} min-h-[5rem]`}
+                  rows={3}
+                  value={lateCheckOutReason}
+                  onChange={(e) => setLateCheckOutReason(e.target.value)}
+                  placeholder={t("employee.lateCheckOutReasonPlaceholder")}
+                  maxLength={2000}
+                  disabled={busy}
+                />
+              </div>
+            )}
+            {punchStatus?.earlyLeaveExpected && !punchStatus?.lateCheckOutApprovalRequired && (
               <div className={`${bannerWarning} mb-3 space-y-2`}>
                 <p className="!bg-transparent !p-0 text-[0.8125rem] font-semibold">
                   {punchStatus.workEndTime
@@ -835,9 +871,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                     btnPrimary + " w-full min-h-[3rem] py-3.5 text-[1.0625rem] sm:min-h-[3.25rem]"
                   }
                 >
-                  {punchStatus?.earlyLeaveExpected
-                    ? t("employee.earlyLeaveSubmitButton")
-                    : t("employee.checkOutOnly")}
+                  {checkOutSubmitLabel}
                 </button>
               ) : (
                 <div className="space-y-3">
@@ -871,9 +905,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                 onClick={() => void submitCheckOut()}
                 className={btnPrimary + " w-full min-h-[3rem] py-3.5 text-[1.0625rem] sm:min-h-[3.25rem]"}
               >
-                {punchStatus?.earlyLeaveExpected
-                  ? t("employee.earlyLeaveSubmitButton")
-                  : t("employee.checkOutOnly")}
+                {checkOutSubmitLabel}
               </button>
             )}
           </div>

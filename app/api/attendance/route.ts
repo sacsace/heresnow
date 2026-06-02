@@ -1,9 +1,8 @@
 import { auth } from "@/auth";
 import {
   checkInErrorMessage,
-  checkOutWindowErrorMessage,
   evaluatePunchEligibility,
-  FORTY_EIGHT_H_MS,
+  isCheckOutPastWindow,
 } from "@/lib/attendancePunchRules";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { evaluateAttendanceWorkFlags } from "@/lib/companyWorkSchedule";
@@ -42,6 +41,8 @@ const bodySchema = z
     earlyLeaveReason: z.string().trim().min(1).max(2000).optional(),
     /** 퇴근 후 4시간 이내 재출근 시 필수 — 관리자 승인 대상 */
     reCheckInReason: z.string().trim().min(1).max(2000).optional(),
+    /** 출근 후 48시간 초과 퇴근 시 필수 — 관리자 승인 대상 */
+    lateCheckOutReason: z.string().trim().min(1).max(2000).optional(),
     photoUrl: z.string().max(2_000_000).optional().nullable(),
     deviceInfo: z.string().max(500).optional(),
     /** 출근 시 필수: 등록 얼굴과 일치 검증 */
@@ -97,6 +98,7 @@ export async function POST(req: Request) {
     businessTripReason,
     earlyLeaveReason,
     reCheckInReason,
+    lateCheckOutReason,
     photoUrl,
     deviceInfo,
     faceDescriptor,
@@ -217,14 +219,12 @@ export async function POST(req: Request) {
     if (!lastRecord || lastRecord.type === "CHECK_OUT") {
       return NextResponse.json({ error: "먼저 출근해 주세요." }, { status: 400 });
     }
-    const elapsed = now.getTime() - lastRecord.timestamp.getTime();
-    if (elapsed > FORTY_EIGHT_H_MS) {
-      return NextResponse.json(
-        { error: checkOutWindowErrorMessage() },
-        { status: 400 }
-      );
-    }
   }
+
+  const checkInAt =
+    lastRecord?.type === "CHECK_IN" ? lastRecord.timestamp : null;
+  const checkOutPastWindow =
+    type === "CHECK_OUT" && checkInAt != null && isCheckOutPastWindow(checkInAt, now);
 
   const ua = req.headers.get("user-agent") ?? "";
   const mergedDevice = deviceInfo?.trim() || ua.slice(0, 500);
@@ -285,14 +285,29 @@ export async function POST(req: Request) {
   const distanceFromSite = siteCtx.distanceFromSite;
   const outsideGeofence = geofence.outsideGeofence;
 
-  // 조퇴(정규 퇴근시각 이전 퇴근) 인 경우 사유 필수 + 관리자 승인 대상으로 처리
-  const earlyLeavePending = type === "CHECK_OUT" && workFlags.isEarlyLeave;
+  // 조퇴(정규 퇴근시각 이전 퇴근) — 48시간 초과 예외 퇴근과 별도
+  const earlyLeavePending =
+    type === "CHECK_OUT" && workFlags.isEarlyLeave && !checkOutPastWindow;
   const trimmedEarlyReason = earlyLeaveReason?.trim() || null;
   if (earlyLeavePending && !trimmedEarlyReason) {
     return NextResponse.json(
       {
         error: "조퇴 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
         code: "EARLY_LEAVE_REASON_REQUIRED",
+      },
+      { status: 400 }
+    );
+  }
+
+  // 출근 후 48시간 초과 퇴근 — 사유 필수 + 관리자 승인
+  const lateCheckOutPending = checkOutPastWindow;
+  const trimmedLateCheckOutReason = lateCheckOutReason?.trim() || null;
+  if (lateCheckOutPending && !trimmedLateCheckOutReason) {
+    return NextResponse.json(
+      {
+        error:
+          "출근 후 48시간이 지났습니다. 퇴근 사유를 입력하면 관리자 승인 후 처리됩니다.",
+        code: "LATE_CHECKOUT_REASON_REQUIRED",
       },
       { status: 400 }
     );
@@ -311,12 +326,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const pendingApproval = earlyLeavePending || reCheckInPending;
-  const pendingReason = earlyLeavePending
-    ? trimmedEarlyReason
-    : reCheckInPending
-      ? trimmedReCheckInReason
-      : null;
+  const pendingApproval = earlyLeavePending || reCheckInPending || lateCheckOutPending;
+  const pendingReason = lateCheckOutPending
+    ? trimmedLateCheckOutReason
+    : earlyLeavePending
+      ? trimmedEarlyReason
+      : reCheckInPending
+        ? trimmedReCheckInReason
+        : null;
 
   const result = await prisma.$transaction(async (tx) => {
     const record = await tx.attendanceRecord.create({
@@ -390,12 +407,14 @@ export async function POST(req: Request) {
     overtimeMinutes: result.record.overtimeMinutes,
     exceptionId: result.exceptionId,
     pendingApproval,
-    message: earlyLeavePending
-      ? "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
-      : reCheckInPending
-        ? "재출근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
-        : outsideGeofence
-          ? "근무지 반경 밖에서 기록되었습니다."
-          : "정상 처리되었습니다.",
+    message: lateCheckOutPending
+      ? "지연 퇴근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+      : earlyLeavePending
+        ? "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+        : reCheckInPending
+          ? "재출근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+          : outsideGeofence
+            ? "근무지 반경 밖에서 기록되었습니다."
+            : "정상 처리되었습니다.",
   });
 }
