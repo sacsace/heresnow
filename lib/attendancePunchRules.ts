@@ -7,8 +7,10 @@ export const FOUR_H_MS = 4 * 60 * 60 * 1000;
 export const SIX_H_MS = 6 * 60 * 60 * 1000;
 /** 출근 후 최대 퇴근 가능 시간 (철야·익일 퇴근 포함) */
 export const FORTY_EIGHT_H_MS = 48 * 60 * 60 * 1000;
-/** 지연 퇴근(48시간 초과) 시 출근일 기준 최대 근무 시간 */
-export const LATE_CHECKOUT_EIGHT_H_MS = 8 * 60 * 60 * 1000;
+/** 출근~퇴근 1회당 최대 근무 시간 (총 21시간) */
+export const MAX_SHIFT_WORK_MS = 21 * 60 * 60 * 1000;
+/** @deprecated MAX_SHIFT_WORK_MS 사용 */
+export const LATE_CHECKOUT_EIGHT_H_MS = MAX_SHIFT_WORK_MS;
 /** @deprecated FORTY_EIGHT_H_MS 사용 */
 export const TWENTY_FOUR_H_MS = 24 * 60 * 60 * 1000;
 
@@ -136,7 +138,10 @@ export function isCheckOutPastWindow(checkInAt: Date, now: Date): boolean {
   return now.getTime() - checkInAt.getTime() > FORTY_EIGHT_H_MS;
 }
 
-export type LateCheckOutTimeBasis = "EIGHT_HOURS" | "END_OF_DAY";
+export type LateCheckOutTimeBasis = "MAX_WORK_HOURS" | "END_OF_DAY";
+
+/** @deprecated MAX_WORK_HOURS 사용 */
+export type LegacyLateCheckOutTimeBasis = "EIGHT_HOURS" | LateCheckOutTimeBasis;
 
 export type ResolvedLateCheckOutTimestamp = {
   /** DB에 저장할 퇴근 시각 */
@@ -145,8 +150,27 @@ export type ResolvedLateCheckOutTimestamp = {
   checkInDay: string;
 };
 
+/** 출근 시각 + 최대 21시간 */
+export function maxShiftWorkEndTimestamp(checkInAt: Date): Date {
+  return new Date(checkInAt.getTime() + MAX_SHIFT_WORK_MS);
+}
+
 /**
- * 48시간 초과 지연 퇴근 — 출근일 기준 출근+8시간과 당일 23:59 중 이른 시각을 기록한다.
+ * 퇴근 시각을 총 21시간 이내로 제한한다.
+ */
+export function capCheckOutTimestamp(
+  checkInAt: Date,
+  proposedCheckOutAt: Date
+): { timestamp: Date; capped: boolean } {
+  const maxEnd = maxShiftWorkEndTimestamp(checkInAt);
+  if (proposedCheckOutAt.getTime() <= maxEnd.getTime()) {
+    return { timestamp: proposedCheckOutAt, capped: false };
+  }
+  return { timestamp: maxEnd, capped: true };
+}
+
+/**
+ * 48시간 초과 지연 퇴근 — 출근일 기준 (출근+21시간)과 당일 23:59 중 이른 시각을 기록한다.
  */
 export function resolveLateCheckOutTimestamp(
   checkInAt: Date,
@@ -154,7 +178,7 @@ export function resolveLateCheckOutTimestamp(
 ): ResolvedLateCheckOutTimestamp {
   const tz = timeZone.trim() || "UTC";
   const checkInDay = calendarDayInTz(checkInAt, tz);
-  const eightHoursLater = new Date(checkInAt.getTime() + LATE_CHECKOUT_EIGHT_H_MS);
+  const maxWorkEnd = maxShiftWorkEndTimestamp(checkInAt);
 
   let endOfDay: Date;
   try {
@@ -164,12 +188,12 @@ export function resolveLateCheckOutTimestamp(
   }
 
   const candidate =
-    eightHoursLater.getTime() <= endOfDay.getTime() ? eightHoursLater : endOfDay;
+    maxWorkEnd.getTime() <= endOfDay.getTime() ? maxWorkEnd : endOfDay;
   const timestamp = new Date(Math.max(checkInAt.getTime(), candidate.getTime()));
   const basis: LateCheckOutTimeBasis =
-    eightHoursLater.getTime() <= endOfDay.getTime() &&
-    timestamp.getTime() === eightHoursLater.getTime()
-      ? "EIGHT_HOURS"
+    maxWorkEnd.getTime() <= endOfDay.getTime() &&
+    timestamp.getTime() === maxWorkEnd.getTime()
+      ? "MAX_WORK_HOURS"
       : "END_OF_DAY";
 
   return { timestamp, basis, checkInDay };
@@ -179,8 +203,17 @@ export function formatLateCheckOutBasisLabel(
   basis: LateCheckOutTimeBasis,
   locale: "ko" | "en"
 ): string {
-  if (basis === "EIGHT_HOURS") {
-    return locale === "en" ? "8 hours after check-in" : "출근 후 8시간";
+  if (basis === "MAX_WORK_HOURS") {
+    return locale === "en" ? "21 hours after check-in (max)" : "출근 후 최대 21시간";
   }
   return locale === "en" ? "23:59 on check-in day" : "출근일 23:59";
+}
+
+/** API·UI 호환 — 예전 EIGHT_HOURS 값 정규화 */
+export function normalizeLateCheckOutTimeBasis(
+  basis: string | null | undefined
+): LateCheckOutTimeBasis | null {
+  if (basis === "MAX_WORK_HOURS" || basis === "END_OF_DAY") return basis;
+  if (basis === "EIGHT_HOURS") return "MAX_WORK_HOURS";
+  return null;
 }

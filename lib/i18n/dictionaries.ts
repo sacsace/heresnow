@@ -290,7 +290,7 @@ export const ko = {
     settingsPageTitle: "설정",
     settingsPageLead: "근무지(내 회사) 등록, 회사 근무 시간·안면 인식, MVS 연동 등 운영 설정을 관리합니다.",
     punchSection: "내 출퇴근",
-    punchLead: "출근·퇴근 버튼을 누르면 현재 위치(GPS)와 시간이 저장됩니다. 퇴근 후 4시간 이내 재출근은 관리자 승인이 필요하며, 4시간 경과 또는 자정 이후에는 승인 없이 출근할 수 있습니다. 48시간이 지난 지연 퇴근은 사유·승인 후 출근일 기준 8시간 또는 23:59로 기록됩니다.",
+    punchLead: "출근·퇴근 버튼을 누르면 현재 위치(GPS)와 시간이 저장됩니다. 퇴근 후 4시간 이내 재출근은 관리자 승인이 필요하며, 4시간 경과 또는 자정 이후에는 승인 없이 출근할 수 있습니다. 1회 출근~퇴근 근무는 최대 21시간이며, 48시간이 지난 지연 퇴근은 사유·승인 후 출근일 기준 21시간 또는 23:59로 기록됩니다.",
     navCheckIn: "출근하기",
     navCheckOut: "퇴근하기",
     punchNoProfile: "출퇴근하려면 직원 프로필(표시 이름)이 필요합니다. 슈퍼관리자에게 문의하세요.",
@@ -726,9 +726,9 @@ export const ko = {
     earlyLeaveReasonRequired: "조퇴 사유를 입력해 주세요.",
     earlyLeaveSubmitButton: "조퇴 요청 (승인 필요)",
     lateCheckOutNotice:
-      "출근 후 48시간이 지났습니다. 퇴근하려면 사유를 입력하고 관리자 승인이 필요합니다. 퇴근 시각은 출근일 기준 출근 후 8시간 또는 23:59 중 이른 시각으로 기록됩니다.",
+      "출근 후 48시간이 지났습니다. 퇴근하려면 사유를 입력하고 관리자 승인이 필요합니다. 퇴근 시각은 출근일 기준 출근 후 최대 21시간 또는 23:59 중 이른 시각으로 기록됩니다.",
     lateCheckOutRecordedPreview: "기록 퇴근 시각: {time} ({basis})",
-    lateCheckOutBasisEightHours: "출근 후 8시간",
+    lateCheckOutBasisMaxWork: "출근 후 최대 21시간",
     lateCheckOutBasisEndOfDay: "출근일 23:59",
     lateCheckOutReasonLabel: "지연 퇴근 사유",
     lateCheckOutReasonPlaceholder: "예: 철야 근무 종료 지연, 시스템 미처리, 긴급 대응 등",
@@ -745,7 +745,7 @@ export const ko = {
     checkInLeadWithFace:
       "출근은 등록된 본인 얼굴 인식 후에만 가능합니다(대리 출근 방지). 퇴근 후 4시간 이내 재출근은 승인이 필요합니다.",
     checkInLeadNoFace:
-      "출근·퇴근 시 현재 위치(GPS)가 저장됩니다. 퇴근 후 4시간 이내 재출근은 승인이 필요하며, 48시간 초과 퇴근은 사유·승인이 필요합니다.",
+      "출근·퇴근 시 현재 위치(GPS)가 저장됩니다. 1회 근무는 최대 21시간이며, 퇴근 후 4시간 이내 재출근은 승인이 필요합니다.",
     checkInModeNormal: "일반 출근",
     checkInModeBusinessTrip: "출장 출근",
     businessTripLocationLabel: "출장 지역",
@@ -1081,7 +1081,7 @@ export const en = {
     settingsPageLead:
       "Register your worksite and manage work hours, face recognition, MVS integration, and other company settings.",
     punchSection: "My attendance",
-    punchLead: "Check-in and check-out save your GPS location and timestamp. Re-check-in within 4 hours of check-out needs manager approval; after 4 hours or midnight, no approval is required. Late check-out after 48 hours is recorded as the earlier of 8 hours after check-in or 23:59 on the check-in day, with manager approval.",
+    punchLead: "Check-in and check-out save your GPS location and timestamp. Each shift is capped at 21 hours. Re-check-in within 4 hours of check-out needs manager approval. Late check-out after 48 hours is recorded as the earlier of 21 hours after check-in or 23:59 on the check-in day, with manager approval.",
     navCheckIn: "Check in",
     navCheckOut: "Check out",
     punchNoProfile: "An employee profile (display name) is required to check in. Contact your super admin.",
@@ -1521,9 +1521,9 @@ export const en = {
     earlyLeaveReasonRequired: "Please enter a reason for leaving early.",
     earlyLeaveSubmitButton: "Submit early-leave (needs approval)",
     lateCheckOutNotice:
-      "More than 48 hours since check-in. Check-out requires a reason and manager approval. The recorded time is the earlier of 8 hours after check-in or 23:59 on the check-in day.",
+      "More than 48 hours since check-in. Check-out requires a reason and manager approval. The recorded time is the earlier of 21 hours after check-in or 23:59 on the check-in day.",
     lateCheckOutRecordedPreview: "Recorded check-out time: {time} ({basis})",
-    lateCheckOutBasisEightHours: "8 hours after check-in",
+    lateCheckOutBasisMaxWork: "21 hours after check-in (max)",
     lateCheckOutBasisEndOfDay: "23:59 on check-in day",
     lateCheckOutReasonLabel: "Late check-out reason",
     lateCheckOutReasonPlaceholder: "e.g. delayed night shift end, system not processed, emergency",
@@ -1541,7 +1541,7 @@ export const en = {
     checkInLeadWithFace:
       "Check-in requires face verification after enrollment. Re-check-in within 4 hours of check-out requires manager approval.",
     checkInLeadNoFace:
-      "Check-in/out saves your GPS at tap time. Re-check-in within 4 hours needs approval; check-out after 48 hours needs a reason and approval.",
+      "Check-in/out saves your GPS at tap time. Each shift is capped at 21 hours. Re-check-in within 4 hours needs approval.",
     checkInModeNormal: "Regular check-in",
     checkInModeBusinessTrip: "Business trip check-in",
     businessTripLocationLabel: "Trip location",

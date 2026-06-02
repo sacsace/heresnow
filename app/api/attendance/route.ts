@@ -1,7 +1,9 @@
 import { auth } from "@/auth";
 import {
+  capCheckOutTimestamp,
   checkInErrorMessage,
   evaluatePunchEligibility,
+  formatLateCheckOutBasisLabel,
   isCheckOutPastWindow,
   resolveLateCheckOutTimestamp,
   type LateCheckOutTimeBasis,
@@ -289,10 +291,17 @@ export async function POST(req: Request) {
     lateCheckOutResolved = resolveLateCheckOutTimestamp(checkInAt, tz);
   }
 
-  const recordTimestamp =
-    type === "CHECK_OUT" && lateCheckOutResolved
-      ? lateCheckOutResolved.timestamp
-      : now;
+  let recordTimestamp = now;
+  let checkOutWorkCapped = false;
+  if (type === "CHECK_OUT" && checkInAt) {
+    if (lateCheckOutResolved) {
+      recordTimestamp = lateCheckOutResolved.timestamp;
+    } else {
+      const capped = capCheckOutTimestamp(checkInAt, now);
+      recordTimestamp = capped.timestamp;
+      checkOutWorkCapped = capped.capped;
+    }
+  }
 
   const workFlags = evaluateAttendanceWorkFlags(
     recordTimestamp,
@@ -357,19 +366,17 @@ export async function POST(req: Request) {
 
   const userMemo = memo?.trim() || "";
   let recordMemo = userMemo;
-  if (lateCheckOutPending && lateCheckOutResolved) {
+  if (type === "CHECK_OUT" && checkInAt) {
     const actualAt = formatInTimeZone(now, tz, "yyyy-MM-dd HH:mm");
-    const recordedAt = formatInTimeZone(
-      lateCheckOutResolved.timestamp,
-      tz,
-      "yyyy-MM-dd HH:mm"
-    );
-    const basisLabel =
-      lateCheckOutResolved.basis === "EIGHT_HOURS"
-        ? "출근 후 8시간"
-        : "출근일 23:59";
-    const systemNote = `[지연 퇴근 보정] 실제 처리 ${actualAt} → 기록 ${recordedAt} (${basisLabel})`;
-    recordMemo = userMemo ? `${userMemo}\n${systemNote}` : systemNote;
+    const recordedAt = formatInTimeZone(recordTimestamp, tz, "yyyy-MM-dd HH:mm");
+    if (lateCheckOutPending && lateCheckOutResolved) {
+      const basisLabel = formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko");
+      const systemNote = `[지연 퇴근 보정] 실제 처리 ${actualAt} → 기록 ${recordedAt} (${basisLabel})`;
+      recordMemo = userMemo ? `${userMemo}\n${systemNote}` : systemNote;
+    } else if (checkOutWorkCapped) {
+      const systemNote = `[근무시간 상한] 실제 처리 ${actualAt} → 기록 ${recordedAt} (최대 21시간)`;
+      recordMemo = userMemo ? `${userMemo}\n${systemNote}` : systemNote;
+    }
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -453,7 +460,7 @@ export async function POST(req: Request) {
     pendingApproval,
     message: lateCheckOutPending
       ? lateCheckOutResolved
-        ? `지연 퇴근 요청이 접수되었습니다. 퇴근 시각은 출근일 기준 ${lateCheckOutResolved.basis === "EIGHT_HOURS" ? "8시간" : "23:59"}(${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")})으로 기록되며, 관리자 승인 후 확정됩니다.`
+        ? `지연 퇴근 요청이 접수되었습니다. 퇴근 시각은 출근일 기준 ${formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko")}(${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")})으로 기록되며, 관리자 승인 후 확정됩니다.`
         : "지연 퇴근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
       : earlyLeavePending
         ? "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."

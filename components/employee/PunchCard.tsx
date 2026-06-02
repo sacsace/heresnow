@@ -582,8 +582,8 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       dateLocale
     );
     const basis =
-      punchStatus.lateCheckOutTimeBasis === "EIGHT_HOURS"
-        ? t("employee.lateCheckOutBasisEightHours")
+      punchStatus.lateCheckOutTimeBasis === "MAX_WORK_HOURS"
+        ? t("employee.lateCheckOutBasisMaxWork")
         : punchStatus.lateCheckOutTimeBasis === "END_OF_DAY"
           ? t("employee.lateCheckOutBasisEndOfDay")
           : "";

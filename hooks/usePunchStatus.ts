@@ -20,8 +20,8 @@ export type PunchStatus = {
   lateCheckOutApprovalRequired?: boolean;
   /** 지연 퇴근 시 DB에 기록될 퇴근 시각(ISO) */
   lateCheckOutRecordedAt?: string | null;
-  /** EIGHT_HOURS | END_OF_DAY */
-  lateCheckOutTimeBasis?: "EIGHT_HOURS" | "END_OF_DAY" | null;
+  /** MAX_WORK_HOURS | END_OF_DAY */
+  lateCheckOutTimeBasis?: "MAX_WORK_HOURS" | "END_OF_DAY" | null;
   /** 회사 타임존 기준 정규 퇴근 "HH:mm" (UI 표시용) */
   workEndTime?: string | null;
 };
