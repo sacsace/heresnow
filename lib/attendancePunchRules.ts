@@ -7,6 +7,8 @@ export const FOUR_H_MS = 4 * 60 * 60 * 1000;
 export const SIX_H_MS = 6 * 60 * 60 * 1000;
 /** 출근 후 최대 퇴근 가능 시간 (철야·익일 퇴근 포함) */
 export const FORTY_EIGHT_H_MS = 48 * 60 * 60 * 1000;
+/** 지연 퇴근(48시간 초과) 시 출근일 기준 최대 근무 시간 */
+export const LATE_CHECKOUT_EIGHT_H_MS = 8 * 60 * 60 * 1000;
 /** @deprecated FORTY_EIGHT_H_MS 사용 */
 export const TWENTY_FOUR_H_MS = 24 * 60 * 60 * 1000;
 
@@ -132,4 +134,53 @@ export function checkOutWindowErrorMessage(): string {
 /** 출근 후 48시간 초과 여부 */
 export function isCheckOutPastWindow(checkInAt: Date, now: Date): boolean {
   return now.getTime() - checkInAt.getTime() > FORTY_EIGHT_H_MS;
+}
+
+export type LateCheckOutTimeBasis = "EIGHT_HOURS" | "END_OF_DAY";
+
+export type ResolvedLateCheckOutTimestamp = {
+  /** DB에 저장할 퇴근 시각 */
+  timestamp: Date;
+  basis: LateCheckOutTimeBasis;
+  checkInDay: string;
+};
+
+/**
+ * 48시간 초과 지연 퇴근 — 출근일 기준 출근+8시간과 당일 23:59 중 이른 시각을 기록한다.
+ */
+export function resolveLateCheckOutTimestamp(
+  checkInAt: Date,
+  timeZone: string
+): ResolvedLateCheckOutTimestamp {
+  const tz = timeZone.trim() || "UTC";
+  const checkInDay = calendarDayInTz(checkInAt, tz);
+  const eightHoursLater = new Date(checkInAt.getTime() + LATE_CHECKOUT_EIGHT_H_MS);
+
+  let endOfDay: Date;
+  try {
+    endOfDay = fromZonedTime(`${checkInDay} 23:59:59`, tz);
+  } catch {
+    endOfDay = fromZonedTime(`${checkInDay} 23:59:59`, "UTC");
+  }
+
+  const candidate =
+    eightHoursLater.getTime() <= endOfDay.getTime() ? eightHoursLater : endOfDay;
+  const timestamp = new Date(Math.max(checkInAt.getTime(), candidate.getTime()));
+  const basis: LateCheckOutTimeBasis =
+    eightHoursLater.getTime() <= endOfDay.getTime() &&
+    timestamp.getTime() === eightHoursLater.getTime()
+      ? "EIGHT_HOURS"
+      : "END_OF_DAY";
+
+  return { timestamp, basis, checkInDay };
+}
+
+export function formatLateCheckOutBasisLabel(
+  basis: LateCheckOutTimeBasis,
+  locale: "ko" | "en"
+): string {
+  if (basis === "EIGHT_HOURS") {
+    return locale === "en" ? "8 hours after check-in" : "출근 후 8시간";
+  }
+  return locale === "en" ? "23:59 on check-in day" : "출근일 23:59";
 }

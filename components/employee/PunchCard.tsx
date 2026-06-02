@@ -574,6 +574,31 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     (Boolean(punchStatus?.lateCheckOutApprovalRequired) && !lateCheckOutReason.trim()) ||
     (Boolean(punchStatus?.earlyLeaveExpected) && !earlyLeaveReason.trim());
 
+  const lateCheckOutRecordedPreview = useMemo(() => {
+    if (!punchStatus?.lateCheckOutRecordedAt) return null;
+    const time = formatTimeInCompanyTz(
+      punchStatus.lateCheckOutRecordedAt,
+      companyTimezone,
+      dateLocale
+    );
+    const basis =
+      punchStatus.lateCheckOutTimeBasis === "EIGHT_HOURS"
+        ? t("employee.lateCheckOutBasisEightHours")
+        : punchStatus.lateCheckOutTimeBasis === "END_OF_DAY"
+          ? t("employee.lateCheckOutBasisEndOfDay")
+          : "";
+    if (!basis) return null;
+    return t("employee.lateCheckOutRecordedPreview")
+      .replace("{time}", time)
+      .replace("{basis}", basis);
+  }, [
+    punchStatus?.lateCheckOutRecordedAt,
+    punchStatus?.lateCheckOutTimeBasis,
+    companyTimezone,
+    dateLocale,
+    t,
+  ]);
+
   return (
     <div className={embedded ? "min-w-0" : "min-w-0 space-y-6 sm:space-y-8"}>
       {!embedded && <AttendanceTrustHero variant="employee" />}
@@ -821,6 +846,11 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                 <p className="!bg-transparent !p-0 text-[0.8125rem] font-semibold">
                   {t("employee.lateCheckOutNotice")}
                 </p>
+                {lateCheckOutRecordedPreview && (
+                  <p className="!bg-transparent !p-0 text-[0.8125rem] font-medium text-[var(--foreground)]">
+                    {lateCheckOutRecordedPreview}
+                  </p>
+                )}
                 <label className={label}>
                   {t("employee.lateCheckOutReasonLabel")}
                   <span className="text-[var(--apple-red)]"> *</span>

@@ -18,6 +18,10 @@ export type PunchStatus = {
   reCheckInApprovalRequired?: boolean;
   /** 출근 후 48시간 초과 퇴근 — 사유 입력·승인 절차가 필요 */
   lateCheckOutApprovalRequired?: boolean;
+  /** 지연 퇴근 시 DB에 기록될 퇴근 시각(ISO) */
+  lateCheckOutRecordedAt?: string | null;
+  /** EIGHT_HOURS | END_OF_DAY */
+  lateCheckOutTimeBasis?: "EIGHT_HOURS" | "END_OF_DAY" | null;
   /** 회사 타임존 기준 정규 퇴근 "HH:mm" (UI 표시용) */
   workEndTime?: string | null;
 };

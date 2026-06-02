@@ -3,10 +3,13 @@ import {
   checkInErrorMessage,
   evaluatePunchEligibility,
   isCheckOutPastWindow,
+  resolveLateCheckOutTimestamp,
+  type LateCheckOutTimeBasis,
 } from "@/lib/attendancePunchRules";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { evaluateAttendanceWorkFlags } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   FACE_DESCRIPTOR_LENGTH,
   isFaceMatch,
@@ -279,7 +282,24 @@ export async function POST(req: Request) {
     company,
     siteCtx.nearestSite
   );
-  const workFlags = evaluateAttendanceWorkFlags(now, tz, type, effectiveSchedule);
+
+  let lateCheckOutResolved: ReturnType<typeof resolveLateCheckOutTimestamp> | null =
+    null;
+  if (checkOutPastWindow && checkInAt) {
+    lateCheckOutResolved = resolveLateCheckOutTimestamp(checkInAt, tz);
+  }
+
+  const recordTimestamp =
+    type === "CHECK_OUT" && lateCheckOutResolved
+      ? lateCheckOutResolved.timestamp
+      : now;
+
+  const workFlags = evaluateAttendanceWorkFlags(
+    recordTimestamp,
+    tz,
+    type,
+    effectiveSchedule
+  );
 
   const siteId = siteCtx.siteId;
   const distanceFromSite = siteCtx.distanceFromSite;
@@ -335,6 +355,23 @@ export async function POST(req: Request) {
         ? trimmedReCheckInReason
         : null;
 
+  const userMemo = memo?.trim() || "";
+  let recordMemo = userMemo;
+  if (lateCheckOutPending && lateCheckOutResolved) {
+    const actualAt = formatInTimeZone(now, tz, "yyyy-MM-dd HH:mm");
+    const recordedAt = formatInTimeZone(
+      lateCheckOutResolved.timestamp,
+      tz,
+      "yyyy-MM-dd HH:mm"
+    );
+    const basisLabel =
+      lateCheckOutResolved.basis === "EIGHT_HOURS"
+        ? "출근 후 8시간"
+        : "출근일 23:59";
+    const systemNote = `[지연 퇴근 보정] 실제 처리 ${actualAt} → 기록 ${recordedAt} (${basisLabel})`;
+    recordMemo = userMemo ? `${userMemo}\n${systemNote}` : systemNote;
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const record = await tx.attendanceRecord.create({
       data: {
@@ -342,6 +379,7 @@ export async function POST(req: Request) {
         employee: { connect: { id: employee.id } },
         ...(siteId ? { site: { connect: { id: siteId } } } : {}),
         type,
+        timestamp: recordTimestamp,
         latitude,
         longitude,
         accuracy: accuracy ?? null,
@@ -349,7 +387,7 @@ export async function POST(req: Request) {
         outsideGeofence,
         // 조퇴·단기 재출근 시 PENDING — 관리자 승인 후 APPROVED 로 전환
         status: pendingApproval ? "PENDING" : "APPROVED",
-        memo: memo?.trim() || null,
+        memo: recordMemo || null,
         isBusinessTrip: type === "CHECK_IN" ? isBusinessTrip : false,
         businessTripLocation:
           type === "CHECK_IN" && isBusinessTrip ? businessTripLocation?.trim() || null : null,
@@ -390,9 +428,15 @@ export async function POST(req: Request) {
     faceVerifiedForAttendance(type, faceRequired, faceMatched)
   );
 
+  const lateCheckOutBasis: LateCheckOutTimeBasis | null =
+    lateCheckOutResolved?.basis ?? null;
+
   return NextResponse.json({
     id: result.record.id,
     status: result.record.status,
+    timestamp: result.record.timestamp.toISOString(),
+    lateCheckOutRecordedAt: lateCheckOutResolved?.timestamp.toISOString() ?? null,
+    lateCheckOutTimeBasis: lateCheckOutBasis,
     distanceFromSite: result.record.distanceFromSite,
     outsideGeofence: result.record.outsideGeofence,
     siteName: result.record.site?.name ?? null,
@@ -408,7 +452,9 @@ export async function POST(req: Request) {
     exceptionId: result.exceptionId,
     pendingApproval,
     message: lateCheckOutPending
-      ? "지연 퇴근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+      ? lateCheckOutResolved
+        ? `지연 퇴근 요청이 접수되었습니다. 퇴근 시각은 출근일 기준 ${lateCheckOutResolved.basis === "EIGHT_HOURS" ? "8시간" : "23:59"}(${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")})으로 기록되며, 관리자 승인 후 확정됩니다.`
+        : "지연 퇴근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
       : earlyLeavePending
         ? "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
         : reCheckInPending
