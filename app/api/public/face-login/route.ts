@@ -15,7 +15,7 @@ const FACE_LOGIN_WINDOW_MS = 60_000;
 
 const bodySchema = z.object({
   descriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH),
-  companyName: z.string().optional(),
+  companyName: z.string().min(1),
 });
 
 export async function POST(req: Request) {
@@ -51,7 +51,8 @@ export async function POST(req: Request) {
 
   const company = await resolveFaceLoginCompanyId(parsed.data.companyName);
   if (!company.ok) {
-    const status = company.reason === "missing_name" ? 400 : 404;
+    const status =
+      company.reason === "missing_name" ? 400 : company.reason === "ambiguous" ? 409 : 404;
     return NextResponse.json({ error: company.reason }, { status });
   }
 

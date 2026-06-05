@@ -4,7 +4,7 @@ import { FaceCapture } from "@/components/employee/FaceCapture";
 import { authError, authFieldGroup, authHint, authInput, authLabel } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
 import { signIn } from "next-auth/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 type Props = {
   callbackUrl: string;
@@ -24,32 +24,12 @@ export function FaceLoginSection({
   const { t } = useI18n();
   const signInStartedRef = useRef(false);
   const [companyName, setCompanyName] = useState("");
-  const [requireCompanyName, setRequireCompanyName] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/public/face-login/config")
-      .then(async (r) => {
-        const data = (await r.json()) as { requireCompanyName?: boolean };
-        if (!cancelled) setRequireCompanyName(Boolean(data.requireCompanyName));
-      })
-      .catch(() => {
-        if (!cancelled) setRequireCompanyName(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const trimmedCompany = companyName.trim();
+  const faceReady = trimmedCompany.length > 0;
 
   const handleVerified = useCallback(
     async (descriptor: number[]) => {
-      if (signInStartedRef.current || disabled) return false;
-      if (requireCompanyName === null) return false;
-
-      if (requireCompanyName && !companyName.trim()) {
-        onError(t("login.faceCompanyRequired"));
-        return false;
-      }
+      if (signInStartedRef.current || disabled || !trimmedCompany) return false;
 
       signInStartedRef.current = true;
       onError(null);
@@ -61,13 +41,12 @@ export function FaceLoginSection({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             descriptor,
-            companyName: companyName.trim() || undefined,
+            companyName: trimmedCompany,
           }),
         });
         const matchBody = (await matchRes.json().catch(() => ({}))) as {
           loginToken?: string;
           error?: string;
-          retryAfterMs?: number;
         };
 
         if (!matchRes.ok) {
@@ -78,6 +57,8 @@ export function FaceLoginSection({
             onError(t("login.faceCompanyRequired"));
           } else if (matchBody.error === "not_found") {
             onError(t("login.errorFaceCompanyNotFound"));
+          } else if (matchBody.error === "ambiguous") {
+            onError(t("login.errorFaceCompanyAmbiguous"));
           } else {
             onError(t("login.errorFaceCredentials"));
           }
@@ -107,48 +88,44 @@ export function FaceLoginSection({
         onLoadingChange(false);
       }
     },
-    [
-      callbackUrl,
-      companyName,
-      disabled,
-      onError,
-      onLoadingChange,
-      requireCompanyName,
-      t,
-    ]
+    [callbackUrl, disabled, onError, onLoadingChange, t, trimmedCompany]
   );
 
   return (
     <>
-      {requireCompanyName === true && (
-        <div className={authFieldGroup}>
-          <label className={authLabel}>{t("login.faceCompanyName")}</label>
-          <input
-            type="text"
-            autoComplete="organization"
-            className={authInput}
-            value={companyName}
-            onChange={(e) => {
-              setCompanyName(e.target.value);
-              onError(null);
-            }}
-            required
-          />
-          <p className={authHint}>{t("login.faceCompanyHint")}</p>
-        </div>
-      )}
+      <div className={authFieldGroup}>
+        <label className={authLabel}>{t("login.faceCompanyName")}</label>
+        <input
+          type="text"
+          autoComplete="organization"
+          className={authInput}
+          value={companyName}
+          onChange={(e) => {
+            setCompanyName(e.target.value);
+            signInStartedRef.current = false;
+            onError(null);
+          }}
+          required
+        />
+        <p className={authHint}>
+          {faceReady ? t("login.faceCompanyHint") : t("login.faceEnterCompanyToStart")}
+        </p>
+      </div>
       {error && <p className={authError}>{error}</p>}
-      <FaceCapture
-        mode="verify"
-        autoVerify
-        verifyOnClientOnly
-        fastScan
-        disabled={disabled || requireCompanyName === null}
-        verifyTitle={t("login.faceVerifyTitle")}
-        verifyLead={t("login.faceVerifyLead")}
-        onVerified={handleVerified}
-        onError={(message) => onError(message)}
-      />
+      {faceReady ? (
+        <FaceCapture
+          key={trimmedCompany.toLowerCase()}
+          mode="verify"
+          autoVerify
+          verifyOnClientOnly
+          fastScan
+          disabled={disabled}
+          verifyTitle={t("login.faceVerifyTitle")}
+          verifyLead={t("login.faceVerifyLead")}
+          onVerified={handleVerified}
+          onError={(message) => onError(message)}
+        />
+      ) : null}
     </>
   );
 }
