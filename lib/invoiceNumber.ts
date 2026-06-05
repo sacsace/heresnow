@@ -38,7 +38,6 @@ export function getInvoiceNumberPrefix(): string {
 /** `{prefix}/{FY}/{serial}` — e.g. `HN/2627/00001` (GST e-Invoice compliant). */
 export function formatStandardInvoiceNumber(fyCode: string, serial: number): string {
   const prefix = getInvoiceNumberPrefix();
-  const serialDigits = Math.max(1, String(Math.floor(serial)).length);
   const maxSerialDigits = Math.min(
     5,
     NIC_INVOICE_NUMBER_MAX_LENGTH - prefix.length - fyCode.length - 2

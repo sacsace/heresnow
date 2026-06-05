@@ -6,7 +6,6 @@ import { canViewBilling } from "@/lib/billingAccess";
 import { getOrCreateCanonicalMonthlyTier } from "@/lib/canonicalUnitPrice";
 import {
   getCompanyBillingProfile,
-  isBillingProfileComplete,
   serializeBillingProfileForApi,
 } from "@/lib/companyBillingProfile";
 import { calculateHeadcountPayment } from "@/lib/pricing";
