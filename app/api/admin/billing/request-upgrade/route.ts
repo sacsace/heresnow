@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   const currentMax = company.pricingTier?.maxSeats ?? company.seatLimit;
   if (target.maxSeats <= currentMax) {
     return NextResponse.json(
-      { error: "현재보다 많은 좌석 상한을 가진 요금제만 신청할 수 있습니다." },
+      { error: "현재보다 많은 사용자 수 상한을 가진 요금제만 신청할 수 있습니다." },
       { status: 400 }
     );
   }

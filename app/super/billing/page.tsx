@@ -45,7 +45,7 @@ export default function SuperBillingPage() {
   }, [load]);
 
   async function resolve(id: string, status: "APPROVED" | "REJECTED") {
-    if (!confirm(status === "APPROVED" ? "승인하고 회사 좌석·구독을 갱신할까요?" : "거절할까요?")) return;
+    if (!confirm(status === "APPROVED" ? "승인하고 회사 사용자 수·구독을 갱신할까요?" : "거절할까요?")) return;
     const r = await fetch(`/api/super/billing-requests/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -63,7 +63,7 @@ export default function SuperBillingPage() {
     <div className={pageStack}>
       <PageHeader
         title="요금 상향 요청"
-        subtitle="회사가 납부 후 요청하면 승인 시 좌석 상한·구독이 갱신됩니다."
+        subtitle="회사가 납부 후 요청하면 승인 시 사용자 수 상한·구독이 갱신됩니다."
       />
 
       <section>
@@ -81,7 +81,7 @@ export default function SuperBillingPage() {
                 <p className={`mt-1.5 ${hint}`}>
                   목표: {q.targetTier.label ?? `${q.targetTier.minSeats}–${q.targetTier.maxSeats}명`} · Rs.
                   {q.targetTier.priceAmount}
-                  {priceSuffix(q.targetTier.billingPeriod)} · 청구 Rs.{q.amountDue} · 현재 좌석{" "}
+                  {priceSuffix(q.targetTier.billingPeriod)} · 청구 Rs.{q.amountDue} · 현재 사용자 수{" "}
                   {q.company.seatLimit}
                 </p>
                 {q.note && <p className={`mt-1 ${hint}`}>메모: {q.note}</p>}

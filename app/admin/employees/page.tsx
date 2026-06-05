@@ -47,6 +47,7 @@ import {
   assignableRolesForCaller,
   canDeleteEmployee,
 } from "@/lib/roleHierarchy";
+import { bypassesSeatLimit } from "@/lib/seatAccessShared";
 import type { Role } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -75,7 +76,11 @@ export default function AdminEmployeesPage() {
   const callerUserId = sessionData?.user?.id ?? null;
 
   const [employees, setEmployees] = useState<Emp[]>([]);
-  const [seatInfo, setSeatInfo] = useState<{ used: number; limit: number } | null>(null);
+  const [seatInfo, setSeatInfo] = useState<{
+    registered: number;
+    billable: number;
+    limit: number;
+  } | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -147,12 +152,25 @@ export default function AdminEmployeesPage() {
             scheduleSummary: employeeScheduleSummary(e, companySchedule, loc).label,
           }))
         );
+        const seatLimit =
+          typeof ej.seatLimit === "number"
+            ? ej.seatLimit
+            : typeof bj.company?.seatLimit === "number"
+              ? bj.company.seatLimit
+              : 0;
+        const registered = rows.length;
+        const billable = rows.filter((e) => !bypassesSeatLimit(e.user.role)).length;
+        setSeatInfo({
+          registered: br.ok && typeof bj.registeredCount === "number" ? bj.registeredCount : registered,
+          billable:
+            br.ok && typeof bj.billableEmployeeCount === "number"
+              ? bj.billableEmployeeCount
+              : billable,
+          limit: br.ok && typeof bj.company?.seatLimit === "number" ? bj.company.seatLimit : seatLimit,
+        });
         setError(null);
       } else if (typeof ej?.error === "string") {
         setError(ej.error);
-      }
-      if (br.ok) {
-        setSeatInfo({ used: bj.employeeCount ?? 0, limit: bj.company?.seatLimit ?? 0 });
       }
     } catch (e) {
       console.error("[employees load]", e);
@@ -553,9 +571,17 @@ export default function AdminEmployeesPage() {
 
   const seatLine = seatInfo
     ? t("admin.employeesSeatLine")
-        .replace("{total}", String(seatInfo.used))
+        .replace("{total}", String(seatInfo.registered))
         .replace("{limit}", String(seatInfo.limit))
     : undefined;
+
+  const paidSeatLine =
+    seatInfo != null
+      ? t("admin.employeesPaidSeatCapacity")
+          .replace("{billable}", String(seatInfo.billable))
+          .replace("{limit}", String(seatInfo.limit))
+          .replace("{remaining}", String(Math.max(0, seatInfo.limit - seatInfo.billable)))
+      : null;
 
   const noDepartments = departments.length === 0;
   const canEditRoles = assignableRoles.length > 0;
@@ -755,15 +781,19 @@ export default function AdminEmployeesPage() {
                 </button>
               )}
             </div>
-            {employees.length > 0 && (
-              <p className={`mt-3 text-[0.8125rem] ${hint}`}>
-                {t("admin.employeesSearchResultCount")
-                  .replace("{shown}", String(filteredEmployees.length))
-                  .replace("{total}", String(employees.length))}
+            {paidSeatLine && (
+              <p className="mt-3 text-[0.8125rem] font-medium leading-relaxed text-[var(--apple-label-secondary)]">
+                {paidSeatLine}
+                {seatInfo && seatInfo.billable >= seatInfo.limit ? (
+                  <span className="text-[var(--apple-orange)]">
+                    {" "}
+                    {t("admin.employeesPaidSeatAtLimit")}
+                  </span>
+                ) : null}
               </p>
             )}
             {employees.some((e) => e.loginEligible !== undefined) && (
-              <p className={`mt-1 text-[0.8125rem] ${hint}`}>
+              <p className={`${paidSeatLine ? "mt-1" : "mt-3"} text-[0.8125rem] ${hint}`}>
                 {t("admin.employeesLoginStatusHint")}
               </p>
             )}

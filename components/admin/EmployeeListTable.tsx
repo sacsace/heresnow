@@ -66,7 +66,7 @@ const MIN_WIDTHS: ColWidths = {
 
 const LOGIN_COL_WIDTH = 120;
 const SCHEDULE_COL_WIDTH = 148;
-const SELECT_COL_WIDTH = 36;
+const SELECT_COL_WIDTH = 56;
 
 const ROLE_ORDER: Role[] = ["EMPLOYEE", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN"];
 
@@ -334,12 +334,20 @@ export function EmployeeListTable({
           <tr>
             {showSelect && (
               <th className={`${empTh} text-center`} style={{ width: SELECT_COL_WIDTH }}>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={() => onToggleSelectAll?.()}
-                  aria-label={t("admin.empScheduleSelectAll")}
-                />
+                <div className="flex items-center justify-center gap-1.5">
+                  <span
+                    className="w-4 shrink-0 text-center text-[0.6875rem] font-medium text-[var(--apple-label-tertiary)]"
+                    aria-hidden
+                  >
+                    #
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={() => onToggleSelectAll?.()}
+                    aria-label={t("admin.empScheduleSelectAll")}
+                  />
+                </div>
               </th>
             )}
             {headerCell("name", t("admin.employeesNameLabel"), true)}
@@ -370,7 +378,7 @@ export function EmployeeListTable({
           </tr>
         </thead>
         <tbody>
-          {sortedEmployees.map((e) => {
+          {sortedEmployees.map((e, rowIndex) => {
             const isSelf = callerUserId != null && e.user.id === callerUserId;
             const canEditThisRole =
               canEditRoles &&
@@ -386,13 +394,21 @@ export function EmployeeListTable({
               <tr key={e.id} className={trDivider}>
                 {showSelect && (
                   <td className={`${empTd} text-center`}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds!.has(e.id)}
-                      onChange={() => onToggleSelect?.(e.id)}
-                      disabled={isBusy}
-                      aria-label={t("admin.empScheduleSelectRow").replace("{name}", e.name)}
-                    />
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span
+                        className="w-4 shrink-0 text-right tabular-nums text-[0.6875rem] text-[var(--apple-label-tertiary)]"
+                        aria-hidden
+                      >
+                        {rowIndex + 1}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds!.has(e.id)}
+                        onChange={() => onToggleSelect?.(e.id)}
+                        disabled={isBusy}
+                        aria-label={t("admin.empScheduleSelectRow").replace("{name}", e.name)}
+                      />
+                    </div>
                   </td>
                 )}
                 <td className={empTd}>

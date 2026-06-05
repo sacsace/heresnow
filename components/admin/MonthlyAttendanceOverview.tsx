@@ -189,7 +189,7 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
           <table className="min-w-full border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-[var(--separator)] text-[var(--apple-label-secondary)]">
-                <th className="sticky left-0 z-10 min-w-[5.5rem] bg-[var(--grouped-bg)] px-2 py-2 font-medium">
+                <th className="sticky left-0 z-10 min-w-[7rem] bg-[var(--grouped-bg)] px-2 py-2 font-medium">
                   {t("admin.monthlyColEmployee")}
                 </th>
                 {dayNums.map((d) => {
@@ -219,10 +219,18 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
               </tr>
             </thead>
             <tbody>
-              {data.rows.map((row) => (
+              {data.rows.map((row, rowIndex) => (
                 <tr key={row.id} className="border-t border-[var(--separator)]">
-                  <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--grouped-bg)] px-2 py-1.5 font-medium text-[var(--foreground)]">
-                    {row.name}
+                  <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--grouped-bg)] px-2 py-1.5 text-[var(--foreground)]">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-5 shrink-0 text-right tabular-nums text-[0.6875rem] text-[var(--apple-label-tertiary)]"
+                        aria-hidden
+                      >
+                        {rowIndex + 1}
+                      </span>
+                      <span className="truncate font-medium">{row.name}</span>
+                    </div>
                   </td>
                   {row.days.map((d) => {
                     const st = cellState(d);

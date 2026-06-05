@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   }
 
   if (parsed.data.minSeats > parsed.data.maxSeats) {
-    return NextResponse.json({ error: "최소 좌석이 최대 좌석보다 클 수 없습니다." }, { status: 400 });
+    return NextResponse.json({ error: "최소 사용자 수가 최대 사용자 수보다 클 수 없습니다." }, { status: 400 });
   }
 
   try {
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ tier }, { status: 201 });
   } catch {
     return NextResponse.json(
-      { error: "동일 좌석 구간·결제 주기(월/연) 조합이 이미 있습니다." },
+      { error: "동일 사용자 수 구간·결제 주기(월/연) 조합이 이미 있습니다." },
       { status: 409 }
     );
   }

@@ -20,7 +20,7 @@ export async function seatLoginForbiddenResponse(
     return NextResponse.json(
       {
         error: "SEAT_LIMIT",
-        message: "로그인 좌석이 배정되지 않았습니다. 관리자에게 문의하세요.",
+        message: "로그인 사용자 수가 배정되지 않았습니다. 관리자에게 문의하세요.",
       },
       { status: 403 }
     );

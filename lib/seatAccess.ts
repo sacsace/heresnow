@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { bypassesSeatLimit, SEAT_EXEMPT_ROLES } from "@/lib/seatAccessShared";
 import type { Role } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 
-/** 좌석·결제 대상에서 제외 — 로그인은 좌석 없이 허용 */
-export const SEAT_EXEMPT_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "HR_MANAGER"];
+export { bypassesSeatLimit, SEAT_EXEMPT_ROLES };
 
 /** 직원 목록·로그인 좌석 배정 기준 정렬 (이름순) */
 export const EMPLOYEE_SEAT_ORDER: Prisma.EmployeeOrderByWithRelationInput[] = [
@@ -11,11 +11,6 @@ export const EMPLOYEE_SEAT_ORDER: Prisma.EmployeeOrderByWithRelationInput[] = [
   { createdAt: "asc" },
   { id: "asc" },
 ];
-
-/** 좌석 제한 없이 로그인 가능한 역할 */
-export function bypassesSeatLimit(role: Role | string | null | undefined): boolean {
-  return SEAT_EXEMPT_ROLES.includes(role as Role);
-}
 
 export function billableEmployeeWhere(companyId: string): Prisma.EmployeeWhereInput {
   return {
