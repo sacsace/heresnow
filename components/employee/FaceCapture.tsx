@@ -24,6 +24,8 @@ type Props = {
   disabled?: boolean;
   /** verify 모드: 얼굴이 인식되면 버튼 없이 자동으로 onVerified 호출 */
   autoVerify?: boolean;
+  /** verify 모드: 세션 API(/api/employee/face) 없이 descriptor만 onVerified에 전달 (로그인 등) */
+  verifyOnClientOnly?: boolean;
   verifyTitle?: string;
   verifyLead?: string;
   verifyButton?: string;
@@ -32,7 +34,7 @@ type Props = {
   onError?: (message: string) => void;
 };
 
-type InitPhase = "idle" | "loading" | "ready" | "error";
+type InitPhase = "idle" | "loading" | "warming" | "ready" | "error";
 
 /** 폴백 스캔 간격 (requestVideoFrameCallback 미지원 기기) */
 const AUTO_SCAN_INTERVAL_MS = 650;
@@ -57,6 +59,7 @@ export function FaceCapture({
   mode,
   disabled,
   autoVerify = false,
+  verifyOnClientOnly = false,
   verifyTitle,
   verifyLead,
   verifyButton,
@@ -89,6 +92,7 @@ export function FaceCapture({
   );
   const [needsTap, setNeedsTap] = useState(false);
   const [autoScanDone, setAutoScanDone] = useState(false);
+  const [previewReady, setPreviewReady] = useState(false);
 
   const autoVerifyActive = mode === "verify" && autoVerify;
 
@@ -128,8 +132,10 @@ export function FaceCapture({
 
       if (!cancelled) setPhase("loading");
 
+      const modelsPromise = loadFaceModels();
+
       try {
-        const [, stream] = await Promise.all([loadFaceModels(), openCamera()]);
+        const stream = await openCamera();
         if (cancelled) {
           stream.getTracks().forEach((tr) => tr.stop());
           return;
@@ -149,13 +155,21 @@ export function FaceCapture({
               if (!cancelled) setNeedsTap(true);
             }
           );
-          if (video.readyState >= 1) {
-            setReady(true);
-            if (!cancelled) setPhase("ready");
+          if (!cancelled) {
+            setPreviewReady(true);
+            setPhase("warming");
           }
         }
         setCameraError(null);
         setCameraErrorKind(null);
+
+        await modelsPromise;
+        if (cancelled) return;
+
+        if (!cancelled) {
+          setReady(true);
+          setPhase("ready");
+        }
       } catch (err) {
         const classified = classifyCameraAccessError(err, profile);
         if (classified.kind !== "no_camera") {
@@ -175,14 +189,14 @@ export function FaceCapture({
   }, [stopCamera]);
 
   useEffect(() => {
-    if (ready || cameraError) return;
+    if (previewReady || cameraError) return;
     if (!streamRef.current) return;
     const start = Date.now();
     const id = window.setInterval(() => {
       const v = videoRef.current;
       if (v && v.readyState >= 2) {
-        setReady(true);
-        setPhase("ready");
+        setPreviewReady(true);
+        setPhase((p) => (p === "loading" ? "warming" : p));
         window.clearInterval(id);
         return;
       }
@@ -191,7 +205,7 @@ export function FaceCapture({
       }
     }, 200);
     return () => window.clearInterval(id);
-  }, [ready, cameraError]);
+  }, [previewReady, cameraError]);
 
   useEffect(() => {
     if (!autoVerifyActive) return;
@@ -252,6 +266,18 @@ export function FaceCapture({
           return true;
         }
 
+        if (verifyOnClientOnly) {
+          const verified = await onVerifiedRef.current?.(arr);
+          if (verified === false) {
+            setStatus(tRef.current("employee.faceVerifyRetry"));
+            return false;
+          }
+          setStatus(tRef.current("employee.faceVerifyOk"));
+          scanStoppedRef.current = true;
+          setAutoScanDone(true);
+          return true;
+        }
+
         const r = await fetch("/api/employee/face", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -284,7 +310,7 @@ export function FaceCapture({
         setBusy(false);
       }
     },
-    [disabled, mode, ready]
+    [disabled, mode, ready, verifyOnClientOnly]
   );
 
   useEffect(() => {
@@ -376,12 +402,10 @@ export function FaceCapture({
             autoPlay
             aria-hidden
             onLoadedMetadata={() => {
-              setReady(true);
-              setPhase("ready");
+              setPreviewReady(true);
             }}
             onCanPlay={() => {
-              setReady(true);
-              setPhase("ready");
+              setPreviewReady(true);
             }}
             onClick={() => {
               const v = videoRef.current;
@@ -398,8 +422,13 @@ export function FaceCapture({
             className="pointer-events-none absolute inset-8 rounded-[50%] border-2 border-dashed border-white/70"
             aria-hidden
           />
-          {phase === "loading" && (
+          {phase === "loading" && !previewReady && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white">
+              {t("employee.faceOpeningCamera")}
+            </div>
+          )}
+          {phase === "warming" && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 text-xs font-medium text-white">
               {t("employee.faceLoadingModels")}
             </div>
           )}

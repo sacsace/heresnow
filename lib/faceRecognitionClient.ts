@@ -19,6 +19,56 @@ export function isFaceModelsReady(): boolean {
   return modelsReady;
 }
 
+const FACE_MODEL_MANIFESTS = [
+  "/models/tiny_face_detector_model-weights_manifest.json",
+  "/models/face_landmark_68_tiny_model-weights_manifest.json",
+  "/models/face_recognition_model-weights_manifest.json",
+] as const;
+
+let modelFilesPrefetched = false;
+
+/** 모델 manifest·WASM 등 정적 파일을 HTTP 캐시에 미리 적재 */
+export function prefetchFaceModelFiles(): void {
+  if (typeof window === "undefined" || modelFilesPrefetched) return;
+  modelFilesPrefetched = true;
+
+  for (const path of FACE_MODEL_MANIFESTS) {
+    void fetch(path).catch(() => {});
+  }
+
+  const profile = getFaceDeviceProfile();
+  if (profile.preferWasmBackend) {
+    void fetch("/tfjs-wasm/tfjs-backend-wasm.wasm").catch(() => {});
+  }
+}
+
+/**
+ * 로그인·출근 화면 등에서 idle 시점에 안면 모듈을 백그라운드 로드.
+ * eager=true 이면 즉시 로드 (탭 전환·호버 등).
+ */
+export function prefetchFaceRecognition(eager = false): void {
+  if (typeof window === "undefined") return;
+  if (!canAttemptFaceRecognition().ok) return;
+  if (modelsReady) return;
+
+  prefetchFaceModelFiles();
+
+  const startLoad = () => {
+    void loadFaceModels().catch(() => {});
+  };
+
+  if (eager) {
+    startLoad();
+    return;
+  }
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(startLoad, { timeout: 2500 });
+  } else {
+    setTimeout(startLoad, 250);
+  }
+}
+
 /** HTTPS·카메라 API 등 선행 조건 (모델 로드 전 빠른 검사) */
 export function canAttemptFaceRecognition(): {
   ok: boolean;
@@ -45,7 +95,11 @@ export async function loadFaceModels(): Promise<void> {
 
   loadPromise = (async () => {
     const profile = getFaceDeviceProfile();
-    const tf = await import("@tensorflow/tfjs-core");
+    prefetchFaceModelFiles();
+
+    const tfCorePromise = import("@tensorflow/tfjs-core");
+    const faceApiPromise = import("@vladmandic/face-api");
+    const tf = await tfCorePromise;
 
     let backendOk = false;
 
@@ -87,7 +141,7 @@ export async function loadFaceModels(): Promise<void> {
       }
     }
 
-    faceApiMod = await import("@vladmandic/face-api");
+    faceApiMod = await faceApiPromise;
     const modelPath = "/models";
     try {
       await Promise.all([

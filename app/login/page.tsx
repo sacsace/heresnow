@@ -18,6 +18,7 @@ import {
   authSubtitleLogin,
 } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
+import { prefetchFaceRecognition } from "@/lib/faceRecognitionClient";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { signIn } from "next-auth/react";
 import dynamic from "next/dynamic";
@@ -50,6 +51,11 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [dbHint, setDbHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    prefetchFaceRecognition(false);
+    void import("@/components/auth/FaceLoginSection");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,8 +102,17 @@ function LoginForm() {
 
   function switchMode(next: LoginMode) {
     if (next === mode) return;
+    if (next === "face") {
+      prefetchFaceRecognition(true);
+      void import("@/components/auth/FaceLoginSection");
+    }
     setMode(next);
     setError(null);
+  }
+
+  function warmFaceLogin() {
+    prefetchFaceRecognition(true);
+    void import("@/components/auth/FaceLoginSection");
   }
 
   const shellWidth =
@@ -149,6 +164,8 @@ function LoginForm() {
                 ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--apple-label-secondary)]"
             }`}
+            onMouseEnter={warmFaceLogin}
+            onFocus={warmFaceLogin}
             onClick={() => switchMode("face")}
           >
             {t("login.modeFace")}

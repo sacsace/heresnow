@@ -3,8 +3,9 @@
 import { FaceCapture } from "@/components/employee/FaceCapture";
 import { authError } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
+import { prefetchFaceRecognition } from "@/lib/faceRecognitionClient";
 import { signIn } from "next-auth/react";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 type Props = {
   callbackUrl: string;
@@ -23,6 +24,10 @@ export function FaceLoginSection({
 }: Props) {
   const { t } = useI18n();
   const signInStartedRef = useRef(false);
+
+  useEffect(() => {
+    prefetchFaceRecognition(true);
+  }, []);
 
   const handleVerified = useCallback(
     async (descriptor: number[]) => {
@@ -53,6 +58,7 @@ export function FaceLoginSection({
       <FaceCapture
         mode="verify"
         autoVerify
+        verifyOnClientOnly
         disabled={disabled}
         verifyTitle={t("login.faceVerifyTitle")}
         verifyLead={t("login.faceVerifyLead")}
