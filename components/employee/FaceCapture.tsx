@@ -26,6 +26,8 @@ type Props = {
   autoVerify?: boolean;
   /** verify 모드: 세션 API(/api/employee/face) 없이 descriptor만 onVerified에 전달 (로그인 등) */
   verifyOnClientOnly?: boolean;
+  /** 로그인 등 — 더 자주·빠르게 스캔 */
+  fastScan?: boolean;
   verifyTitle?: string;
   verifyLead?: string;
   verifyButton?: string;
@@ -36,11 +38,12 @@ type Props = {
 
 type InitPhase = "idle" | "loading" | "warming" | "ready" | "error";
 
-/** 폴백 스캔 간격 (requestVideoFrameCallback 미지원 기기) */
-const AUTO_SCAN_INTERVAL_MS = 650;
-const AUTO_SCAN_INITIAL_DELAY_MS = 280;
 /** rVFC 사용 시 N 프레임마다 1회 감지 (과부하 방지) */
 const SCAN_EVERY_N_FRAMES = 2;
+const SCAN_EVERY_N_FRAMES_FAST = 1;
+const AUTO_SCAN_INTERVAL_MS = 650;
+const AUTO_SCAN_INTERVAL_MS_FAST = 420;
+const AUTO_SCAN_INITIAL_DELAY_MS = 280;
 
 async function openCamera(): Promise<MediaStream> {
   const attempts = buildCameraConstraintAttempts(getFaceDeviceProfile());
@@ -60,6 +63,7 @@ export function FaceCapture({
   disabled,
   autoVerify = false,
   verifyOnClientOnly = false,
+  fastScan = false,
   verifyTitle,
   verifyLead,
   verifyButton,
@@ -310,7 +314,7 @@ export function FaceCapture({
         setBusy(false);
       }
     },
-    [disabled, mode, ready, verifyOnClientOnly]
+    [disabled, mode, ready, verifyOnClientOnly, fastScan]
   );
 
   useEffect(() => {
@@ -319,13 +323,15 @@ export function FaceCapture({
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let frameCounter = 0;
+    const scanEvery = fastScan ? SCAN_EVERY_N_FRAMES_FAST : SCAN_EVERY_N_FRAMES;
+    const scanInterval = fastScan ? AUTO_SCAN_INTERVAL_MS_FAST : AUTO_SCAN_INTERVAL_MS;
 
     type VideoWithRvf = HTMLVideoElement & {
       requestVideoFrameCallback?: (cb: () => void) => number;
     };
 
     const scheduleInterval = () => {
-      timer = setTimeout(() => void tick(), AUTO_SCAN_INTERVAL_MS);
+      timer = setTimeout(() => void tick(), scanInterval);
     };
 
     async function tick() {
@@ -339,7 +345,7 @@ export function FaceCapture({
     function onFrame() {
       if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError) return;
       frameCounter += 1;
-      if (frameCounter % SCAN_EVERY_N_FRAMES === 0 && !busyRef.current) {
+      if (frameCounter % scanEvery === 0 && !busyRef.current) {
         void runCapture({ silentNoFace: true });
       }
       const v = videoRef.current as VideoWithRvf | null;
@@ -363,7 +369,7 @@ export function FaceCapture({
       clearTimeout(initial);
       if (timer) clearTimeout(timer);
     };
-  }, [autoVerifyActive, ready, disabled, cameraError, runCapture]);
+  }, [autoVerifyActive, ready, disabled, cameraError, runCapture, fastScan]);
 
   const title =
     mode === "enroll"

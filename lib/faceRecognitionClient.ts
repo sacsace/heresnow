@@ -1,6 +1,10 @@
 "use client";
 
 import { FACE_DESCRIPTOR_LENGTH } from "@/lib/faceMatch";
+import {
+  prefetchFaceModelAssets,
+  withCachedModelFetch,
+} from "@/lib/faceModelCache";
 import { getFaceDeviceProfile } from "@/lib/faceDeviceProfile";
 
 export type FaceApiModule = typeof import("@vladmandic/face-api");
@@ -9,7 +13,6 @@ let faceApiMod: FaceApiModule | null = null;
 let modelsReady = false;
 let loadPromise: Promise<void> | null = null;
 let activeBackend: "webgl" | "wasm" | "cpu" | null = null;
-let warmupDone = false;
 
 export function getActiveFaceBackend(): "webgl" | "wasm" | "cpu" | null {
   return activeBackend;
@@ -19,31 +22,13 @@ export function isFaceModelsReady(): boolean {
   return modelsReady;
 }
 
-const FACE_MODEL_MANIFESTS = [
-  "/models/tiny_face_detector_model-weights_manifest.json",
-  "/models/face_landmark_68_tiny_model-weights_manifest.json",
-  "/models/face_recognition_model-weights_manifest.json",
-] as const;
-
-let modelFilesPrefetched = false;
-
-/** 모델 manifest·WASM 등 정적 파일을 HTTP 캐시에 미리 적재 */
+/** @deprecated prefetchFaceModelAssets 사용 */
 export function prefetchFaceModelFiles(): void {
-  if (typeof window === "undefined" || modelFilesPrefetched) return;
-  modelFilesPrefetched = true;
-
-  for (const path of FACE_MODEL_MANIFESTS) {
-    void fetch(path).catch(() => {});
-  }
-
-  const profile = getFaceDeviceProfile();
-  if (profile.preferWasmBackend) {
-    void fetch("/tfjs-wasm/tfjs-backend-wasm.wasm").catch(() => {});
-  }
+  prefetchFaceModelAssets();
 }
 
 /**
- * 로그인·출근 화면 등에서 idle 시점에 안면 모듈을 백그라운드 로드.
+ * 로그인·출근 화면 등에서 안면 모듈을 백그라운드 로드.
  * eager=true 이면 즉시 로드 (탭 전환·호버 등).
  */
 export function prefetchFaceRecognition(eager = false): void {
@@ -51,7 +36,7 @@ export function prefetchFaceRecognition(eager = false): void {
   if (!canAttemptFaceRecognition().ok) return;
   if (modelsReady) return;
 
-  prefetchFaceModelFiles();
+  prefetchFaceModelAssets();
 
   const startLoad = () => {
     void loadFaceModels().catch(() => {});
@@ -63,9 +48,9 @@ export function prefetchFaceRecognition(eager = false): void {
   }
 
   if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(startLoad, { timeout: 2500 });
+    window.requestIdleCallback(startLoad, { timeout: 800 });
   } else {
-    setTimeout(startLoad, 250);
+    setTimeout(startLoad, 100);
   }
 }
 
@@ -85,6 +70,38 @@ export function canAttemptFaceRecognition(): {
   return { ok: true };
 }
 
+async function initTfBackend(
+  tf: typeof import("@tensorflow/tfjs-core"),
+  profile: ReturnType<typeof getFaceDeviceProfile>
+): Promise<void> {
+  if (!profile.preferWasmBackend) {
+    try {
+      await import("@tensorflow/tfjs-backend-webgl");
+      await tf.setBackend("webgl");
+      await tf.ready();
+      activeBackend = "webgl";
+      return;
+    } catch (e) {
+      console.warn("[face] WebGL backend unavailable, will try WASM", e);
+    }
+  }
+
+  try {
+    const wasm = await import("@tensorflow/tfjs-backend-wasm");
+    wasm.setWasmPaths("/tfjs-wasm/");
+    await tf.setBackend("wasm");
+    await tf.ready();
+    activeBackend = "wasm";
+    return;
+  } catch (e) {
+    console.warn("[face] WASM backend unavailable, will try CPU", e);
+  }
+
+  await tf.setBackend("cpu");
+  await tf.ready();
+  activeBackend = "cpu";
+}
+
 /**
  * WASM 바이너리는 CDN 대신 /public/tfjs-wasm 에 자체 호스팅 (CSP·오프라인·인앱 대응).
  * iOS WebKit 은 WebGL fp16 이슈로 WASM 우선, Android/데스크톱 은 WebGL 우선.
@@ -93,59 +110,27 @@ export async function loadFaceModels(): Promise<void> {
   if (modelsReady) return;
   if (loadPromise) return loadPromise;
 
-  loadPromise = (async () => {
+  loadPromise = withCachedModelFetch(async () => {
     const profile = getFaceDeviceProfile();
-    prefetchFaceModelFiles();
+    prefetchFaceModelAssets();
 
     const tfCorePromise = import("@tensorflow/tfjs-core");
     const faceApiPromise = import("@vladmandic/face-api");
     const tf = await tfCorePromise;
 
-    let backendOk = false;
-
-    if (!profile.preferWasmBackend) {
-      try {
-        await import("@tensorflow/tfjs-backend-webgl");
-        await tf.setBackend("webgl");
-        await tf.ready();
-        activeBackend = "webgl";
-        backendOk = true;
-      } catch (e) {
-        console.warn("[face] WebGL backend unavailable, will try WASM", e);
-      }
-    }
-
-    if (!backendOk) {
-      try {
-        const wasm = await import("@tensorflow/tfjs-backend-wasm");
-        wasm.setWasmPaths("/tfjs-wasm/");
-        await tf.setBackend("wasm");
-        await tf.ready();
-        activeBackend = "wasm";
-        backendOk = true;
-      } catch (e) {
-        console.warn("[face] WASM backend unavailable, will try CPU", e);
-      }
-    }
-
-    if (!backendOk) {
-      try {
-        await tf.setBackend("cpu");
-        await tf.ready();
-        activeBackend = "cpu";
-        backendOk = true;
-      } catch (e) {
-        console.error("[face] CPU backend also failed", e);
-        loadPromise = null;
-        throw new Error("FACE_BACKEND_UNAVAILABLE");
-      }
+    try {
+      await initTfBackend(tf, profile);
+    } catch (e) {
+      loadPromise = null;
+      console.error("[face] CPU backend also failed", e);
+      throw new Error("FACE_BACKEND_UNAVAILABLE");
     }
 
     faceApiMod = await faceApiPromise;
     const modelPath = "/models";
     try {
+      await faceApiMod.nets.tinyFaceDetector.loadFromUri(modelPath);
       await Promise.all([
-        faceApiMod.nets.tinyFaceDetector.loadFromUri(modelPath),
         faceApiMod.nets.faceLandmark68TinyNet.loadFromUri(modelPath),
         faceApiMod.nets.faceRecognitionNet.loadFromUri(modelPath),
       ]);
@@ -155,20 +140,12 @@ export async function loadFaceModels(): Promise<void> {
       throw new Error(`FACE_MODELS_FAILED:${detail}`);
     }
 
-    if (!warmupDone) {
-      try {
-        await tf.ready();
-        warmupDone = true;
-      } catch {
-        /* warm-up optional */
-      }
-    }
-
     modelsReady = true;
+    void warmupFaceInference(faceApiMod).catch(() => {});
     console.info(
       `[face] ready backend=${activeBackend} inputSize=${profile.detectorInputSize}`
     );
-  })();
+  });
 
   return loadPromise;
 }
@@ -178,6 +155,20 @@ function getFaceApi(): FaceApiModule {
     throw new Error("Face models not loaded");
   }
   return faceApiMod;
+}
+
+/** 첫 실제 스캔 전 GPU/WASM 워밍업 */
+async function warmupFaceInference(faceapi: FaceApiModule): Promise<void> {
+  if (typeof document === "undefined") return;
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  ctx?.fillRect(0, 0, 64, 64);
+  await faceapi
+    .detectSingleFace(canvas, detectorOptions(faceapi))
+    .withFaceLandmarks(true)
+    .withFaceDescriptor();
 }
 
 function detectorOptions(faceapi: FaceApiModule) {
@@ -194,6 +185,7 @@ export async function extractFaceDescriptor(
 ): Promise<Float32Array | null> {
   await loadFaceModels();
   const faceapi = getFaceApi();
+
   const result = await faceapi
     .detectSingleFace(input, detectorOptions(faceapi))
     .withFaceLandmarks(true)

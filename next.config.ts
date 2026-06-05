@@ -52,7 +52,17 @@ const nextConfig: NextConfig = {
           ] as const)
         : []),
     ];
-    return [{ source: "/:path*", headers: [...headers] }];
+    return [
+      { source: "/:path*", headers: [...headers] },
+      {
+        source: "/models/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      {
+        source: "/tfjs-wasm/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
   },
 };
 

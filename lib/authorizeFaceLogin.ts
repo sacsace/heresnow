@@ -1,58 +1,39 @@
 import type { Role } from "@prisma/client";
-import { identifySingleFaceMatch, parseFaceDescriptor } from "@/lib/faceMatch";
+import { verifyFaceLoginToken } from "@/lib/faceLoginToken";
 import { prisma } from "@/lib/prisma";
 
-function parseProbeDescriptor(raw: unknown): number[] | null {
-  if (typeof raw === "string") {
-    try {
-      return parseFaceDescriptor(JSON.parse(raw));
-    } catch {
-      return null;
-    }
-  }
-  return parseFaceDescriptor(raw);
-}
-
 export async function authorizeFaceLogin(
-  credentials: Partial<Record<"descriptor", unknown>>
+  credentials: Partial<Record<"loginToken", unknown>>
 ) {
-  const probe = parseProbeDescriptor(credentials?.descriptor);
-  if (!probe) return null;
+  const token = String(credentials?.loginToken ?? "").trim();
+  if (!token) return null;
 
-  let employees;
+  let userId: string | null;
   try {
-    employees = await prisma.employee.findMany({
-      where: {
-        faceEnrolledAt: { not: null },
-        company: { faceRecognitionEnabled: true },
-      },
-      select: {
-        id: true,
-        faceDescriptor: true,
-        user: {
-          select: {
-            id: true,
-            email: true,
-            role: true,
-            companyId: true,
-          },
-        },
-      },
+    userId = verifyFaceLoginToken(token);
+  } catch {
+    return null;
+  }
+  if (!userId) return null;
+
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { employee: { select: { id: true } } },
     });
   } catch (e) {
     console.error("[auth] DB 연결 실패 — .env 의 DATABASE_URL(비밀번호·호스트)을 확인하세요.", e);
     return null;
   }
 
-  const identified = identifySingleFaceMatch(employees, probe);
-  if (!identified) return null;
+  if (!user?.employee?.id) return null;
 
-  const { match: emp } = identified;
   return {
-    id: emp.user.id,
-    email: emp.user.email,
-    role: emp.user.role as Role,
-    companyId: emp.user.companyId,
-    employeeId: emp.id,
+    id: user.id,
+    email: user.email,
+    role: user.role as Role,
+    companyId: user.companyId,
+    employeeId: user.employee.id,
   };
 }

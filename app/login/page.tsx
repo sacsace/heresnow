@@ -53,11 +53,6 @@ function LoginForm() {
   const [dbHint, setDbHint] = useState<string | null>(null);
 
   useEffect(() => {
-    prefetchFaceRecognition(false);
-    void import("@/components/auth/FaceLoginSection");
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     fetch("/api/dev/health")
       .then(async (r) => {
