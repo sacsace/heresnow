@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { verifyIntegrationDispatchSecret } from "@/lib/integrations/mvsAuth";
 import { dispatchPendingMvsOutbox } from "@/lib/integrations/dispatchMvs";
 import { NextResponse } from "next/server";

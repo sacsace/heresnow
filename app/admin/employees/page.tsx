@@ -1,5 +1,6 @@
 "use client";
 
+import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import { EmployeeBulkImportPanel } from "@/components/admin/EmployeeBulkImportPanel";
 import {
   DepartmentManagerModal,
@@ -60,6 +61,9 @@ type Emp = {
   workStartTime?: string | null;
   workEndTime?: string | null;
   scheduleSummary?: string;
+  loginEligible?: boolean;
+  loginEligibleByAdmin?: boolean;
+  seatRank?: number;
 };
 
 const profileEditRoles = new Set<Role>(["COMPANY_ADMIN", "HR_MANAGER", "SUPER_ADMIN"]);
@@ -94,6 +98,8 @@ export default function AdminEmployeesPage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilterId, setDepartmentFilterId] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Emp | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const assignableRoles = useMemo(
     () => assignableRolesForCaller(callerRole),
@@ -425,10 +431,13 @@ export default function AdminEmployeesPage() {
   }
 
   async function deleteEmployee(emp: Emp) {
-    const ok = window.confirm(
-      t("admin.employeesDeleteConfirm").replace("{name}", emp.name)
-    );
-    if (!ok) return;
+    setDeleteTarget(emp);
+  }
+
+  async function confirmDeleteEmployee() {
+    const emp = deleteTarget;
+    if (!emp) return;
+    setDeleteBusy(true);
     setRowBusyId(emp.id);
     setRowError(null);
     if (passwordEditId === emp.id) {
@@ -461,6 +470,8 @@ export default function AdminEmployeesPage() {
       setRowError(t("admin.employeesDeleteFail"));
     } finally {
       setRowBusyId(null);
+      setDeleteBusy(false);
+      setDeleteTarget(null);
     }
   }
 
@@ -542,7 +553,7 @@ export default function AdminEmployeesPage() {
 
   const seatLine = seatInfo
     ? t("admin.employeesSeatLine")
-        .replace("{used}", String(seatInfo.used))
+        .replace("{total}", String(seatInfo.used))
         .replace("{limit}", String(seatInfo.limit))
     : undefined;
 
@@ -550,7 +561,7 @@ export default function AdminEmployeesPage() {
   const canEditRoles = assignableRoles.length > 0;
 
   return (
-    <div className={pageStack}>
+    <div className={`${pageStack} w-full min-w-0`}>
       <PageHeader
         title={t("admin.employeesTitle")}
         subtitle={seatLine}
@@ -751,6 +762,11 @@ export default function AdminEmployeesPage() {
                   .replace("{total}", String(employees.length))}
               </p>
             )}
+            {employees.some((e) => e.loginEligible !== undefined) && (
+              <p className={`mt-1 text-[0.8125rem] ${hint}`}>
+                {t("admin.employeesLoginStatusHint")}
+              </p>
+            )}
           </div>
 
           {employees.length === 0 ? (
@@ -815,6 +831,24 @@ export default function AdminEmployeesPage() {
         open={deptModalOpen}
         onClose={() => setDeptModalOpen(false)}
         onChanged={() => void loadAll()}
+      />
+
+      <AppleConfirmDialog
+        open={deleteTarget != null}
+        title={t("admin.employeesDeleteConfirmTitle")}
+        message={
+          deleteTarget
+            ? t("admin.employeesDeleteConfirmMessage").replace("{name}", deleteTarget.name)
+            : ""
+        }
+        confirmLabel={t("admin.employeesDeleteConfirmAction")}
+        cancelLabel={t("common.cancel")}
+        destructive
+        loading={deleteBusy}
+        onConfirm={() => void confirmDeleteEmployee()}
+        onCancel={() => {
+          if (!deleteBusy) setDeleteTarget(null);
+        }}
       />
     </div>
   );

@@ -30,6 +30,7 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const registered = searchParams.get("registered") === "1";
   const sessionInvalid = searchParams.get("session") === "invalid";
+  const seatLimitError = searchParams.get("error") === "SeatLimit";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +96,7 @@ function LoginForm() {
         <p className={authSubtitleLogin}>{t("login.subtitle")}</p>
         {registered && <p className={`${authBannerSuccess} mt-4`}>{t("login.registered")}</p>}
         {sessionInvalid && <p className={authBannerWarning}>{t("login.sessionInvalid")}</p>}
+        {seatLimitError && <p className={authBannerWarning}>{t("login.errorSeatLimit")}</p>}
         {dbHint && <p className={authBannerWarning}>{dbHint}</p>}
         <form onSubmit={onSubmit} className={authFormLogin}>
           <div className={authFieldGroup}>

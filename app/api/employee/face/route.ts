@@ -1,4 +1,8 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
+import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import { FACE_DESCRIPTOR_LENGTH, isFaceMatch, parseFaceDescriptor } from "@/lib/faceMatch";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -10,6 +14,8 @@ const enrollSchema = z.object({
 
 export async function GET() {
   const session = await auth();
+  const seatDenied = await seatLoginForbiddenResponse(session);
+  if (seatDenied) return seatDenied;
   if (!session?.user?.employeeId || !session.user.companyId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -48,6 +54,8 @@ async function assertFaceRecognitionEnabled(companyId: string) {
 
 export async function POST(req: Request) {
   const session = await auth();
+  const seatDenied = await seatLoginForbiddenResponse(session);
+  if (seatDenied) return seatDenied;
   if (!session?.user?.employeeId || !session.user.companyId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

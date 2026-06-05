@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 
 const Body = z.object({
   currentPassword: z.string().min(1).max(200),

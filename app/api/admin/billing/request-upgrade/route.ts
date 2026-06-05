@@ -1,5 +1,10 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
+import { calculateUsageBilling } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
+import { countBillableEmployees } from "@/lib/seatAccess";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -59,11 +64,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "이미 처리 대기 중인 요청이 있습니다." }, { status: 400 });
   }
 
+  const employeeCount = await countBillableEmployees(companyId);
+  const bill = calculateUsageBilling(employeeCount, target, {
+    discountPercent: company.billingDiscountPercent,
+    discountAmount: company.billingDiscountAmount,
+  });
+
   await prisma.billingRequest.create({
     data: {
       companyId,
       targetTierId: target.id,
-      amountDue: target.priceAmount,
+      amountDue: bill.total,
       note: parsed.data.note?.trim() || null,
     },
   });

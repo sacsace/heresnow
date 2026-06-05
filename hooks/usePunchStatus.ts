@@ -16,8 +16,8 @@ export type PunchStatus = {
   earlyLeaveExpected?: boolean;
   /** 퇴근 후 4시간 이내 재출근 — 사유 입력·승인 절차가 필요 */
   reCheckInApprovalRequired?: boolean;
-  /** 출근 후 48시간 초과 퇴근 — 사유 입력·승인 절차가 필요 */
-  lateCheckOutApprovalRequired?: boolean;
+  /** 출근 후 48시간 초과 — 퇴근 가능, 기록 시각만 보정 */
+  lateCheckOutPastWindow?: boolean;
   /** 지연 퇴근 시 DB에 기록될 퇴근 시각(ISO) */
   lateCheckOutRecordedAt?: string | null;
   /** MAX_WORK_HOURS | END_OF_DAY */

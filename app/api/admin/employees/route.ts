@@ -1,4 +1,8 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
+import { annotateEmployeesWithLoginAccess, EMPLOYEE_SEAT_ORDER } from "@/lib/seatAccess";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import { normalizeShiftPresets } from "@/lib/shiftPresets";
@@ -44,6 +48,7 @@ export async function GET(req: Request) {
       prisma.company.findUnique({
         where: { id: companyId },
         select: {
+          seatLimit: true,
           workStartTime: true,
           workEndTime: true,
           workDays: true,
@@ -53,7 +58,7 @@ export async function GET(req: Request) {
       }),
       prisma.employee.findMany({
         where: { companyId },
-        orderBy: { name: "asc" },
+        orderBy: EMPLOYEE_SEAT_ORDER,
         include: {
           user: { select: { id: true, email: true, role: true } },
           department: { select: { id: true, name: true } },
@@ -71,7 +76,13 @@ export async function GET(req: Request) {
       shiftPresets: company.shiftPresets,
     };
     const shiftPresets = normalizeShiftPresets(company.shiftPresets);
-    return NextResponse.json({ employees, shiftPresets, companySchedule });
+    const employeesWithLogin = annotateEmployeesWithLoginAccess(employees, company.seatLimit);
+    return NextResponse.json({
+      employees: employeesWithLogin,
+      seatLimit: company.seatLimit,
+      shiftPresets,
+      companySchedule,
+    });
   } catch (e) {
     console.error("[employees GET]", e);
     const message = e instanceof Error ? e.message : "Internal error";
@@ -104,7 +115,7 @@ const postSchema = z.object({
   role: z.enum(COMPANY_ROLES).optional(),
 });
 
-/** 직원 추가 (좌석 상한 seatLimit 적용) */
+/** 직원 추가 — 등록 인원 제한 없음. 로그인은 충전 좌석·이름순 상위부터 적용 */
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -147,14 +158,6 @@ export async function POST(req: Request) {
 
   const company = await prisma.company.findUnique({ where: { id: companyId } });
   if (!company) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const count = await prisma.employee.count({ where: { companyId } });
-  if (count >= company.seatLimit) {
-    return NextResponse.json(
-      { error: `좌석 상한(${company.seatLimit}명)에 도달했습니다. 요금제를 상향하세요.` },
-      { status: 403 }
-    );
-  }
 
   // 부서 ID가 들어오면 동일 회사 소속인지 확인 (다른 회사 부서 차단)
   if (departmentId) {

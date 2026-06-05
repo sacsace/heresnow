@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { calendarDayInTz } from "@/lib/adminMonthlyAttendance";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
@@ -36,7 +39,7 @@ export async function GET(req: Request) {
 
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { timezone: true },
+    select: { timezone: true, subscriptionEndsAt: true, seatLimit: true },
   });
   if (!company) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -86,6 +89,8 @@ export async function GET(req: Request) {
   return NextResponse.json({
     date: today,
     timezone: tz,
+    subscriptionEndsAt: company.subscriptionEndsAt?.toISOString() ?? null,
+    seatLimit: company.seatLimit,
     employeeCount,
     checkedIn: checkedInEmployees.size,
     checkedOut: checkedOutEmployees.size,

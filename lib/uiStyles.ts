@@ -9,10 +9,10 @@ export const pageBg = "min-h-dvh bg-[var(--background)] text-[var(--foreground)]
 export const appShell =
   "flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)]";
 
-export const appBody = "flex w-full min-w-0 flex-1 flex-col items-center";
+export const appBody = "flex w-full min-w-0 flex-1 flex-col items-stretch";
 
-/** Shared content column — viewport width minus 8rem left/right (see globals.css) */
-export const appBodyWidth = "app-content-width";
+/** Shared content column — viewport width, capped at --app-content-max (86.4rem) */
+export const appBodyWidth = "app-content-width w-full min-w-0";
 
 export const appFooter =
   "shrink-0 bg-[var(--bar-bg)] px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:px-8 lg:px-10";
@@ -103,6 +103,8 @@ export const pageTitle =
   "text-[1.25rem] font-semibold leading-tight tracking-tight text-[var(--foreground)] sm:text-[1.375rem]";
 export const pageSubtitle =
   "mt-1.5 max-w-3xl text-[0.8125rem] leading-snug text-[var(--apple-label-secondary)] sm:text-[0.875rem]";
+export const pageSubtitleFull =
+  "mt-1.5 w-full text-[0.8125rem] leading-snug text-[var(--apple-label-secondary)] sm:text-[0.875rem]";
 
 /** Section label above grouped content */
 export const sectionLabel =

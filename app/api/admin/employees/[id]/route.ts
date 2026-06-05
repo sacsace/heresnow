@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { employeeScheduleSummary } from "@/lib/employeeWorkSchedule";
 import { normalizeWorkScheduleByDay } from "@/lib/companyWorkSchedule";

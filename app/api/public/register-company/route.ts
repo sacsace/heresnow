@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import { subscriptionEndsAtForTier } from "@/lib/pricing";

@@ -1,4 +1,8 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
+import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import {
   calendarDayInTz,
   checkInErrorMessage,
@@ -15,6 +19,8 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const session = await auth();
+  const seatDenied = await seatLoginForbiddenResponse(session);
+  if (seatDenied) return seatDenied;
   if (!session?.user?.employeeId || !session.user.companyId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -71,14 +77,15 @@ export async function GET() {
     eligibility.canCheckOut &&
     isCheckOutEarly(now, tz, effectiveSchedule);
 
-  const lateCheckOutApprovalRequired =
+  /** 출근 후 48시간 초과 — 퇴근은 가능, 기록 시각만 보정 */
+  const lateCheckOutPastWindow =
     eligibility.canCheckOut &&
     lastRecord?.type === "CHECK_IN" &&
     isCheckOutPastWindow(lastRecord.timestamp, now);
 
   let lateCheckOutRecordedAt: string | null = null;
   let lateCheckOutTimeBasis: LateCheckOutTimeBasis | null = null;
-  if (lateCheckOutApprovalRequired && lastRecord?.type === "CHECK_IN") {
+  if (lateCheckOutPastWindow && lastRecord?.type === "CHECK_IN") {
     const resolved = resolveLateCheckOutTimestamp(lastRecord.timestamp, tz);
     lateCheckOutRecordedAt = resolved.timestamp.toISOString();
     lateCheckOutTimeBasis = resolved.basis;
@@ -91,7 +98,7 @@ export async function GET() {
     lastTimestamp: lastRecord?.timestamp.toISOString() ?? null,
     today: calendarDayInTz(now, tz),
     earlyLeaveExpected,
-    lateCheckOutApprovalRequired,
+    lateCheckOutPastWindow,
     lateCheckOutRecordedAt,
     lateCheckOutTimeBasis,
     reCheckInApprovalRequired: eligibility.reCheckInApprovalRequired,

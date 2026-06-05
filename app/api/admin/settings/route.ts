@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { DEFAULT_COMPANY_TIMEZONE, isValidIanaTimezone } from "@/lib/companyTimezones";
 import {

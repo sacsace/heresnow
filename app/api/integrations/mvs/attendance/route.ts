@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { verifyMvsIntegrationApiKey } from "@/lib/integrations/mvsAuth";
 import { isMvsAttendanceEventV1 } from "@/lib/integrations/mvsTypes";
 import { prisma } from "@/lib/prisma";

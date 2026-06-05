@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
@@ -64,14 +67,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const company = await prisma.company.findUnique({ where: { id: companyId } });
   if (!company) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const count = await prisma.employee.count({ where: { companyId } });
-  if (count >= company.seatLimit) {
-    return NextResponse.json(
-      { error: `좌석 상한(${company.seatLimit}명)에 도달했습니다.` },
-      { status: 403 }
-    );
   }
 
   const dup = await prisma.user.findUnique({ where: { email } });

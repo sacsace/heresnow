@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { createCompanyEmployee } from "@/lib/employeeCreate";
 import { parseEmployeeBulkWorkbook, parseEmployeeRole } from "@/lib/employeeBulkExcel";
@@ -51,21 +54,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parseErrors[0], errors: parseErrors }, { status: 400 });
   }
 
-  const [company, departments, employeeCount] = await Promise.all([
-    prisma.company.findUnique({
-      where: { id: companyId },
-      select: { seatLimit: true },
-    }),
-    prisma.department.findMany({
-      where: { companyId },
-      select: { id: true, name: true },
-    }),
-    prisma.employee.count({ where: { companyId } }),
-  ]);
-
-  if (!company) {
-    return NextResponse.json({ error: "Company not found" }, { status: 404 });
-  }
+  const departments = await prisma.department.findMany({
+    where: { companyId },
+    select: { id: true, name: true },
+  });
 
   const deptByName = new Map(
     departments.map((d) => [d.name.trim().toLowerCase(), d.id] as const)
@@ -73,7 +65,6 @@ export async function POST(req: Request) {
 
   const failures: BulkImportFailure[] = [];
   let created = 0;
-  let currentCount = employeeCount;
   const seenEmails = new Set<string>();
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -139,8 +130,6 @@ export async function POST(req: Request) {
         role: role as Role,
       },
       {
-        seatLimit: company.seatLimit,
-        currentCount,
         callerRole: session.user.role!,
       }
     );
@@ -155,7 +144,6 @@ export async function POST(req: Request) {
     }
 
     created += 1;
-    currentCount += 1;
   }
 
   return NextResponse.json({

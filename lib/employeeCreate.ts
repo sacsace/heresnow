@@ -18,17 +18,9 @@ export type CreateEmployeeResult =
 
 export async function createCompanyEmployee(
   input: CreateEmployeeInput,
-  opts: { seatLimit: number; currentCount: number; callerRole: Role | string }
+  opts: { callerRole: Role | string }
 ): Promise<CreateEmployeeResult> {
   const { companyId, email, name, password, departmentId, role } = input;
-
-  if (opts.currentCount >= opts.seatLimit) {
-    return {
-      ok: false,
-      code: "SEAT_LIMIT",
-      message: `좌석 상한(${opts.seatLimit}명)에 도달했습니다.`,
-    };
-  }
 
   if (departmentId) {
     const dep = await prisma.department.findUnique({

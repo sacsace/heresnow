@@ -21,7 +21,6 @@ import {
 import { useI18n } from "@/components/LanguageProvider";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { formatTierPrice } from "@/lib/pricing";
-import { segmentedBtn, segmentedWrap } from "@/lib/uiStyles";
 import type { BillingPeriod } from "@prisma/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -33,6 +32,7 @@ type Tier = {
   maxSeats: number;
   billingPeriod: BillingPeriod;
   priceAmount: number;
+  pricePerUser: number;
   currency: string;
   label: string | null;
   trialDays: number | null;
@@ -43,50 +43,36 @@ const IST_VALUE = "Asia/Kolkata" as const;
 export default function SignupPage() {
   const { t } = useI18n();
   const router = useRouter();
-  const [tiers, setTiers] = useState<Tier[]>([]);
   const [companyName, setCompanyName] = useState("");
   const [timezone] = useState<string>(IST_VALUE);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminName, setAdminName] = useState("");
-  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("YEARLY");
   const [tierId, setTierId] = useState("");
+  const [unitPriceLabel, setUnitPriceLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const loadTiers = useCallback(
-    (period: BillingPeriod) => {
-      void fetch(`/api/public/pricing-tiers?period=${period}`)
-        .then((r) => r.json())
-        .then((j: { tiers?: Tier[] }) => {
-          const list = (j.tiers ?? []).map((row) => ({
-            ...row,
-            trialDays: row.trialDays ?? null,
-          }));
-          setTiers(list);
-          setTierId(list[0]?.id ?? "");
-        })
-        .catch(() => setError(t("signup.errorTiers")));
-    },
-    [t]
-  );
+  const loadTiers = useCallback(() => {
+    void fetch("/api/public/pricing-tiers")
+      .then((r) => r.json())
+      .then((j: { tiers?: Tier[] }) => {
+        const list = (j.tiers ?? []).map((row) => ({
+          ...row,
+          trialDays: row.trialDays ?? null,
+        }));
+        setTierId(list[0]?.id ?? "");
+        const tr = list[0];
+        if (tr) {
+          setUnitPriceLabel(formatTierPrice({ ...tr, billingPeriod: "MONTHLY" }));
+        }
+      })
+      .catch(() => setError(t("signup.errorTiers")));
+  }, [t]);
 
   useEffect(() => {
-    loadTiers(billingPeriod);
-  }, [billingPeriod, loadTiers]);
-
-  const filteredTiers = tiers.filter((tr) => tr.billingPeriod === billingPeriod);
-
-  function tierLabelLine(tr: Tier) {
-    if (tr.trialDays != null && tr.trialDays > 0) {
-      return t("signup.tierTrialLine").replace("{seats}", String(tr.maxSeats)).replace("{days}", String(tr.trialDays));
-    }
-    if (tr.label) {
-      return `${tr.label} — ${formatTierPrice(tr)}`;
-    }
-    const range = `${tr.minSeats}–${tr.maxSeats}${t("signup.seats")}`;
-    return `${range} — ${formatTierPrice(tr)}`;
-  }
+    loadTiers();
+  }, [loadTiers]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -153,38 +139,10 @@ export default function SignupPage() {
             <p className={authHint}>{t("signup.timezoneIndiaOnly")}</p>
           </div>
           <div className={authFieldGroup}>
-            <label className={authLabel}>{t("signup.billingPeriod")}</label>
-            <div className={segmentedWrap}>
-              <button
-                type="button"
-                onClick={() => setBillingPeriod("MONTHLY")}
-                className={segmentedBtn(billingPeriod === "MONTHLY")}
-              >
-                {t("signup.periodMonthly")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingPeriod("YEARLY")}
-                className={segmentedBtn(billingPeriod === "YEARLY")}
-              >
-                {t("signup.periodYearly")}
-              </button>
-            </div>
-          </div>
-          <div className={authFieldGroup}>
             <label className={authLabel}>{t("signup.plan")}</label>
-            <select
-              className={authSelect}
-              value={tierId}
-              onChange={(e) => setTierId(e.target.value)}
-              required
-            >
-              {filteredTiers.map((tr) => (
-                <option key={tr.id} value={tr.id}>
-                  {tierLabelLine(tr)}
-                </option>
-              ))}
-            </select>
+            <p className="mt-1 text-[0.875rem] font-medium text-[var(--foreground)]">
+              {unitPriceLabel || "—"}
+            </p>
             <p className={authHint}>{t("signup.planHint")}</p>
           </div>
           <div className={authFieldGroup}>

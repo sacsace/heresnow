@@ -1,29 +1,31 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+import { getOrCreateCanonicalMonthlyTier } from "@/lib/canonicalUnitPrice";
 import { prisma } from "@/lib/prisma";
-import { BillingPeriod } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
-/** 비로그인 공개: 가입 화면에서 요금제 표시 (?period=MONTHLY|YEARLY) */
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const periodParam = url.searchParams.get("period");
-  const periodParsed = z.enum(["MONTHLY", "YEARLY"]).safeParse(periodParam);
-  const period = periodParsed.success ? periodParsed.data : undefined;
-
-  const tiers = await prisma.pricingTier.findMany({
-    where: period ? { billingPeriod: period as BillingPeriod } : undefined,
-    orderBy: [{ billingPeriod: "asc" }, { sortOrder: "asc" }],
-    select: {
-      id: true,
-      minSeats: true,
-      maxSeats: true,
-      billingPeriod: true,
-      priceAmount: true,
-      currency: true,
-      label: true,
-      sortOrder: true,
-      trialDays: true,
-    },
-  });
-  return NextResponse.json({ tiers });
+/** 비로그인 공개: 가입 화면 — 1인당 월 요금만 */
+export async function GET() {
+  try {
+    const tier = await getOrCreateCanonicalMonthlyTier(prisma);
+    return NextResponse.json({
+      tiers: [
+        {
+          id: tier.id,
+          minSeats: tier.minSeats,
+          maxSeats: tier.maxSeats,
+          billingPeriod: tier.billingPeriod,
+          priceAmount: tier.priceAmount,
+          pricePerUser: tier.pricePerUser,
+          currency: tier.currency,
+          label: tier.label,
+          sortOrder: tier.sortOrder,
+          trialDays: tier.trialDays,
+        },
+      ],
+    });
+  } catch {
+    return NextResponse.json({ tiers: [] }, { status: 500 });
+  }
 }

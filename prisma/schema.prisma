@@ -45,6 +45,24 @@ enum BillingPeriod {
   YEARLY
 }
 
+enum PaymentOrderStatus {
+  CREATED
+  PAID
+  FAILED
+}
+
+enum EInvoiceStatus {
+  SKIPPED
+  PENDING
+  ISSUED
+  FAILED
+}
+
+enum PaymentPurpose {
+  SUBSCRIPTION_RENEWAL
+  TIER_UPGRADE
+}
+
 /// 외부 HR/출퇴근 연동 (MVS 등)
 enum IntegrationProvider {
   MVS
@@ -62,7 +80,9 @@ model PricingTier {
   minSeats       Int
   maxSeats       Int
   billingPeriod  BillingPeriod  @default(YEARLY)
-  priceAmount    Int /// INR 등 정수 (월 요금 또는 연 요금)
+  priceAmount    Int /// 레거시 구간 정액 (표시·호환용)
+  /// 1인당 요금 — 청구 = 사용 인원 × pricePerUser (0이면 priceAmount/maxSeats 로 추정)
+  pricePerUser   Int            @default(0)
   currency       String         @default("INR")
   label          String?
   /// 가입 시 구독 만료: 체험일 우선, 없으면 월/연에 따라 1개월·1년
@@ -95,6 +115,57 @@ model BillingRequest {
   @@index([status])
 }
 
+/// Razorpay 결제 주문
+model PaymentOrder {
+  id                 String             @id @default(cuid())
+  companyId          String
+  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purpose            PaymentPurpose     @default(SUBSCRIPTION_RENEWAL)
+  amountPaise        Int
+  currency           String             @default("INR")
+  employeeCount      Int
+  pricePerUser       Int
+  discountTotal      Int                @default(0)
+  billingPeriod      BillingPeriod
+  /// 결제한 사용 개월 수 (구독 연장)
+  usageMonths        Int                @default(1)
+  pricingTierId      String?
+  targetTierId       String?
+  razorpayOrderId    String?            @unique
+  razorpayPaymentId  String?
+  status             PaymentOrderStatus @default(CREATED)
+  paidAt             DateTime?
+  /// 결제 완료 시점 고객 청구 정보 스냅샷 (인보이스용)
+  invoiceCustomerSnapshot Json?
+  /// GST — 할인 후 과세 금액 (paise)
+  taxableAmountPaise Int?
+  cgstPaise          Int                @default(0)
+  sgstPaise          Int                @default(0)
+  igstPaise          Int                @default(0)
+  gstRatePercent     Int                @default(18)
+  supplierState      String?
+  customerState      String?
+  /// India GST e-Invoice (IRN)
+  eInvoiceStatus     EInvoiceStatus     @default(SKIPPED)
+  eInvoiceIrn        String?
+  eInvoiceAckNo      String?
+  eInvoiceAckAt      DateTime?
+  eInvoiceSignedQrCode String?
+  eInvoiceLastError  String?
+  /// GST tax invoice number — `{prefix}/{FY}/{serial}`, assigned at payment
+  invoiceNumber      String?            @unique
+  createdAt          DateTime           @default(now())
+
+  @@index([companyId])
+  @@index([status])
+}
+
+/// Sequential invoice numbers per Indian financial year (Apr–Mar).
+model InvoiceNumberSequence {
+  financialYear String @id
+  lastSerial    Int    @default(0)
+}
+
 model Company {
   id        String   @id @default(cuid())
   name      String
@@ -121,6 +192,22 @@ model Company {
   /// 직원(Employee) 최대 수 — 요금제에 따라 상한
   seatLimit            Int          @default(20)
   subscriptionEndsAt   DateTime?
+  /// 청구 할인 (%), 0–100
+  billingDiscountPercent Int        @default(0)
+  /// 청구 할인 (정액, Rs 등)
+  billingDiscountAmount  Int        @default(0)
+  /// 세금계산서(인보이스) — 법인명 (미입력 시 name 사용)
+  billingLegalName       String?
+  billingAddressLine1    String?
+  billingAddressLine2    String?
+  billingCity            String?
+  billingState           String?
+  billingPostalCode      String?
+  billingCountry         String?    @default("India")
+  /// GSTIN / Tax ID
+  billingGstin           String?
+  billingEmail           String?
+  billingPhone           String?
 
   users                User[]
   employees            Employee[]
@@ -130,6 +217,7 @@ model Company {
   attendanceExceptions AttendanceException[]
   approvalLogs         ApprovalLog[]
   billingRequests      BillingRequest[]
+  paymentOrders        PaymentOrder[]
   integrations         CompanyIntegration[]
   integrationOutbox    IntegrationOutbox[]
 }

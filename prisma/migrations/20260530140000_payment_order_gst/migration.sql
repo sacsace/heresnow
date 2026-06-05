@@ -1,0 +1,7 @@
+ALTER TABLE "PaymentOrder" ADD COLUMN "taxableAmountPaise" INTEGER;
+ALTER TABLE "PaymentOrder" ADD COLUMN "cgstPaise" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "PaymentOrder" ADD COLUMN "sgstPaise" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "PaymentOrder" ADD COLUMN "igstPaise" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "PaymentOrder" ADD COLUMN "gstRatePercent" INTEGER NOT NULL DEFAULT 18;
+ALTER TABLE "PaymentOrder" ADD COLUMN "supplierState" TEXT;
+ALTER TABLE "PaymentOrder" ADD COLUMN "customerState" TEXT;

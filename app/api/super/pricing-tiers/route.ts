@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { BillingPeriod } from "@prisma/client";
@@ -36,6 +39,7 @@ const tierRowSchema = z.object({
   id: z.string().min(1).optional(),
   billingPeriod: z.enum(["MONTHLY", "YEARLY"]).optional(),
   priceAmount: z.coerce.number().int().min(0).optional(),
+  pricePerUser: z.coerce.number().int().min(0).optional(),
   label: z.string().max(100).nullable().optional(),
   minSeats: z.coerce.number().int().min(1).optional(),
   maxSeats: z.coerce.number().int().min(1).optional(),
@@ -52,6 +56,7 @@ const postSchema = z.object({
   minSeats: z.coerce.number().int().min(1),
   maxSeats: z.coerce.number().int().min(1),
   priceAmount: z.coerce.number().int().min(0),
+  pricePerUser: z.coerce.number().int().min(0).optional(),
   label: z.string().max(100).nullable().optional(),
   sortOrder: z.coerce.number().int().optional(),
   trialDays: z.union([z.number().int().min(0).max(366), z.null()]).optional(),
@@ -79,12 +84,19 @@ export async function POST(req: Request) {
   }
 
   try {
+    const pricePerUser =
+      parsed.data.pricePerUser ??
+      (parsed.data.maxSeats > 0
+        ? Math.round(parsed.data.priceAmount / parsed.data.maxSeats)
+        : parsed.data.priceAmount);
+    const priceAmount = pricePerUser * parsed.data.maxSeats;
     const tier = await prisma.pricingTier.create({
       data: {
         billingPeriod: parsed.data.billingPeriod,
         minSeats: parsed.data.minSeats,
         maxSeats: parsed.data.maxSeats,
-        priceAmount: parsed.data.priceAmount,
+        priceAmount,
+        pricePerUser,
         label: parsed.data.label ?? null,
         sortOrder: parsed.data.sortOrder ?? 0,
         trialDays:
@@ -122,6 +134,7 @@ export async function PATCH(req: Request) {
   for (const row of parsed.data.tiers) {
     const data: Record<string, unknown> = {};
     if (row.priceAmount !== undefined) data.priceAmount = row.priceAmount;
+    if (row.pricePerUser !== undefined) data.pricePerUser = row.pricePerUser;
     if (row.label !== undefined) data.label = row.label;
     if (row.minSeats !== undefined) data.minSeats = row.minSeats;
     if (row.maxSeats !== undefined) data.maxSeats = row.maxSeats;

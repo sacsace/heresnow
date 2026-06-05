@@ -38,28 +38,11 @@
   --separator-opaque: #c6c6c8;
 
   /**
-   * App body/header column — 모바일은 가용 너비 전체, 화면이 커질수록 좌우 여백을 늘린다.
-   * 기존에는 calc(100% - 16rem) 가 모바일에서 본문 폭을 ~120px 까지 줄여 깨졌다.
+   * App shell content column — viewport 전체를 쓰고 max-width 로만 상한.
+   * calc(100% - Nrem) 방식은 창을 줄일 때 본문만 좁아져 헤더·카드와 어긋나고
+   * 오른쪽 빈 공간이 커 보였다.
    */
-  --app-content-width: 100%;
-}
-
-@media (min-width: 768px) {
-  :root {
-    --app-content-width: calc(100% - 4rem);
-  }
-}
-
-@media (min-width: 1024px) {
-  :root {
-    --app-content-width: calc(100% - 8rem);
-  }
-}
-
-@media (min-width: 1280px) {
-  :root {
-    --app-content-width: calc(100% - 16rem);
-  }
+  --app-content-max: 86.4rem;
 }
 
 html {
@@ -124,13 +107,12 @@ body {
     border-bottom: none;
   }
 
-  /** App shell — stable width from first paint (avoids Tailwind JIT missing lib/uiStyles tokens) */
+  /** App shell — 헤더·본문 동일 max-width, 가용 너비 100% */
   .app-content-width {
     box-sizing: border-box;
-    width: var(--app-content-width);
-    max-width: var(--app-content-width);
+    width: 100%;
+    max-width: var(--app-content-max);
     min-width: 0;
-    flex-shrink: 0;
     margin-left: auto;
     margin-right: auto;
   }

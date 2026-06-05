@@ -4,16 +4,93 @@ import { AppLogo } from "@/components/AppLogo";
 import { AuthShell } from "@/components/auth/AuthShell";
 import {
   authButtonPrimary,
-  authCard,
   authError,
-  authSubtitle,
-  authTitle,
+  consentActions,
+  consentCard,
+  consentFooter,
+  consentIntro,
+  consentList,
+  consentPrivacyBanner,
+  consentPrivacyBannerText,
+  consentRow,
+  consentRowDivider,
+  consentRowSecondary,
+  consentSectionsStack,
+  consentSectionLabel,
+  consentShellWidth,
+  consentTitle,
 } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
-import { groupedCard, groupedRow } from "@/lib/uiStyles";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState } from "react";
+
+function ShieldIcon() {
+  return (
+    <svg
+      aria-hidden
+      className="mt-0.5 h-5 w-5 shrink-0 text-[var(--apple-blue)]"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3 20 6.5V11c0 4.4-3.2 8.5-8 10.5C6.2 19.5 3 15.4 3 11V6.5L12 3z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      aria-hidden
+      className="h-3 w-3"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+    </svg>
+  );
+}
+
+function ConsentListRow({ children, secondary }: { children: ReactNode; secondary?: boolean }) {
+  return (
+    <li className={`${secondary ? consentRowSecondary : consentRow} ${consentRowDivider}`}>
+      {children}
+    </li>
+  );
+}
+
+function ConsentCheckRow({ children }: { children: ReactNode }) {
+  return (
+    <li className={`flex items-start gap-3 ${consentRowSecondary} ${consentRowDivider}`}>
+      <span
+        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--apple-green)_16%,transparent)] text-[var(--apple-green)]"
+        aria-hidden
+      >
+        <CheckIcon />
+      </span>
+      <span className="min-w-0 flex-1">{children}</span>
+    </li>
+  );
+}
+
+function ConsentSection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section>
+      <h2 className={consentSectionLabel}>{label}</h2>
+      {children}
+    </section>
+  );
+}
 
 export default function ConsentPage() {
   const { t } = useI18n();
@@ -40,68 +117,69 @@ export default function ConsentPage() {
     router.refresh();
   }
 
-  const blocks = [
-    {
-      title: t("consent.sectionItems"),
-      body: (
-        <ul className="mt-1.5 list-inside list-disc space-y-0.5">
-          <li>{t("consent.item1")}</li>
-          <li>{t("consent.item2")}</li>
-          <li>{t("consent.item3")}</li>
-          <li>{t("consent.item4")}</li>
-        </ul>
-      ),
-    },
-    {
-      title: t("consent.sectionPurpose"),
-      body: <p className="mt-1">{t("consent.purposeText")}</p>,
-    },
-    {
-      title: t("consent.sectionNotCollected"),
-      body: (
-        <ul className="mt-1.5 list-inside list-disc space-y-0.5">
-          <li>{t("consent.not1")}</li>
-          <li>{t("consent.not2")}</li>
-        </ul>
-      ),
-    },
+  const collectedItems = [
+    t("consent.item1"),
+    t("consent.item2"),
+    t("consent.item3"),
+    t("consent.item4"),
   ];
+  const notCollectedItems = [t("consent.not1"), t("consent.not2")];
 
   return (
-    <AuthShell className="!w-[min(100%,34rem)] sm:!w-[34rem]">
-      <div className={authCard}>
-        <div className="mb-4 flex justify-center sm:mb-5">
+    <AuthShell className={consentShellWidth}>
+      <div className={consentCard}>
+        <div className="mb-6 flex justify-center sm:mb-7">
           <AppLogo variant="auth" title={t("login.title")} />
         </div>
-        <h1 className={`${authTitle} text-left`}>{t("consent.title")}</h1>
-        <p className={`${authSubtitle} mt-3 text-left`}>
-          {t("consent.introLine1")}
-          <strong className="font-semibold text-[var(--foreground)]">{t("consent.introBold")}</strong>
-          {t("consent.introLine2")}
-        </p>
-        <div className={`mt-5 ${groupedCard} text-[0.8125rem] leading-relaxed text-[var(--apple-label-secondary)]`}>
-          {blocks.map((b, i) => (
-            <div
-              key={b.title}
-              className={`${groupedRow} ${i < blocks.length - 1 ? "hig-divider" : ""}`}
-            >
-              <p className="font-semibold text-[var(--foreground)]">{b.title}</p>
-              {b.body}
-            </div>
-          ))}
-          <p className={`${groupedRow} text-[0.8125rem] text-[var(--apple-label-tertiary)]`}>
-            {t("consent.footer")}
-          </p>
+
+        <h1 className={consentTitle}>{t("consent.title")}</h1>
+        <p className={consentIntro}>{t("consent.introLine1")}</p>
+
+        <div className={consentPrivacyBanner} role="note">
+          <ShieldIcon />
+          <p className={consentPrivacyBannerText}>{t("consent.introBold")}</p>
         </div>
+
+        <div className={consentSectionsStack}>
+          <ConsentSection label={t("consent.sectionItems")}>
+            <ul className={consentList}>
+              {collectedItems.map((item) => (
+                <ConsentListRow key={item}>{item}</ConsentListRow>
+              ))}
+            </ul>
+          </ConsentSection>
+
+          <ConsentSection label={t("consent.sectionPurpose")}>
+            <div className={consentList}>
+              <p className={`${consentRowSecondary} ${consentRowDivider}`}>
+                {t("consent.purposeText")}
+              </p>
+            </div>
+          </ConsentSection>
+
+          <ConsentSection label={t("consent.sectionNotCollected")}>
+            <ul className={consentList}>
+              {notCollectedItems.map((item) => (
+                <ConsentCheckRow key={item}>{item}</ConsentCheckRow>
+              ))}
+            </ul>
+          </ConsentSection>
+        </div>
+
+        <p className={consentFooter}>{t("consent.footer")}</p>
+
         {err && <p className={`${authError} mt-4`}>{err}</p>}
-        <button
-          type="button"
-          onClick={() => void agree()}
-          disabled={loading}
-          className={`${authButtonPrimary} mt-6 bg-[var(--apple-green)] hover:bg-[#30b350] active:bg-[#2da84a]`}
-        >
-          {loading ? t("common.processing") : t("consent.agree")}
-        </button>
+
+        <div className={consentActions}>
+          <button
+            type="button"
+            onClick={() => void agree()}
+            disabled={loading}
+            className={authButtonPrimary}
+          >
+            {loading ? t("common.processing") : t("consent.agree")}
+          </button>
+        </div>
       </div>
     </AuthShell>
   );

@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { isShiftCode } from "@/lib/employeeWorkSchedule";
 import { prisma } from "@/lib/prisma";

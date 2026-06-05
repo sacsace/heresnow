@@ -2,6 +2,7 @@ import {
   pageMeta,
   pageMetaLg,
   pageSubtitle,
+  pageSubtitleFull,
   pageSubtitleLg,
   pageTitle,
   pageTitleLg,
@@ -11,16 +12,22 @@ import type { ReactNode } from "react";
 type Props = {
   title: string;
   subtitle?: string;
+  /** 부제를 body 가로 전체 너비로 표시 */
+  subtitleWide?: boolean;
   /** 좌석·통계 등 부가 한 줄 */
   meta?: ReactNode;
   actions?: ReactNode;
   size?: "default" | "lg";
 };
 
-export function PageHeader({ title, subtitle, meta, actions, size = "default" }: Props) {
+export function PageHeader({ title, subtitle, subtitleWide, meta, actions, size = "default" }: Props) {
   const lg = size === "lg";
   const titleClass = lg ? pageTitleLg : pageTitle;
-  const subtitleClass = lg ? pageSubtitleLg : pageSubtitle;
+  const subtitleClass = subtitleWide
+    ? pageSubtitleFull
+    : lg
+      ? pageSubtitleLg
+      : pageSubtitle;
   const metaClass = lg ? pageMetaLg : pageMeta;
 
   return (

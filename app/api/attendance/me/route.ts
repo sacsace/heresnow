@@ -1,4 +1,8 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
+import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
 import { lateMinutesFor, overtimeMinutesFor } from "@/lib/companyWorkSchedule";
@@ -9,6 +13,8 @@ import { NextResponse } from "next/server";
 export async function GET(req: Request) {
   try {
     const session = await auth();
+    const seatDenied = await seatLoginForbiddenResponse(session);
+    if (seatDenied) return seatDenied;
     if (!session?.user?.id || !session.user.employeeId || !session.user.companyId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

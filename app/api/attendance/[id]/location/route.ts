@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { mapSiteRow, resolvePunchSiteContext } from "@/lib/attendanceSiteContext";
 import { prisma } from "@/lib/prisma";

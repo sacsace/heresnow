@@ -130,7 +130,7 @@ export function checkInErrorMessage(
 }
 
 export function checkOutWindowErrorMessage(): string {
-  return "출근 시점부터 48시간이 지나 퇴근할 수 없습니다. 사유를 입력해 예외 승인을 요청해 주세요.";
+  return "출근 후 48시간이 지났습니다. 퇴근은 가능하며, 퇴근 시각은 출근일 기준 출근 후 최대 21시간 또는 23:59 중 이른 시각으로 기록됩니다.";
 }
 
 /** 출근 후 48시간 초과 여부 */

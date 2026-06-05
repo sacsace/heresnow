@@ -4,7 +4,7 @@ import type { Department } from "@/components/admin/DepartmentManagerModal";
 import { useI18n } from "@/components/LanguageProvider";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
-import { btnDanger, emptyStateCompact, table, tableHead, tableWrap, td, th, trDivider } from "@/lib/uiStyles";
+import { emptyStateCompact, tableHead, tableWrap, trDivider } from "@/lib/uiStyles";
 import type { Role } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -18,18 +18,27 @@ export type EmployeeRow = {
   shiftCode?: string | null;
   workStartTime?: string | null;
   workEndTime?: string | null;
+  loginEligible?: boolean;
+  loginEligibleByAdmin?: boolean;
+  seatRank?: number;
 };
 
 const rowControl =
-  "h-8 w-full rounded-[0.5rem] bg-[var(--fill-secondary)] px-2.5 pr-8 text-[0.8125rem] leading-none text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60";
+  "h-7 w-full rounded-[0.4375rem] bg-[var(--fill-secondary)] px-2 pr-7 text-[0.75rem] leading-none text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60";
 const rowControlStatic =
-  "flex h-8 w-full items-center rounded-[0.5rem] bg-[var(--fill-tertiary)] px-2.5 text-[0.8125rem] text-[var(--apple-label-secondary)]";
+  "flex h-7 w-full items-center rounded-[0.4375rem] bg-[var(--fill-tertiary)] px-2 text-[0.75rem] text-[var(--apple-label-secondary)]";
 const rowInput =
-  "h-8 w-full min-w-0 rounded-[0.5rem] bg-[var(--fill-secondary)] px-2.5 text-[0.8125rem] leading-none text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60";
+  "h-7 w-full min-w-0 rounded-[0.4375rem] bg-[var(--fill-secondary)] px-2 text-[0.75rem] leading-none text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60";
 const rowPasswordMask =
-  "flex h-8 w-full min-w-0 items-center rounded-[0.5rem] bg-[var(--fill-secondary)] px-2.5 text-[0.8125rem] tracking-[0.2em] text-[var(--apple-label-secondary)] outline-none transition-[box-shadow,background-color] hover:bg-[var(--fill-secondary-hover)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:cursor-default disabled:opacity-60";
+  "flex h-7 w-full min-w-0 items-center rounded-[0.4375rem] bg-[var(--fill-secondary)] px-2 text-[0.75rem] tracking-[0.18em] text-[var(--apple-label-secondary)] outline-none transition-[box-shadow,background-color] hover:bg-[var(--fill-secondary-hover)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:cursor-default disabled:opacity-60";
 
-const WIDTH_STORAGE_KEY = "heresnow_employee_col_widths";
+const empTable = "w-full min-w-full text-left text-[0.8125rem] sm:text-[0.875rem]";
+const empTh = "px-3 py-2 whitespace-nowrap sm:px-3.5";
+const empTd = "px-3 py-2 align-middle text-[var(--foreground)] sm:px-3.5";
+const empBtnDanger =
+  "inline-flex h-7 touch-manipulation items-center justify-center rounded-md bg-[var(--apple-red)]/10 px-2.5 text-[0.75rem] font-medium text-[var(--apple-red)] transition-colors hover:bg-[var(--apple-red)]/16 disabled:opacity-40";
+
+const WIDTH_STORAGE_KEY = "heresnow_employee_col_widths_v4";
 
 type ResizableCol = "name" | "email" | "password" | "role" | "department";
 type SortKey = ResizableCol;
@@ -38,22 +47,26 @@ type SortDir = "asc" | "desc";
 type ColWidths = Record<ResizableCol, number> & { actions: number };
 
 const DEFAULT_WIDTHS: ColWidths = {
-  name: 208,
-  email: 200,
-  password: 126,
-  role: 140,
-  department: 152,
-  actions: 76,
+  name: 148,
+  email: 220,
+  password: 96,
+  role: 132,
+  department: 128,
+  actions: 56,
 };
 
 const MIN_WIDTHS: ColWidths = {
   name: 96,
-  email: 120,
-  password: 88,
+  email: 140,
+  password: 80,
   role: 100,
-  department: 100,
-  actions: 64,
+  department: 96,
+  actions: 48,
 };
+
+const LOGIN_COL_WIDTH = 120;
+const SCHEDULE_COL_WIDTH = 148;
+const SELECT_COL_WIDTH = 36;
 
 const ROLE_ORDER: Role[] = ["EMPLOYEE", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN"];
 
@@ -193,7 +206,7 @@ export function EmployeeListTable({
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir(key === "name" || key === "department" ? "asc" : "asc");
+      setSortDir("asc");
     }
   }
 
@@ -241,7 +254,7 @@ export function EmployeeListTable({
   const headerCell = (key: SortKey, label: string, resizable: boolean) => (
     <th
       key={key}
-      className={`${th} relative select-none`}
+      className={`${empTh} relative select-none text-left`}
       style={{ width: widths[key], minWidth: MIN_WIDTHS[key] }}
       aria-sort={
         key !== "password" && sortKey === key
@@ -284,16 +297,16 @@ export function EmployeeListTable({
   }
 
   const showSelect = Boolean(onToggleSelect && selectedIds);
-  const scheduleColWidth = 168;
-  const selectColWidth = 40;
-  const tableWidth =
-    (showSelect ? selectColWidth : 0) +
+  const showLoginStatus = employees.some((e) => e.loginEligible !== undefined);
+  const tableMinWidth =
+    (showSelect ? SELECT_COL_WIDTH : 0) +
     widths.name +
     widths.email +
     widths.password +
     widths.role +
     widths.department +
-    scheduleColWidth +
+    (showLoginStatus ? LOGIN_COL_WIDTH : 0) +
+    SCHEDULE_COL_WIDTH +
     widths.actions;
   const allSelected =
     showSelect && employees.length > 0 && employees.every((e) => selectedIds!.has(e.id));
@@ -301,23 +314,26 @@ export function EmployeeListTable({
   return (
     <div className={tableWrap}>
       <table
-        className={table}
-        style={{ tableLayout: "fixed", width: "100%", minWidth: tableWidth }}
+        className={empTable}
+        style={{ tableLayout: "fixed", width: "100%", minWidth: tableMinWidth }}
       >
         <colgroup>
-          {showSelect && <col style={{ width: selectColWidth }} />}
+          {showSelect && <col style={{ width: SELECT_COL_WIDTH }} />}
           <col style={{ width: widths.name }} />
           <col style={{ width: widths.email }} />
           <col style={{ width: widths.password }} />
           <col style={{ width: widths.role }} />
           <col style={{ width: widths.department }} />
-          <col style={{ width: scheduleColWidth }} />
-          <col style={{ width: widths.actions }} />
+          {showLoginStatus && (
+            <col style={{ width: LOGIN_COL_WIDTH, minWidth: LOGIN_COL_WIDTH }} />
+          )}
+          <col style={{ width: SCHEDULE_COL_WIDTH, minWidth: SCHEDULE_COL_WIDTH }} />
+          <col style={{ width: widths.actions, minWidth: MIN_WIDTHS.actions }} />
         </colgroup>
         <thead className={tableHead}>
           <tr>
             {showSelect && (
-              <th className={th} style={{ width: selectColWidth }}>
+              <th className={`${empTh} text-center`} style={{ width: SELECT_COL_WIDTH }}>
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -331,14 +347,25 @@ export function EmployeeListTable({
             {headerCell("password", t("admin.employeesPasswordColLabel"), true)}
             {headerCell("role", t("admin.employeesRoleLabel"), true)}
             {headerCell("department", t("admin.employeesDepartmentLabel"), true)}
-            <th className={th} style={{ width: scheduleColWidth }}>
+            {showLoginStatus && (
+              <th
+                className={`${empTh} text-center`}
+                style={{ width: LOGIN_COL_WIDTH, minWidth: LOGIN_COL_WIDTH }}
+              >
+                {t("admin.employeesLoginStatusCol")}
+              </th>
+            )}
+            <th
+              className={`${empTh} text-left`}
+              style={{ width: SCHEDULE_COL_WIDTH, minWidth: SCHEDULE_COL_WIDTH }}
+            >
               {t("admin.empScheduleCol")}
             </th>
             <th
-              className={`${th} text-right`}
+              className={`${empTh} text-center`}
               style={{ width: widths.actions, minWidth: MIN_WIDTHS.actions }}
             >
-              <span className="sr-only">{t("admin.employeesColActions")}</span>
+              {t("admin.employeesColActions")}
             </th>
           </tr>
         </thead>
@@ -358,7 +385,7 @@ export function EmployeeListTable({
             return (
               <tr key={e.id} className={trDivider}>
                 {showSelect && (
-                  <td className={`${td} align-middle`}>
+                  <td className={`${empTd} text-center`}>
                     <input
                       type="checkbox"
                       checked={selectedIds!.has(e.id)}
@@ -368,7 +395,7 @@ export function EmployeeListTable({
                     />
                   </td>
                 )}
-                <td className={`${td} align-middle`}>
+                <td className={empTd}>
                   {canEditProfile ? (
                     <input
                       className={`${rowInput} font-medium`}
@@ -385,7 +412,7 @@ export function EmployeeListTable({
                     <p className={`${rowControlStatic} truncate font-medium`}>{e.name}</p>
                   )}
                 </td>
-                <td className={`${td} align-middle`}>
+                <td className={empTd}>
                   {canEditProfile ? (
                     <input
                       type="email"
@@ -404,7 +431,7 @@ export function EmployeeListTable({
                     <p className={`${rowControlStatic} truncate`}>{e.user.email}</p>
                   )}
                 </td>
-                <td className={`${td} align-middle`}>
+                <td className={empTd}>
                   {canEditProfile ? (
                     editingPassword ? (
                       <input
@@ -445,7 +472,7 @@ export function EmployeeListTable({
                     </span>
                   )}
                 </td>
-                <td className={`${td} align-middle`}>
+                <td className={empTd}>
                   {canEditThisRole ? (
                     <select
                       className={`auth-select-field ${rowControl}`}
@@ -473,7 +500,7 @@ export function EmployeeListTable({
                     <span className={`${rowControlStatic} truncate`}>{roleLabel(e.user.role)}</span>
                   )}
                 </td>
-                <td className={`${td} align-middle`}>
+                <td className={empTd}>
                   <select
                     className={`auth-select-field ${rowControl}`}
                     value={e.department?.id ?? ""}
@@ -489,36 +516,60 @@ export function EmployeeListTable({
                     ))}
                   </select>
                 </td>
-                <td className={`${td} align-middle`}>
-                  <p className="truncate text-[0.75rem] text-[var(--apple-label-secondary)]">
-                    {e.scheduleSummary ?? "—"}
-                  </p>
-                  {canEditSchedule && onEditSchedule && (
-                    <button
-                      type="button"
-                      className="mt-1 text-[0.75rem] font-medium text-[var(--apple-blue)] hover:underline"
-                      disabled={isBusy}
-                      onClick={() => onEditSchedule(e)}
-                    >
-                      {t("admin.empScheduleEdit")}
-                    </button>
-                  )}
-                </td>
-                <td className={`${td} align-middle text-right`}>
-                  {canEditProfile ? (
-                    <div className="flex justify-end">
+                {showLoginStatus && (
+                  <td className={`${empTd} text-center`}>
+                    {e.loginEligible ? (
+                      <span
+                        className="inline-flex whitespace-nowrap rounded-md bg-[var(--apple-green)]/12 px-2 py-0.5 text-[0.75rem] font-medium leading-none text-[var(--apple-green-dark)]"
+                        title={
+                          e.loginEligibleByAdmin
+                            ? t("admin.employeesLoginEligibleAdmin")
+                            : e.seatRank != null
+                              ? `#${e.seatRank}`
+                              : undefined
+                        }
+                      >
+                        {e.loginEligibleByAdmin
+                          ? t("admin.employeesLoginEligibleAdmin")
+                          : t("admin.employeesLoginEligible")}
+                      </span>
+                    ) : (
+                      <span className="inline-flex whitespace-nowrap rounded-md bg-[var(--apple-red)]/10 px-2 py-0.5 text-[0.75rem] font-medium leading-none text-[var(--apple-red)]">
+                        {t("admin.employeesLoginIneligible")}
+                      </span>
+                    )}
+                  </td>
+                )}
+                <td className={empTd}>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="min-w-0 truncate text-[0.75rem] text-[var(--apple-label-secondary)]">
+                      {e.scheduleSummary ?? "—"}
+                    </span>
+                    {canEditSchedule && onEditSchedule && (
                       <button
                         type="button"
-                        className={`${btnDanger} whitespace-nowrap`}
-                        disabled={!canDeleteThis || isBusy}
-                        title={deleteTitle}
-                        onClick={() => {
-                          if (canDeleteThis) onDelete(e);
-                        }}
+                        className="shrink-0 text-[0.75rem] font-medium text-[var(--apple-blue)] hover:underline"
+                        disabled={isBusy}
+                        onClick={() => onEditSchedule(e)}
                       >
-                        {t("admin.employeesDelete")}
+                        {t("admin.empScheduleEdit")}
                       </button>
-                    </div>
+                    )}
+                  </div>
+                </td>
+                <td className={`${empTd} text-center`}>
+                  {canEditProfile ? (
+                    <button
+                      type="button"
+                      className={`${empBtnDanger} whitespace-nowrap`}
+                      disabled={!canDeleteThis || isBusy}
+                      title={deleteTitle}
+                      onClick={() => {
+                        if (canDeleteThis) onDelete(e);
+                      }}
+                    >
+                      {t("admin.employeesDelete")}
+                    </button>
                   ) : null}
                 </td>
               </tr>

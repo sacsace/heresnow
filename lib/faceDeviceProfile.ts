@@ -92,3 +92,66 @@ export function hasCameraApi(): boolean {
 export function isSecureForCamera(): boolean {
   return typeof window !== "undefined" && window.isSecureContext;
 }
+
+function isNotFoundCameraError(err: unknown): boolean {
+  if (!(err instanceof DOMException || err instanceof Error)) return false;
+  const name = err.name;
+  if (name === "NotFoundError" || name === "OverconstrainedError") return true;
+  return /device not found|requested device not found|no camera|not found/i.test(
+    err.message ?? ""
+  );
+}
+
+export type CameraAccessFailureKind = "no_camera" | "permission" | "in_use" | "other";
+
+/** getUserMedia 실패를 UI용 종류·메시지로 분류 */
+export function classifyCameraAccessError(
+  err: unknown,
+  profile: FaceDeviceProfile
+): { kind: CameraAccessFailureKind; messageKey: string } {
+  if (!isSecureForCamera()) {
+    return { kind: "other", messageKey: "employee.faceInsecureContext" };
+  }
+  if (!hasCameraApi()) {
+    return { kind: "other", messageKey: "employee.faceUnsupportedBrowser" };
+  }
+  if (err instanceof Error) {
+    if (err.message.startsWith("FACE_MODELS_FAILED")) {
+      return { kind: "other", messageKey: "employee.faceModelLoadFail" };
+    }
+    if (err.message === "FACE_BACKEND_UNAVAILABLE") {
+      return { kind: "other", messageKey: "employee.faceBackendUnavailable" };
+    }
+  }
+  if (isNotFoundCameraError(err)) {
+    return { kind: "no_camera", messageKey: "employee.faceNoCamera" };
+  }
+  const name = err instanceof Error ? err.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return {
+      kind: "permission",
+      messageKey: profile.likelyInAppBrowser
+        ? "employee.faceInAppBrowser"
+        : "employee.faceCameraDenied",
+    };
+  }
+  if (name === "NotReadableError" || name === "AbortError") {
+    return { kind: "in_use", messageKey: "employee.faceCameraInUse" };
+  }
+  if (profile.likelyInAppBrowser) {
+    return { kind: "other", messageKey: "employee.faceInAppBrowser" };
+  }
+  return { kind: "permission", messageKey: "employee.faceCameraDenied" };
+}
+
+/** enumerateDevices 로 영상 입력 장치 존재 여부 (권한 없을 때 빈 목록이면 unknown) */
+export async function probeVideoInputDevice(): Promise<"yes" | "no" | "unknown"> {
+  if (!hasCameraApi()) return "no";
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    if (devices.length === 0) return "unknown";
+    return devices.some((d) => d.kind === "videoinput") ? "yes" : "no";
+  } catch {
+    return "unknown";
+  }
+}

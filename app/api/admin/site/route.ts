@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { DEFAULT_SITE_RADIUS_M } from "@/lib/siteGeofence";
 import { prisma } from "@/lib/prisma";

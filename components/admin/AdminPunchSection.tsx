@@ -39,7 +39,7 @@ export function AdminPunchSection({ asPage = false }: Props) {
   if (asPage) {
     return (
       <div className={pageStack}>
-        <PageHeader title={pageTitle} subtitle={t("admin.punchLead")} />
+        <PageHeader title={pageTitle} subtitle={t("admin.punchLead")} subtitleWide />
         {body}
       </div>
     );

@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { dateOnlyToSubscriptionEndsAt, isSubscriptionDateOnly } from "@/lib/subscriptionEndsAt";
@@ -15,7 +18,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     where: { id },
     include: {
       pricingTier: {
-        select: { label: true, maxSeats: true, priceAmount: true, billingPeriod: true },
+        select: { label: true, maxSeats: true, priceAmount: true, pricePerUser: true, billingPeriod: true },
       },
       _count: { select: { users: true, employees: true, attendanceRecords: true } },
     },
@@ -30,6 +33,8 @@ const patchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   seatLimit: z.coerce.number().int().min(1).max(100_000).optional(),
   subscriptionEndsAt: z.union([z.string(), z.null()]).optional(),
+  billingDiscountPercent: z.coerce.number().int().min(0).max(100).optional(),
+  billingDiscountAmount: z.coerce.number().int().min(0).optional(),
 });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -51,8 +56,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { name, seatLimit, subscriptionEndsAt } = parsed.data;
-  if (name === undefined && seatLimit === undefined && subscriptionEndsAt === undefined) {
+  const { name, seatLimit, subscriptionEndsAt, billingDiscountPercent, billingDiscountAmount } =
+    parsed.data;
+  if (
+    name === undefined &&
+    seatLimit === undefined &&
+    subscriptionEndsAt === undefined &&
+    billingDiscountPercent === undefined &&
+    billingDiscountAmount === undefined
+  ) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
@@ -79,16 +91,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
   }
 
-  if (seatLimit !== undefined) {
-    const empCount = await prisma.employee.count({ where: { companyId: id } });
-    if (seatLimit < empCount) {
-      return NextResponse.json(
-        { error: `좌석 상한은 직원 수(${empCount}) 이상이어야 합니다.` },
-        { status: 400 }
-      );
-    }
-  }
-
   try {
     const company = await prisma.company.update({
       where: { id },
@@ -96,10 +98,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         ...(name !== undefined ? { name: name.trim() } : {}),
         ...(seatLimit !== undefined ? { seatLimit } : {}),
         ...(ends !== undefined ? { subscriptionEndsAt: ends } : {}),
+        ...(billingDiscountPercent !== undefined
+          ? { billingDiscountPercent }
+          : {}),
+        ...(billingDiscountAmount !== undefined ? { billingDiscountAmount } : {}),
       },
       include: {
         pricingTier: {
-        select: { label: true, maxSeats: true, priceAmount: true, billingPeriod: true },
+        select: { label: true, maxSeats: true, priceAmount: true, pricePerUser: true, billingPeriod: true },
       },
         _count: { select: { users: true, employees: true, attendanceRecords: true } },
       },

@@ -2,9 +2,12 @@
 
 import {
   buildCameraConstraintAttempts,
+  classifyCameraAccessError,
   getFaceDeviceProfile,
   hasCameraApi,
   isSecureForCamera,
+  probeVideoInputDevice,
+  type CameraAccessFailureKind,
 } from "@/lib/faceDeviceProfile";
 import {
   descriptorToArray,
@@ -81,6 +84,9 @@ export function FaceCapture({
   const [phase, setPhase] = useState<InitPhase>("idle");
   const [status, setStatus] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraErrorKind, setCameraErrorKind] = useState<CameraAccessFailureKind | null>(
+    null
+  );
   const [needsTap, setNeedsTap] = useState(false);
   const [autoScanDone, setAutoScanDone] = useState(false);
 
@@ -97,53 +103,26 @@ export function FaceCapture({
     const tx = tRef.current;
     const profile = getFaceDeviceProfile();
 
-    function deriveErrorMessage(err: unknown): string {
-      if (!isSecureForCamera()) {
-        return tx("employee.faceInsecureContext");
-      }
-      if (!hasCameraApi()) {
-        return tx("employee.faceUnsupportedBrowser");
-      }
-      if (err instanceof Error) {
-        if (err.message.startsWith("FACE_MODELS_FAILED")) {
-          return tx("employee.faceModelLoadFail");
-        }
-        if (err.message === "FACE_BACKEND_UNAVAILABLE") {
-          return tx("employee.faceBackendUnavailable");
-        }
-      }
-      const name = err instanceof Error ? err.name : "";
-      if (name === "NotAllowedError" || name === "SecurityError") {
-        if (profile.likelyInAppBrowser) {
-          return tx("employee.faceInAppBrowser");
-        }
-        return tx("employee.faceCameraDenied");
-      }
-      if (name === "NotFoundError" || name === "OverconstrainedError") {
-        return tx("employee.faceNoCamera");
-      }
-      if (name === "NotReadableError" || name === "AbortError") {
-        return tx("employee.faceCameraInUse");
-      }
-      if (profile.likelyInAppBrowser) {
-        return tx("employee.faceInAppBrowser");
-      }
-      return tx("employee.faceCameraDenied");
+    function failCamera(kind: CameraAccessFailureKind, message: string) {
+      if (cancelled) return;
+      setCameraErrorKind(kind);
+      setCameraError(message);
+      setPhase("error");
     }
 
     async function init() {
       if (!isSecureForCamera()) {
-        if (!cancelled) {
-          setCameraError(tx("employee.faceInsecureContext"));
-          setPhase("error");
-        }
+        failCamera("other", tx("employee.faceInsecureContext"));
         return;
       }
       if (!hasCameraApi()) {
-        if (!cancelled) {
-          setCameraError(tx("employee.faceUnsupportedBrowser"));
-          setPhase("error");
-        }
+        failCamera("other", tx("employee.faceUnsupportedBrowser"));
+        return;
+      }
+
+      const videoProbe = await probeVideoInputDevice();
+      if (videoProbe === "no") {
+        failCamera("no_camera", tx("employee.faceNoCamera"));
         return;
       }
 
@@ -176,11 +155,14 @@ export function FaceCapture({
           }
         }
         setCameraError(null);
+        setCameraErrorKind(null);
       } catch (err) {
-        console.error("[face] init failed", err);
+        const classified = classifyCameraAccessError(err, profile);
+        if (classified.kind !== "no_camera") {
+          console.warn("[face] init failed", err);
+        }
         if (!cancelled) {
-          setCameraError(deriveErrorMessage(err));
-          setPhase("error");
+          failCamera(classified.kind, tx(classified.messageKey));
         }
       }
     }
@@ -369,6 +351,14 @@ export function FaceCapture({
       : (verifyButton ?? t("employee.faceVerifyButton"));
   const showManualButton = mode === "enroll" || !autoVerify;
 
+  if (cameraErrorKind === "no_camera" && cameraError) {
+    return (
+      <div className="flex aspect-[4/3] w-full items-center justify-center rounded-xl border-2 border-[var(--apple-red)] bg-[color-mix(in_srgb,var(--apple-red)_12%,var(--grouped-bg))] px-4 py-6 text-center shadow-sm">
+        <p className="text-sm font-medium leading-relaxed text-[var(--apple-red)]">{cameraError}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-xl bg-[var(--grouped-bg)] p-3 shadow-sm ring-1 ring-black/[0.04] sm:p-4">
       <p className="text-sm font-semibold text-[var(--foreground)]">{title}</p>
@@ -398,7 +388,9 @@ export function FaceCapture({
               if (v && v.paused) {
                 v.play()
                   .then(() => setNeedsTap(false))
-                  .catch((e) => console.warn("[face] tap play failed", e));
+                  .catch(() => {
+                    /* 사용자 탭 재생 실패 — 무시 */
+                  });
               }
             }}
           />

@@ -14,13 +14,18 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["leaflet"],
+  serverExternalPackages: ["pdfkit"],
   /**
    * dev 서버에 LAN/모바일에서 접속할 때 허용할 origin.
    * Next.js 15+에서 같은 네트워크 IP/호스트도 명시해야 _next/* 가 cross-origin 경고 없이 로드됨.
    * 필요 시 다른 IP/도메인을 추가하세요 (e.g. "192.168.1.50", "macbook.local").
    */
   allowedDevOrigins: ["192.168.0.120"],
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
+    // Windows dev: HMR can corrupt webpack module cache (.next) — disable in dev.
+    if (dev) {
+      config.cache = false;
+    }
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,

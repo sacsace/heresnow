@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import { useI18n } from "@/components/LanguageProvider";
 import { isSubscriptionDateOnly, subscriptionEndsAtToDateInput } from "@/lib/subscriptionEndsAt";
 import {
@@ -47,10 +48,13 @@ type Company = {
   seatLimit: number;
   timezone: string;
   subscriptionEndsAt: string | null;
+  billingDiscountPercent: number;
+  billingDiscountAmount: number;
   pricingTier: {
     label: string | null;
     maxSeats: number;
     priceAmount: number;
+    pricePerUser: number;
     billingPeriod: "MONTHLY" | "YEARLY";
   } | null;
   _count: { users: number; employees: number; attendanceRecords: number };
@@ -60,10 +64,31 @@ type RowDraft = {
   name: string;
   seatLimit: string;
   subscriptionInput: string;
+  discountPercent: string;
+  discountAmount: string;
 };
+
+function draftFromCompany(c: Company, prev?: Partial<RowDraft>): RowDraft {
+  return {
+    name: prev?.name ?? c.name,
+    seatLimit: prev?.seatLimit ?? String(c.seatLimit),
+    subscriptionInput:
+      prev?.subscriptionInput ??
+      subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone),
+    discountPercent: prev?.discountPercent ?? String(c.billingDiscountPercent ?? 0),
+    discountAmount: prev?.discountAmount ?? String(c.billingDiscountAmount ?? 0),
+  };
+}
 
 function companyInUse(c: Company) {
   return c._count.users > 0 || c._count.employees > 0 || c._count.attendanceRecords > 0;
+}
+
+function clampDiscountPercent(raw: string): string {
+  if (raw.trim() === "") return "";
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) return "0";
+  return String(Math.min(100, Math.max(0, n)));
 }
 
 export default function SuperPage() {
@@ -78,6 +103,11 @@ export default function SuperPage() {
   const [savingNameId, setSavingNameId] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [discountWarning, setDiscountWarning] = useState<{
+    companyId: string;
+    previousPercent: string;
+    nextPercent: string;
+  } | null>(null);
   const [logs, setLogs] = useState<
     { id: string; action: string; timestamp: string; company: { name: string }; approver: { email: string } }[]
   >([]);
@@ -123,11 +153,7 @@ export default function SuperPage() {
   useEffect(() => {
     const m: Record<string, RowDraft> = {};
     for (const c of companies) {
-      m[c.id] = {
-        name: c.name,
-        seatLimit: String(c.seatLimit),
-        subscriptionInput: subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone),
-      };
+      m[c.id] = draftFromCompany(c);
     }
     setDraft(m);
   }, [companies]);
@@ -141,6 +167,45 @@ export default function SuperPage() {
     });
     setName("");
     await load();
+  }
+
+  function updateDraftDiscountPercent(companyId: string, c: Company, raw: string) {
+    const prev = draft[companyId]?.discountPercent ?? "0";
+    const next = clampDiscountPercent(raw);
+    if (next === prev) return;
+
+    setDraft((prevDraft) => ({
+      ...prevDraft,
+      [companyId]: draftFromCompany(c, {
+        ...prevDraft[companyId],
+        discountPercent: next,
+      }),
+    }));
+
+    if (next !== "" && Number.parseInt(next, 10) > 50) {
+      setDiscountWarning({
+        companyId,
+        previousPercent: prev,
+        nextPercent: next,
+      });
+    }
+  }
+
+  function confirmHighDiscount() {
+    setDiscountWarning(null);
+  }
+
+  function cancelHighDiscount() {
+    if (!discountWarning) return;
+    const { companyId, previousPercent } = discountWarning;
+    setDraft((prev) => ({
+      ...prev,
+      [companyId]: {
+        ...prev[companyId],
+        discountPercent: previousPercent,
+      },
+    }));
+    setDiscountWarning(null);
   }
 
   async function saveCompany(id: string) {
@@ -161,12 +226,29 @@ export default function SuperPage() {
     } else {
       subscriptionEndsAt = subRaw;
     }
+    const discountPercent = Number.parseInt(d.discountPercent, 10);
+    const discountAmount = Number.parseInt(d.discountAmount, 10);
+    if (
+      !Number.isFinite(discountPercent) ||
+      discountPercent < 0 ||
+      discountPercent > 100 ||
+      !Number.isFinite(discountAmount) ||
+      discountAmount < 0
+    ) {
+      setBanner(t("super.saveCompanyFail"));
+      return;
+    }
     setSavingId(id);
     setBanner(null);
     const r = await fetch(`/api/super/companies/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seatLimit, subscriptionEndsAt }),
+      body: JSON.stringify({
+        seatLimit,
+        subscriptionEndsAt,
+        billingDiscountPercent: discountPercent,
+        billingDiscountAmount: discountAmount,
+      }),
     });
     const body = await r.json().catch(() => ({}));
     setSavingId(null);
@@ -181,13 +263,7 @@ export default function SuperPage() {
   function startEditName(c: Company) {
     setDraft((prev) => ({
       ...prev,
-      [c.id]: {
-        name: prev[c.id]?.name ?? c.name,
-        seatLimit: prev[c.id]?.seatLimit ?? String(c.seatLimit),
-        subscriptionInput:
-          prev[c.id]?.subscriptionInput ??
-          subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone),
-      },
+      [c.id]: draftFromCompany(c, prev[c.id]),
     }));
     setEditingNameId(c.id);
     setBanner(null);
@@ -196,13 +272,12 @@ export default function SuperPage() {
   function cancelEditName(c: Company) {
     setDraft((prev) => ({
       ...prev,
-      [c.id]: {
-        name: c.name,
-        seatLimit: prev[c.id]?.seatLimit ?? String(c.seatLimit),
-        subscriptionInput:
-          prev[c.id]?.subscriptionInput ??
-          subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone),
-      },
+      [c.id]: draftFromCompany(c, {
+        seatLimit: prev[c.id]?.seatLimit,
+        subscriptionInput: prev[c.id]?.subscriptionInput,
+        discountPercent: prev[c.id]?.discountPercent,
+        discountAmount: prev[c.id]?.discountAmount,
+      }),
     }));
     setEditingNameId(null);
   }
@@ -326,13 +401,14 @@ export default function SuperPage() {
                   <th className={th}>{t("super.thName")}</th>
                   <th className={`${th} w-[7rem] min-w-[7rem]`}>{t("super.thSeatCap")}</th>
                   <th className={`${th} w-[10.5rem]`}>{t("super.thSubscriptionEnd")}</th>
+                  <th className={`${th} w-[15rem] min-w-[15rem] whitespace-nowrap`}>{t("super.thDiscount")}</th>
                   <th className={`${th} text-right`}>{t("super.thActions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCompanies.length === 0 ? (
                   <tr className={tableRow}>
-                    <td className={`${td} py-6 text-center text-[var(--apple-label-tertiary)]`} colSpan={4}>
+                    <td className={`${td} py-6 text-center text-[var(--apple-label-tertiary)]`} colSpan={5}>
                       {t("super.searchNoResults")}
                     </td>
                   </tr>
@@ -354,17 +430,10 @@ export default function SuperPage() {
                                 onChange={(e) =>
                                   setDraft((prev) => ({
                                     ...prev,
-                                    [c.id]: {
+                                    [c.id]: draftFromCompany(c, {
+                                      ...prev[c.id],
                                       name: e.target.value,
-                                      seatLimit:
-                                        prev[c.id]?.seatLimit ?? String(c.seatLimit),
-                                      subscriptionInput:
-                                        prev[c.id]?.subscriptionInput ??
-                                        subscriptionEndsAtToDateInput(
-                                          c.subscriptionEndsAt,
-                                          c.timezone
-                                        ),
-                                    },
+                                    }),
                                   }))
                                 }
                                 onKeyDown={(e) => {
@@ -437,13 +506,10 @@ export default function SuperPage() {
                           onChange={(e) =>
                             setDraft((prev) => ({
                               ...prev,
-                              [c.id]: {
-                                name: prev[c.id]?.name ?? c.name,
+                              [c.id]: draftFromCompany(c, {
+                                ...prev[c.id],
                                 seatLimit: e.target.value,
-                                subscriptionInput:
-                                  prev[c.id]?.subscriptionInput ??
-                                  subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone),
-                              },
+                              }),
                             }))
                           }
                         />
@@ -462,14 +528,78 @@ export default function SuperPage() {
                           onChange={(e) =>
                             setDraft((prev) => ({
                               ...prev,
-                              [c.id]: {
-                                name: prev[c.id]?.name ?? c.name,
-                                seatLimit: prev[c.id]?.seatLimit ?? String(c.seatLimit),
+                              [c.id]: draftFromCompany(c, {
+                                ...prev[c.id],
                                 subscriptionInput: e.target.value,
-                              },
+                              }),
                             }))
                           }
                         />
+                      </td>
+                      <td className={`${td} whitespace-nowrap`}>
+                        <div
+                          className="inline-flex max-w-full flex-nowrap items-center overflow-hidden rounded-[0.625rem] border border-[var(--separator)] bg-[var(--grouped-bg)] shadow-sm"
+                          role="group"
+                          aria-label={t("super.thDiscount")}
+                        >
+                          <label
+                            htmlFor={`disc-pct-${c.id}`}
+                            className="flex shrink-0 items-center gap-1.5 border-r border-[var(--separator)] px-2.5 py-1.5"
+                          >
+                            <input
+                              id={`disc-pct-${c.id}`}
+                              type="number"
+                              min={0}
+                              max={100}
+                              aria-label={`${t("super.thDiscount")} %`}
+                              className="h-8 w-11 shrink-0 rounded-[0.5rem] border-0 bg-[var(--fill-secondary)] px-1.5 text-center text-[0.9375rem] font-semibold tabular-nums text-[var(--foreground)] outline-none [appearance:textfield] focus:bg-[var(--fill-secondary-hover)] focus:ring-2 focus:ring-[var(--apple-blue)]/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              value={draft[c.id]?.discountPercent ?? "0"}
+                              onChange={(e) => updateDraftDiscountPercent(c.id, c, e.target.value)}
+                              onBlur={(e) => {
+                                const clamped = clampDiscountPercent(e.target.value);
+                                if (clamped === "") {
+                                  setDraft((prev) => ({
+                                    ...prev,
+                                    [c.id]: draftFromCompany(c, {
+                                      ...prev[c.id],
+                                      discountPercent: "0",
+                                    }),
+                                  }));
+                                } else if (clamped !== e.target.value) {
+                                  updateDraftDiscountPercent(c.id, c, clamped);
+                                }
+                              }}
+                            />
+                            <span className="shrink-0 text-[0.8125rem] font-bold text-[var(--apple-blue)]">
+                              %
+                            </span>
+                          </label>
+                          <label
+                            htmlFor={`disc-amt-${c.id}`}
+                            className="flex shrink-0 items-center gap-1.5 px-2.5 py-1.5"
+                          >
+                            <span className="shrink-0 text-[0.8125rem] font-bold text-[var(--apple-green-dark)]">
+                              Rs.
+                            </span>
+                            <input
+                              id={`disc-amt-${c.id}`}
+                              type="number"
+                              min={0}
+                              aria-label={`${t("super.thDiscount")} Rs`}
+                              className="h-8 w-[4.5rem] shrink-0 rounded-[0.5rem] border-0 bg-[var(--fill-secondary)] px-2 text-right text-[0.9375rem] font-semibold tabular-nums text-[var(--foreground)] outline-none [appearance:textfield] focus:bg-[var(--fill-secondary-hover)] focus:ring-2 focus:ring-[var(--apple-green)]/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              value={draft[c.id]?.discountAmount ?? "0"}
+                              onChange={(e) =>
+                                setDraft((prev) => ({
+                                  ...prev,
+                                  [c.id]: draftFromCompany(c, {
+                                    ...prev[c.id],
+                                    discountAmount: e.target.value,
+                                  }),
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
                       </td>
                       <td className={td}>
                         <div className={`${cardActionBar} justify-end`}>
@@ -536,6 +666,19 @@ export default function SuperPage() {
           </table>
         </div>
       </section>
+
+      <AppleConfirmDialog
+        open={discountWarning !== null}
+        title={t("super.discountHighWarningTitle")}
+        message={t("super.discountHighWarningMessage").replace(
+          "{n}",
+          discountWarning?.nextPercent ?? ""
+        )}
+        confirmLabel={t("super.discountHighWarningConfirm")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={confirmHighDiscount}
+        onCancel={cancelHighDiscount}
+      />
     </div>
   );
 }

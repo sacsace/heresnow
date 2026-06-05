@@ -1,4 +1,8 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
+import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import {
   capCheckOutTimestamp,
   checkInErrorMessage,
@@ -46,8 +50,6 @@ const bodySchema = z
     earlyLeaveReason: z.string().trim().min(1).max(2000).optional(),
     /** 퇴근 후 4시간 이내 재출근 시 필수 — 관리자 승인 대상 */
     reCheckInReason: z.string().trim().min(1).max(2000).optional(),
-    /** 출근 후 48시간 초과 퇴근 시 필수 — 관리자 승인 대상 */
-    lateCheckOutReason: z.string().trim().min(1).max(2000).optional(),
     photoUrl: z.string().max(2_000_000).optional().nullable(),
     deviceInfo: z.string().max(500).optional(),
     /** 출근 시 필수: 등록 얼굴과 일치 검증 */
@@ -72,6 +74,8 @@ const bodySchema = z
  */
 export async function POST(req: Request) {
   const session = await auth();
+  const seatDenied = await seatLoginForbiddenResponse(session);
+  if (seatDenied) return seatDenied;
   if (!session?.user?.id || !session.user.employeeId) {
     return NextResponse.json({ error: "직원 프로필이 필요합니다." }, { status: 403 });
   }
@@ -103,7 +107,6 @@ export async function POST(req: Request) {
     businessTripReason,
     earlyLeaveReason,
     reCheckInReason,
-    lateCheckOutReason,
     photoUrl,
     deviceInfo,
     faceDescriptor,
@@ -328,20 +331,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // 출근 후 48시간 초과 퇴근 — 사유 필수 + 관리자 승인
-  const lateCheckOutPending = checkOutPastWindow;
-  const trimmedLateCheckOutReason = lateCheckOutReason?.trim() || null;
-  if (lateCheckOutPending && !trimmedLateCheckOutReason) {
-    return NextResponse.json(
-      {
-        error:
-          "출근 후 48시간이 지났습니다. 퇴근 사유를 입력하면 관리자 승인 후 처리됩니다.",
-        code: "LATE_CHECKOUT_REASON_REQUIRED",
-      },
-      { status: 400 }
-    );
-  }
-
   // 퇴근 후 4시간 이내 재출근 — 사유 필수 + 관리자 승인
   const reCheckInPending = type === "CHECK_IN" && eligibility.reCheckInApprovalRequired;
   const trimmedReCheckInReason = reCheckInReason?.trim() || null;
@@ -355,21 +344,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const pendingApproval = earlyLeavePending || reCheckInPending || lateCheckOutPending;
-  const pendingReason = lateCheckOutPending
-    ? trimmedLateCheckOutReason
-    : earlyLeavePending
-      ? trimmedEarlyReason
-      : reCheckInPending
-        ? trimmedReCheckInReason
-        : null;
+  const pendingApproval = earlyLeavePending || reCheckInPending;
+  const pendingReason = earlyLeavePending
+    ? trimmedEarlyReason
+    : reCheckInPending
+      ? trimmedReCheckInReason
+      : null;
 
   const userMemo = memo?.trim() || "";
   let recordMemo = userMemo;
   if (type === "CHECK_OUT" && checkInAt) {
     const actualAt = formatInTimeZone(now, tz, "yyyy-MM-dd HH:mm");
     const recordedAt = formatInTimeZone(recordTimestamp, tz, "yyyy-MM-dd HH:mm");
-    if (lateCheckOutPending && lateCheckOutResolved) {
+    if (checkOutPastWindow && lateCheckOutResolved) {
       const basisLabel = formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko");
       const systemNote = `[지연 퇴근 보정] 실제 처리 ${actualAt} → 기록 ${recordedAt} (${basisLabel})`;
       recordMemo = userMemo ? `${userMemo}\n${systemNote}` : systemNote;
@@ -458,10 +445,8 @@ export async function POST(req: Request) {
     overtimeMinutes: result.record.overtimeMinutes,
     exceptionId: result.exceptionId,
     pendingApproval,
-    message: lateCheckOutPending
-      ? lateCheckOutResolved
-        ? `지연 퇴근 요청이 접수되었습니다. 퇴근 시각은 출근일 기준 ${formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko")}(${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")})으로 기록되며, 관리자 승인 후 확정됩니다.`
-        : "지연 퇴근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+    message: checkOutPastWindow && lateCheckOutResolved
+      ? `퇴근 처리되었습니다. 출근 후 48시간이 지나 퇴근 시각은 출근일 기준 ${formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko")}(${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")})으로 기록됩니다.`
       : earlyLeavePending
         ? "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
         : reCheckInPending

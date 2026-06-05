@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -13,7 +16,7 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     include: {
       pricingTier: {
-        select: { label: true, maxSeats: true, priceAmount: true, billingPeriod: true },
+        select: { label: true, maxSeats: true, priceAmount: true, pricePerUser: true, billingPeriod: true },
       },
       _count: {
         select: { users: true, employees: true, attendanceRecords: true },
