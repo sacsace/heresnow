@@ -23,3 +23,41 @@ export function euclideanDistance(a: number[], b: number[]): number {
 export function isFaceMatch(stored: number[], probe: number[], threshold = FACE_MATCH_THRESHOLD): boolean {
   return euclideanDistance(stored, probe) < threshold;
 }
+
+/** 1:N 식별 시 1·2위 거리 차이가 이보다 작으면 동일인으로 확정하지 않음 */
+export const FACE_IDENTIFY_MIN_GAP = 0.06;
+
+export type FaceIdentifyCandidate = {
+  id: string;
+  faceDescriptor: unknown;
+};
+
+export type FaceIdentifyResult<T extends FaceIdentifyCandidate> = {
+  match: T;
+  distance: number;
+};
+
+/** 등록된 후보 중 probe와 일치하는 단일 후보를 찾음. 모호하면 null */
+export function identifySingleFaceMatch<T extends FaceIdentifyCandidate>(
+  candidates: T[],
+  probe: number[],
+  threshold = FACE_MATCH_THRESHOLD,
+  minGap = FACE_IDENTIFY_MIN_GAP
+): FaceIdentifyResult<T> | null {
+  const matches: { candidate: T; distance: number }[] = [];
+  for (const candidate of candidates) {
+    const stored = parseFaceDescriptor(candidate.faceDescriptor);
+    if (!stored) continue;
+    const distance = euclideanDistance(stored, probe);
+    if (distance < threshold) {
+      matches.push({ candidate, distance });
+    }
+  }
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => a.distance - b.distance);
+  const best = matches[0]!;
+  if (matches.length > 1 && best.distance + minGap > matches[1]!.distance) {
+    return null;
+  }
+  return { match: best.candidate, distance: best.distance };
+}

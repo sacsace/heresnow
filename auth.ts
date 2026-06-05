@@ -16,5 +16,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return authorizeCredentials(credentials);
       },
     }),
+    Credentials({
+      id: "face-login",
+      name: "Face Login",
+      credentials: {
+        descriptor: { label: "Descriptor", type: "text" },
+      },
+      authorize: async (credentials) => {
+        const { authorizeFaceLogin } = await import("@/lib/authorizeFaceLogin");
+        return authorizeFaceLogin(credentials);
+      },
+    }),
   ],
 });

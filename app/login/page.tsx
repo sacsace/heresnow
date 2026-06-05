@@ -20,9 +20,22 @@ import {
 import { useI18n } from "@/components/LanguageProvider";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { signIn } from "next-auth/react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState, Suspense, useEffect } from "react";
+
+const FaceLoginSection = dynamic(
+  () => import("@/components/auth/FaceLoginSection").then((m) => m.FaceLoginSection),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-center text-[0.8125rem] text-[var(--apple-label-secondary)]">…</p>
+    ),
+  }
+);
+
+type LoginMode = "password" | "face";
 
 function LoginForm() {
   const { t } = useI18n();
@@ -31,6 +44,7 @@ function LoginForm() {
   const registered = searchParams.get("registered") === "1";
   const sessionInvalid = searchParams.get("session") === "invalid";
   const seatLimitError = searchParams.get("error") === "SeatLimit";
+  const [mode, setMode] = useState<LoginMode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -80,9 +94,18 @@ function LoginForm() {
     window.location.href = callbackUrl;
   }
 
+  function switchMode(next: LoginMode) {
+    if (next === mode) return;
+    setMode(next);
+    setError(null);
+  }
+
+  const shellWidth =
+    mode === "face" ? "!w-[26rem] sm:!w-[28rem]" : "!w-[26rem] sm:!w-[27rem]";
+
   return (
     <AuthShell
-      className="!w-[26rem] sm:!w-[27rem]"
+      className={shellWidth}
       footer={
         <p className={authCopyright}>
           © 2026 Minsub Ventures Private Limited
@@ -98,38 +121,85 @@ function LoginForm() {
         {sessionInvalid && <p className={authBannerWarning}>{t("login.sessionInvalid")}</p>}
         {seatLimitError && <p className={authBannerWarning}>{t("login.errorSeatLimit")}</p>}
         {dbHint && <p className={authBannerWarning}>{dbHint}</p>}
-        <form onSubmit={onSubmit} className={authFormLogin}>
-          <div className={authFieldGroup}>
-            <label className={authLabel}>{t("login.email")}</label>
-            <input
-              type="email"
-              autoComplete="username"
-              className={authInput}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className={authFieldGroup}>
-            <label className={authLabel}>{t("login.password")}</label>
-            <input
-              type="password"
-              autoComplete="current-password"
-              className={authInput}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={MIN_PASSWORD_LENGTH}
-              required
-            />
-            <p className="mt-1 text-[0.75rem] text-[var(--apple-label-secondary)]">
-              {t("login.passwordHint")}
-            </p>
-          </div>
-          {error && <p className={authError}>{error}</p>}
-          <button type="submit" disabled={loading} className={authButtonPrimary}>
-            {loading ? t("login.submitting") : t("login.submit")}
+
+        <div
+          className="mt-5 flex rounded-[0.625rem] bg-[var(--fill-secondary)] p-0.5"
+          role="tablist"
+          aria-label={t("login.submit")}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "password"}
+            className={`flex-1 rounded-[0.5rem] py-2 text-[0.8125rem] font-medium transition-colors sm:text-[0.875rem] ${
+              mode === "password"
+                ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--apple-label-secondary)]"
+            }`}
+            onClick={() => switchMode("password")}
+          >
+            {t("login.modePassword")}
           </button>
-        </form>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "face"}
+            className={`flex-1 rounded-[0.5rem] py-2 text-[0.8125rem] font-medium transition-colors sm:text-[0.875rem] ${
+              mode === "face"
+                ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--apple-label-secondary)]"
+            }`}
+            onClick={() => switchMode("face")}
+          >
+            {t("login.modeFace")}
+          </button>
+        </div>
+
+        {mode === "password" ? (
+          <form onSubmit={onSubmit} className={authFormLogin}>
+            <div className={authFieldGroup}>
+              <label className={authLabel}>{t("login.email")}</label>
+              <input
+                type="email"
+                autoComplete="username"
+                className={authInput}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className={authFieldGroup}>
+              <label className={authLabel}>{t("login.password")}</label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                className={authInput}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={MIN_PASSWORD_LENGTH}
+                required
+              />
+              <p className="mt-1 text-[0.75rem] text-[var(--apple-label-secondary)]">
+                {t("login.passwordHint")}
+              </p>
+            </div>
+            {error && <p className={authError}>{error}</p>}
+            <button type="submit" disabled={loading} className={authButtonPrimary}>
+              {loading ? t("login.submitting") : t("login.submit")}
+            </button>
+          </form>
+        ) : (
+          <div className={authFormLogin}>
+            <FaceLoginSection
+              callbackUrl={callbackUrl}
+              disabled={loading}
+              error={error}
+              onLoadingChange={setLoading}
+              onError={setError}
+            />
+          </div>
+        )}
+
         <p className={`${authFooter} mt-6`}>
           <Link href="/signup" className={authLink}>
             {t("login.signupLink")}

@@ -108,6 +108,11 @@ export const ko = {
     errorSeatLimit:
       "로그인 좌석이 배정되지 않았습니다. 회사 관리자에게 문의하거나 좌석 결제를 요청해 주세요.",
     errorPasswordMinLength: "비밀번호는 6자 이상 입력해 주세요.",
+    modePassword: "비밀번호",
+    modeFace: "안면 인식",
+    faceVerifyTitle: "안면 인식 로그인",
+    faceVerifyLead: "카메라에 본인 얼굴을 맞추면 등록된 계정으로 자동 로그인됩니다.",
+    errorFaceCredentials: "등록된 얼굴을 찾지 못했습니다. 안면 등록 후 다시 시도하거나 비밀번호로 로그인하세요.",
     signupLink: "회사 가입",
   },
   signup: {
@@ -1002,6 +1007,12 @@ export const en = {
     errorSeatLimit:
       "No login seat is assigned to your account. Ask your company admin or request a seat upgrade.",
     errorPasswordMinLength: "Password must be at least 6 characters.",
+    modePassword: "Password",
+    modeFace: "Face",
+    faceVerifyTitle: "Face sign-in",
+    faceVerifyLead: "Align your face in the frame to sign in to your enrolled account automatically.",
+    errorFaceCredentials:
+      "No enrolled face matched. Enroll your face first or sign in with your password.",
     signupLink: "Company sign-up",
   },
   signup: {
