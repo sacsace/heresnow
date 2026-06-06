@@ -20,7 +20,6 @@ import {
 } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
-import { formatTierPrice } from "@/lib/pricing";
 import type { BillingPeriod } from "@prisma/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,7 +48,6 @@ export default function SignupPage() {
   const [adminPassword, setAdminPassword] = useState("");
   const [adminName, setAdminName] = useState("");
   const [tierId, setTierId] = useState("");
-  const [unitPriceLabel, setUnitPriceLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -62,10 +60,6 @@ export default function SignupPage() {
           trialDays: row.trialDays ?? null,
         }));
         setTierId(list[0]?.id ?? "");
-        const tr = list[0];
-        if (tr) {
-          setUnitPriceLabel(formatTierPrice({ ...tr, billingPeriod: "MONTHLY" }));
-        }
       })
       .catch(() => setError(t("signup.errorTiers")));
   }, [t]);
@@ -140,8 +134,8 @@ export default function SignupPage() {
           </div>
           <div className={authFieldGroup}>
             <label className={authLabel}>{t("signup.plan")}</label>
-            <p className="mt-1 text-[0.875rem] font-medium text-[var(--foreground)]">
-              {unitPriceLabel || "—"}
+            <p className="mt-1 text-[0.875rem] leading-relaxed text-[var(--foreground)]">
+              {t("signup.planNote")}
             </p>
             <p className={authHint}>{t("signup.planHint")}</p>
           </div>
