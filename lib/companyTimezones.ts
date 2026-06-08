@@ -11,6 +11,7 @@ export const COMPANY_TIMEZONE_OPTIONS = [
   "Asia/Hong_Kong",
   "Asia/Dubai",
   "Asia/Bangkok",
+  "Asia/Ho_Chi_Minh",
   "Asia/Jakarta",
   "Australia/Sydney",
   "Europe/London",
