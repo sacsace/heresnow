@@ -84,9 +84,10 @@ export const authBannerWarning = `${bannerWarning} text-[0.75rem]`;
 export const authLangSlot = "fixed right-4 top-4 z-50 sm:right-6 sm:top-5";
 
 /** 개인정보 동의 — iOS Settings 스타일 grouped list */
-export const consentShellWidth = "!w-[min(100%,40rem)] sm:!w-[40rem]";
+export const consentShellWidth =
+  "!w-full !max-w-[min(100%,36rem)] sm:!max-w-[38rem] md:!max-w-[44rem] lg:!max-w-[48rem] xl:!max-w-[52rem]";
 export const consentCard =
-  "w-full overflow-hidden rounded-2xl bg-[var(--grouped-bg)] px-5 py-7 shadow-sm ring-1 ring-black/[0.04] sm:px-8 sm:py-9";
+  "w-full overflow-hidden rounded-2xl bg-[var(--grouped-bg)] px-5 py-7 shadow-sm ring-1 ring-black/[0.04] sm:px-8 sm:py-9 md:px-10 md:py-10";
 export const consentTitle =
   "text-[1.375rem] font-semibold leading-tight tracking-tight text-[var(--foreground)] sm:text-[1.5rem]";
 export const consentIntro =
@@ -100,7 +101,7 @@ export const consentSectionLabel =
 export const consentSectionsStack = "mt-7 flex flex-col gap-7";
 export const consentList = "overflow-hidden rounded-xl bg-[var(--fill-tertiary)] ring-1 ring-black/[0.04]";
 export const consentRow =
-  "px-4 py-3 text-[0.8125rem] leading-snug text-[var(--foreground)] sm:px-5 sm:py-3.5 sm:text-[0.875rem]";
+  "px-4 py-3 text-[0.8125rem] leading-relaxed text-[var(--foreground)] sm:px-5 sm:py-3.5 sm:text-[0.875rem] md:text-[0.9375rem]";
 export const consentRowSecondary = `${consentRow} text-[var(--apple-label-secondary)]`;
 export const consentRowDivider = "border-b border-[var(--separator)] last:border-b-0";
 export const consentFooter =

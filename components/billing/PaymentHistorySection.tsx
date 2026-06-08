@@ -115,22 +115,22 @@ export function PaymentHistorySection({ refreshKey = 0, canRetryEInvoice = false
             </p>
           ) : (
             <div className={tableWrap}>
-              <table className={table}>
+              <table className={`${table} [&_th]:text-center [&_td]:text-center`}>
                 <thead>
                   <tr className={tableHead}>
-                    <th className="py-3 pr-4 font-semibold">{t("admin.billingHistoryPaidAt")}</th>
-                    <th className="py-3 pr-4 font-semibold">{t("admin.billingHistoryInvoice")}</th>
-                    <th className="py-3 pr-4 font-semibold">{t("admin.billingHistorySeats")}</th>
-                    <th className="py-3 pr-4 font-semibold">{t("admin.billingHistoryTerm")}</th>
-                    <th className="py-3 pr-4 font-semibold">{t("admin.billingHistoryAmount")}</th>
-                    <th className="py-3 pr-4 font-semibold">{t("admin.billingEInvoiceCol")}</th>
-                    <th className="py-3 font-semibold">{t("admin.billingHistoryActions")}</th>
+                    <th className="px-3 py-3 font-semibold">{t("admin.billingHistoryPaidAt")}</th>
+                    <th className="px-3 py-3 font-semibold">{t("admin.billingHistoryInvoice")}</th>
+                    <th className="px-3 py-3 font-semibold">{t("admin.billingHistorySeats")}</th>
+                    <th className="px-3 py-3 font-semibold">{t("admin.billingHistoryTerm")}</th>
+                    <th className="px-3 py-3 font-semibold">{t("admin.billingHistoryAmount")}</th>
+                    <th className="px-3 py-3 font-semibold">{t("admin.billingEInvoiceCol")}</th>
+                    <th className="px-3 py-3 font-semibold">{t("admin.billingHistoryActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payments.map((p) => (
                     <tr key={p.id} className={tableRow}>
-                      <td className="py-3 pr-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {p.paidAt
                           ? new Date(p.paidAt).toLocaleDateString(dateLocale, {
                               year: "numeric",
@@ -139,22 +139,22 @@ export function PaymentHistorySection({ refreshKey = 0, canRetryEInvoice = false
                             })
                           : "—"}
                       </td>
-                      <td className="py-3 pr-4 font-mono text-[0.8125rem] text-[var(--apple-label-secondary)]">
+                      <td className="px-3 py-3 font-mono text-[0.8125rem] text-[var(--apple-label-secondary)]">
                         {p.invoiceNumber ?? "—"}
                       </td>
-                      <td className="py-3 pr-4">
+                      <td className="px-3 py-3">
                         {p.employeeCount}
                         {locale === "en" ? "" : "명"}
                       </td>
-                      <td className="py-3 pr-4">
+                      <td className="px-3 py-3">
                         {p.usageMonths}
                         {locale === "en" ? " mo" : "개월"}
                       </td>
-                      <td className="py-3 pr-4 font-semibold whitespace-nowrap">
+                      <td className="px-3 py-3 font-semibold whitespace-nowrap">
                         {p.currency === "INR" ? "Rs." : p.currency}
                         {p.amount.toLocaleString()}
                       </td>
-                      <td className="py-3 pr-4 text-[0.8125rem]">
+                      <td className="px-3 py-3 text-[0.8125rem]">
                         <span
                           className={
                             p.eInvoiceStatus === "ISSUED"
@@ -172,8 +172,8 @@ export function PaymentHistorySection({ refreshKey = 0, canRetryEInvoice = false
                           </span>
                         )}
                       </td>
-                      <td className="py-3">
-                        <div className="flex flex-wrap gap-2">
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
                           <button
                             type="button"
                             className={btnSecondary}

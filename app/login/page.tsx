@@ -17,6 +17,7 @@ import {
   authLink,
   authSubtitleLogin,
 } from "@/components/auth/authStyles";
+import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { useI18n } from "@/components/LanguageProvider";
 import { prefetchFaceRecognition } from "@/lib/faceRecognitionClient";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
@@ -117,9 +118,10 @@ function LoginForm() {
     <AuthShell
       className={shellWidth}
       footer={
-        <p className={authCopyright}>
-          © 2026 Minsub Ventures Private Limited
-        </p>
+        <div className="pointer-events-auto text-center">
+          <LegalFooterLinks className="mb-2" />
+          <p className={authCopyright}>© 2026 Minsub Ventures Private Limited</p>
+        </div>
       }
     >
       <div className={authCardLogin}>

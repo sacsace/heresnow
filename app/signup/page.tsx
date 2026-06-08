@@ -18,6 +18,7 @@ import {
   authSubtitleSignup,
   authTitle,
 } from "@/components/auth/authStyles";
+import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { useI18n } from "@/components/LanguageProvider";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import type { BillingPeriod } from "@prisma/client";
@@ -183,6 +184,7 @@ export default function SignupPage() {
             {t("signup.loginLink")}
           </Link>
         </p>
+        <LegalFooterLinks className="mt-4" />
       </div>
     </AuthShell>
   );

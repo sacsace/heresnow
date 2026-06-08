@@ -24,7 +24,7 @@ export function AuthShell({ children, footer, className = "" }: Props) {
         <LanguageSwitcher variant="auth" />
       </div>
       <div className={`${authColumnFixed} ${className}`.trim()}>
-        <div className="flex w-full shrink-0 flex-col justify-center py-2">{children}</div>
+        <div className="flex w-full min-w-0 shrink-0 flex-col justify-center py-2">{children}</div>
       </div>
       {footer ? <div className={authViewportFooter}>{footer}</div> : null}
     </main>
