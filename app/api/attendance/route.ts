@@ -13,7 +13,7 @@ import {
   type LateCheckOutTimeBasis,
 } from "@/lib/attendancePunchRules";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
-import { evaluateAttendanceWorkFlags } from "@/lib/companyWorkSchedule";
+import { evaluateAttendanceWorkFlags, evaluateCheckOutWorkFlags } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { formatInTimeZone } from "date-fns-tz";
 import {
@@ -306,12 +306,10 @@ export async function POST(req: Request) {
     }
   }
 
-  const workFlags = evaluateAttendanceWorkFlags(
-    recordTimestamp,
-    tz,
-    type,
-    effectiveSchedule
-  );
+  const workFlags =
+    type === "CHECK_OUT" && checkInAt
+      ? evaluateCheckOutWorkFlags(recordTimestamp, checkInAt, tz, effectiveSchedule)
+      : evaluateAttendanceWorkFlags(recordTimestamp, tz, type, effectiveSchedule);
 
   const siteId = siteCtx.siteId;
   const distanceFromSite = siteCtx.distanceFromSite;

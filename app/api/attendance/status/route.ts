@@ -75,7 +75,8 @@ export async function GET() {
   // "지금 퇴근하면 조퇴인가?" — 클라이언트가 사유 입력 UI 를 노출할지 결정
   const earlyLeaveExpected =
     eligibility.canCheckOut &&
-    isCheckOutEarly(now, tz, effectiveSchedule);
+    lastRecord?.type === "CHECK_IN" &&
+    isCheckOutEarly(now, lastRecord.timestamp, tz, effectiveSchedule);
 
   /** 출근 후 48시간 초과 — 퇴근은 가능, 기록 시각만 보정 */
   const lateCheckOutPastWindow =

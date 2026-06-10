@@ -1,5 +1,6 @@
 import { localMinutesFromDate, parseHHmm } from "@/lib/attendanceRules";
-import { formatInTimeZone } from "date-fns-tz";
+import { calendarDayInTz } from "@/lib/attendancePunchRules";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 /** JS Date.getDay(): 0=일요일 … 6=토요일 */
 export const WEEKDAY_LABELS_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
@@ -109,6 +110,96 @@ function resolveWorkMinutesWindow(
   };
 }
 
+function resolveWorkWindowForWeekday(
+  weekday: number,
+  schedule: CompanyWorkSchedule
+): { startMin: number | null; endMin: number | null; endStr: string; startStr: string } {
+  const byDay = normalizeWorkScheduleByDay(schedule.workScheduleByDay);
+  const dayWindow = byDay[weekday];
+  const startStr = dayWindow?.workStartTime ?? schedule.workStartTime ?? DEFAULT_WORK_START;
+  const endStr = dayWindow?.workEndTime ?? schedule.workEndTime ?? DEFAULT_WORK_END;
+  return {
+    startMin: parseHHmm(startStr),
+    endMin: parseHHmm(endStr),
+    endStr,
+    startStr,
+  };
+}
+
+function nextCalendarDayStr(dayStr: string): string {
+  const d = new Date(`${dayStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * 출근 시각·회사 스케줄 기준 해당 근무의 정규 퇴근 시각(절대 시각).
+ * 야간 근무(end <= start)는 출근일 다음 날 end 시각.
+ */
+export function scheduledShiftEndAt(
+  checkInAt: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule
+): Date | null {
+  const tz = timeZone.trim() || "UTC";
+  const checkInDay = calendarDayInTz(checkInAt, tz);
+  const weekday = localWeekday(checkInAt, tz);
+  const { startMin, endMin, endStr } = resolveWorkWindowForWeekday(weekday, schedule);
+  if (endMin == null) return null;
+
+  const isOvernight = startMin != null && endMin <= startMin;
+  const endDay = isOvernight ? nextCalendarDayStr(checkInDay) : checkInDay;
+
+  try {
+    return fromZonedTime(`${endDay} ${endStr}:00`, tz);
+  } catch {
+    return fromZonedTime(`${endDay} ${endStr}:00`, "UTC");
+  }
+}
+
+/**
+ * 퇴근 판정 — 반드시 직전 출근(CHECK_IN)과 한 세트로 평가.
+ * 정규 퇴근 시각은 출근일 스케줄 기준이며, 익일 새벽 퇴근은 조퇴가 아님.
+ */
+export function evaluateCheckOutWorkFlags(
+  checkOutAt: Date,
+  checkInAt: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule
+): AttendanceWorkFlags {
+  const tz = timeZone.trim() || "UTC";
+  const workDays = parseWorkDays(schedule.workDays);
+  const onWorkDay = isWorkDay(checkInAt, tz, workDays);
+  const isHolidayWork = !onWorkDay;
+
+  let isEarlyLeave = false;
+  let isOvertime = false;
+  let overtimeMinutes = 0;
+
+  if (onWorkDay) {
+    const shiftEnd = scheduledShiftEndAt(checkInAt, tz, schedule);
+    if (shiftEnd) {
+      const outMs = checkOutAt.getTime();
+      const endMs = shiftEnd.getTime();
+      if (outMs < endMs) {
+        isEarlyLeave = true;
+      } else if (outMs > endMs) {
+        isOvertime = true;
+        overtimeMinutes = Math.round((outMs - endMs) / 60_000);
+      }
+    }
+  }
+
+  return {
+    isLate: false,
+    isEarlyLeave,
+    isOvertime,
+    isHolidayWork,
+    lateMinutes: 0,
+    overtimeMinutes,
+  };
+}
+
 export function evaluateAttendanceWorkFlags(
   timestamp: Date,
   timeZone: string,
@@ -144,13 +235,13 @@ export function evaluateAttendanceWorkFlags(
       }
     }
   } else if (onWorkDay && endMin != null) {
+    // CHECK_OUT 단독 평가(레거시 보정용) — 실제 퇴근 기록은 evaluateCheckOutWorkFlags + 출근 시각 사용
     if (isOvernight) {
       if (nowMin < endMin && nowMin < (startMin ?? 0)) isEarlyLeave = true;
       if (nowMin > endMin && nowMin < (startMin ?? 24 * 60)) {
         isOvertime = true;
         overtimeMinutes = nowMin - endMin;
       }
-      if (startMin != null && nowMin > startMin) isEarlyLeave = true;
     } else {
       if (nowMin < endMin) isEarlyLeave = true;
       if (nowMin > endMin) {
@@ -205,14 +296,13 @@ export function overtimeMinutesFor(
 }
 
 /**
- * "지금 퇴근하면 조퇴인가?"를 판정.
- * 회사 근무일이며 회사 타임존 기준 현재시각이 workEndTime 이전일 때만 true.
+ * "지금 퇴근하면 조퇴인가?" — 출근 시각과 한 세트로 판정.
  */
 export function isCheckOutEarly(
-  timestamp: Date,
+  checkOutAt: Date,
+  checkInAt: Date,
   timeZone: string,
   schedule: CompanyWorkSchedule
 ): boolean {
-  const flags = evaluateAttendanceWorkFlags(timestamp, timeZone, "CHECK_OUT", schedule);
-  return flags.isEarlyLeave;
+  return evaluateCheckOutWorkFlags(checkOutAt, checkInAt, timeZone, schedule).isEarlyLeave;
 }

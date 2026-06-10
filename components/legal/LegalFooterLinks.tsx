@@ -36,6 +36,14 @@ export function LegalFooterLinks({ className = "" }: Props) {
           {t("legal.privacy")}
         </Link>
         <FooterDot />
+        <Link href="/cancellation-policy" className={authLink}>
+          {t("legal.cancellationPolicy")}
+        </Link>
+        <FooterDot />
+        <Link href="/refund-policy" className={authLink}>
+          {t("legal.refundPolicy")}
+        </Link>
+        <FooterDot />
         <button
           type="button"
           className={`${authLink} cursor-pointer border-0 bg-transparent p-0`}
