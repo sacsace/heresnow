@@ -588,6 +588,49 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     t,
   ]);
 
+  const memoSection =
+    checkInMode === "normal" ? (
+      <div className="mt-4 border-t border-[var(--separator)] pt-4">
+        <label className={label}>{t("employee.memoOptional")}</label>
+        <textarea
+          className={`${input} mt-1.5`}
+          rows={2}
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder={t("employee.memoPlaceholder")}
+          disabled={busy}
+        />
+      </div>
+    ) : null;
+
+  const locationPreviewSection = (
+    <div className="mt-4 border-t border-[var(--separator)] pt-4">
+      <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">{t("employee.locationMap")}</p>
+      <p className={`mt-0.5 ${hint}`}>{t("employee.locationMapLead")}</p>
+      <button
+        type="button"
+        disabled={busy || mapBusy}
+        onClick={() => void loadMapPreview()}
+        className={`mt-2 ${btnSecondary}`}
+      >
+        {mapBusy ? t("employee.readingLocation") : t("employee.showOnMap")}
+      </button>
+      {previewCoords && (
+        <div className="mt-3">
+          <StaticMap
+            lat={previewCoords.lat}
+            lng={previewCoords.lng}
+            label={t("employee.currentLocation")}
+            noKeyFallback="embed"
+          />
+          <p className="mt-1 break-all text-[0.6875rem] text-[var(--apple-label-tertiary)]">
+            {previewCoords.lat.toFixed(6)}, {previewCoords.lng.toFixed(6)}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className={embedded ? "min-w-0" : "min-w-0 space-y-6 sm:space-y-8"}>
       {!embedded && <AttendanceTrustHero variant="employee" />}
@@ -734,20 +777,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
           </>
         )}
 
-        {readyForPunch && checkInMode === "normal" && (
-          <>
-            <div className="mt-4 border-t border-[var(--separator)] pt-4">
-            <label className={label}>{t("employee.memoOptional")}</label>
-            <textarea
-              className={`${input} mt-1.5`}
-              rows={2}
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              placeholder={t("employee.memoPlaceholder")}
-            />
-            </div>
-          </>
-        )}
+        {showCheckIn && checkInMode === "normal" && memoSection}
 
         {showCheckIn && (
           <div className="mt-4 border-t border-[var(--separator)] pt-4">
@@ -802,31 +832,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
           </div>
         )}
 
-        <div className="mt-4 border-t border-[var(--separator)] pt-4">
-          <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">{t("employee.locationMap")}</p>
-          <p className={`mt-0.5 ${hint}`}>{t("employee.locationMapLead")}</p>
-          <button
-            type="button"
-            disabled={busy || mapBusy}
-            onClick={() => void loadMapPreview()}
-            className={`mt-2 ${btnSecondary}`}
-          >
-            {mapBusy ? t("employee.readingLocation") : t("employee.showOnMap")}
-          </button>
-          {previewCoords && (
-            <div className="mt-3">
-              <StaticMap
-                lat={previewCoords.lat}
-                lng={previewCoords.lng}
-                label={t("employee.currentLocation")}
-                noKeyFallback="embed"
-              />
-              <p className="mt-1 break-all text-[0.6875rem] text-[var(--apple-label-tertiary)]">
-                {previewCoords.lat.toFixed(6)}, {previewCoords.lng.toFixed(6)}
-              </p>
-            </div>
-          )}
-        </div>
+        {showCheckIn && locationPreviewSection}
 
         {canCheckOut && !punchStatusLoading && (
           <div className="mt-6 border-t border-[var(--separator)] pt-5">
@@ -914,6 +920,8 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                 {checkOutSubmitLabel}
               </button>
             )}
+            {memoSection}
+            {locationPreviewSection}
           </div>
         )}
 
