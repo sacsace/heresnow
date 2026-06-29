@@ -32,6 +32,8 @@ export function roleBadge(role: string, lg = false): string {
       return `${b} bg-[var(--apple-green)]/14 text-[var(--apple-green-dark)]`;
     case "EMPLOYEE":
       return `${b} bg-[var(--fill-secondary)] text-[var(--apple-label-secondary)]`;
+    case "DOOR":
+      return `${b} bg-[var(--apple-blue)]/10 text-[var(--apple-blue)]`;
     default:
       return `${b} bg-[var(--fill-secondary)] text-[var(--apple-label-secondary)]`;
   }

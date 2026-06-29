@@ -9,11 +9,16 @@ export const authConfig = {
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   logger: {
     error(error) {
-      const text =
-        error instanceof Error ? `${error.name} ${error.message}` : String(error);
+      const authErr = error as { type?: string; name?: string };
+      const type = authErr.type ?? authErr.name ?? "";
       // Wrong email/password — expected; UI already shows login.errorCredentials.
-      if (text.includes("CredentialsSignin")) {
-        if (process.env.NODE_ENV === "development") return;
+      if (type === "CredentialsSignin" && process.env.NODE_ENV === "development") {
+        return;
+      }
+      // Stale or invalid session cookie (AUTH_SECRET changed, expired token, etc.).
+      // Auth.js clears the cookie; user should sign in again.
+      if (type === "JWTSessionError") {
+        return;
       }
       console.error("[auth]", error);
     },

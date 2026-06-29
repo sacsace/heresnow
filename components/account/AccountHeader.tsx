@@ -16,7 +16,10 @@ function homeFor(role?: string | null): string {
     case "HR_MANAGER":
     case "APPROVER":
       return "/admin";
+    case "DOOR":
+      return "/door";
     case "EMPLOYEE":
+      return "/employee";
     default:
       return "/employee";
   }

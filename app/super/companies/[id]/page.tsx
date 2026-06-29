@@ -55,7 +55,7 @@ type CompanyDetail = {
   _count: { users: number; employees: number; attendanceRecords: number };
 };
 
-const ADD_ROLES = ["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE"] as const;
+const ADD_ROLES = ["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE", "DOOR"] as const;
 
 export default function SuperCompanyUsersPage() {
   const { t } = useI18n();
@@ -125,6 +125,8 @@ export default function SuperCompanyUsersPage() {
         return t("super.roleApprover");
       case "EMPLOYEE":
         return t("super.roleEmployee");
+      case "DOOR":
+        return t("common.roleDoor");
       default:
         return r;
     }

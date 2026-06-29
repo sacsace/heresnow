@@ -11,7 +11,7 @@ import { z } from "zod";
  * 회사 소속 사용자에게 할당 가능한 역할만 허용한다.
  * SUPER_ADMIN 은 companyId 가 null 이어야 하므로 여기선 명시적으로 제외.
  */
-const COMPANY_ROLES = ["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE"] as const;
+const COMPANY_ROLES = ["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE", "DOOR"] as const;
 
 const patchSchema = z
   .object({

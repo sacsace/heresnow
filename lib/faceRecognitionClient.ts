@@ -5,9 +5,22 @@ import {
   prefetchFaceModelAssets,
   withCachedModelFetch,
 } from "@/lib/faceModelCache";
-import { getFaceDeviceProfile } from "@/lib/faceDeviceProfile";
+import { getFaceDeviceProfile, type FaceProfileKind } from "@/lib/faceDeviceProfile";
 
 export type FaceApiModule = typeof import("@vladmandic/face-api");
+
+export type FaceExtractOptions = {
+  profileKind?: FaceProfileKind;
+  /** 감지 confidence 하한 (0~1) */
+  minDetectionScore?: number;
+  /** 얼굴 bbox 면적 / 프레임 면적 하한 */
+  minFaceAreaRatio?: number;
+};
+
+export type FaceDetectionResult = {
+  descriptor: Float32Array;
+  detectionScore: number;
+};
 
 let faceApiMod: FaceApiModule | null = null;
 let modelsReady = false;
@@ -171,32 +184,90 @@ async function warmupFaceInference(faceapi: FaceApiModule): Promise<void> {
     .withFaceDescriptor();
 }
 
-function detectorOptions(faceapi: FaceApiModule) {
-  const profile = getFaceDeviceProfile();
+function detectorOptions(faceapi: FaceApiModule, kind: FaceProfileKind = "default") {
+  const profile = getFaceDeviceProfile(kind);
   return new faceapi.TinyFaceDetectorOptions({
     inputSize: profile.detectorInputSize,
     scoreThreshold: profile.detectorScoreThreshold,
   });
 }
 
-/** 비디오/이미지에서 단일 얼굴 descriptor 추출 */
-export async function extractFaceDescriptor(
+function frameDimensions(
   input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement
-): Promise<Float32Array | null> {
+): { width: number; height: number } {
+  if (input instanceof HTMLVideoElement) {
+    return {
+      width: input.videoWidth || input.clientWidth,
+      height: input.videoHeight || input.clientHeight,
+    };
+  }
+  if (input instanceof HTMLImageElement) {
+    return {
+      width: input.naturalWidth || input.clientWidth,
+      height: input.naturalHeight || input.clientHeight,
+    };
+  }
+  return { width: input.width, height: input.height };
+}
+
+/** 비디오/이미지 프레임에 얼굴이 있는지 가볍게 감지 (descriptor 추출 없음) */
+export async function detectFaceInFrame(
+  input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+  options?: Pick<FaceExtractOptions, "profileKind">
+): Promise<boolean> {
   await loadFaceModels();
   const faceapi = getFaceApi();
+  const kind = options?.profileKind ?? "default";
+  const result = await faceapi.detectSingleFace(input, detectorOptions(faceapi, kind));
+  return !!result;
+}
+
+/** 품질 검사 포함 descriptor 추출 */
+export async function extractFaceDetection(
+  input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+  options?: FaceExtractOptions
+): Promise<FaceDetectionResult | null> {
+  await loadFaceModels();
+  const faceapi = getFaceApi();
+  const kind = options?.profileKind ?? "default";
 
   const result = await faceapi
-    .detectSingleFace(input, detectorOptions(faceapi))
+    .detectSingleFace(input, detectorOptions(faceapi, kind))
     .withFaceLandmarks(true)
     .withFaceDescriptor();
 
   if (!result?.descriptor || result.descriptor.length !== FACE_DESCRIPTOR_LENGTH) {
     return null;
   }
-  return result.descriptor;
+
+  const detectionScore = result.detection.score;
+  const minScore = options?.minDetectionScore ?? 0;
+  if (detectionScore < minScore) return null;
+
+  const minArea = options?.minFaceAreaRatio ?? 0;
+  if (minArea > 0) {
+    const { width, height } = frameDimensions(input);
+    if (width > 0 && height > 0) {
+      const box = result.detection.box;
+      const areaRatio = (box.width * box.height) / (width * height);
+      if (areaRatio < minArea) return null;
+    }
+  }
+
+  return { descriptor: result.descriptor, detectionScore };
+}
+
+/** 비디오/이미지에서 단일 얼굴 descriptor 추출 */
+export async function extractFaceDescriptor(
+  input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+  options?: FaceExtractOptions
+): Promise<Float32Array | null> {
+  const result = await extractFaceDetection(input, options);
+  return result?.descriptor ?? null;
 }
 
 export function descriptorToArray(d: Float32Array): number[] {
   return Array.from(d);
 }
+
+export { getFaceDeviceProfile, type FaceProfileKind };

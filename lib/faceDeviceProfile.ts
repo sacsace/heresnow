@@ -1,5 +1,7 @@
 /** 안면 인식용 기기·브라우저 프로필 (클라이언트 전용) */
 
+export type FaceProfileKind = "default" | "kiosk";
+
 export type FaceDeviceProfile = {
   /** iOS/iPadOS WebKit — WebGL fp16 이슈로 WASM 우선 */
   preferWasmBackend: boolean;
@@ -43,10 +45,20 @@ function isMobileDevice(): boolean {
 }
 
 /** 기기별 감지·백엔드·입력 크기 튜닝 */
-export function getFaceDeviceProfile(): FaceDeviceProfile {
+export function getFaceDeviceProfile(kind: FaceProfileKind = "default"): FaceDeviceProfile {
   const ios = isIosWebKit();
   const mobile = isMobileDevice();
   const android = isAndroid();
+
+  if (kind === "kiosk") {
+    return {
+      preferWasmBackend: ios,
+      detectorInputSize: ios ? 416 : 512,
+      detectorScoreThreshold: 0.4,
+      likelyInAppBrowser: isLikelyInAppBrowser(),
+      isMobile: mobile,
+    };
+  }
 
   let detectorInputSize = 416;
   if (ios || (mobile && !android)) {
@@ -65,7 +77,34 @@ export function getFaceDeviceProfile(): FaceDeviceProfile {
 }
 
 /** getUserMedia 제약 — 실패 시 더 느슨한 옵션으로 재시도 */
-export function buildCameraConstraintAttempts(profile: FaceDeviceProfile): MediaStreamConstraints[] {
+export function buildCameraConstraintAttempts(
+  profile: FaceDeviceProfile,
+  kind: FaceProfileKind = "default"
+): MediaStreamConstraints[] {
+  if (kind === "kiosk") {
+    return [
+      {
+        video: {
+          facingMode: { ideal: "user" },
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+        },
+        audio: false,
+      },
+      {
+        video: {
+          facingMode: { ideal: "user" },
+          width: { ideal: 960 },
+          height: { ideal: 540 },
+        },
+        audio: false,
+      },
+      { video: { facingMode: { ideal: "user" } }, audio: false },
+      { video: { facingMode: "user" }, audio: false },
+      { video: true, audio: false },
+    ];
+  }
+
   const small = profile.isMobile;
   return [
     {

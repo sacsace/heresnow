@@ -1,17 +1,18 @@
 import type { Role } from "@prisma/client";
 
 /**
- * 역할 서열(높을수록 강한 권한). 같은 단계는 동권으로 본다.
+ * 역할 서열(높을수록 강한 권한). DOOR 는 EMPLOYEE 와 동급(0).
  *
- * SUPER_ADMIN(4) > COMPANY_ADMIN(3) > HR_MANAGER(2) > APPROVER(1) > EMPLOYEE(0)
- *
- * 본 모듈은 회사 컨텍스트의 역할 변경 권한 검사를 일원화하기 위한 표준이다.
- * 같은 회사 내에서, 호출자(caller)는 본인보다 *엄격히 낮은* 등급의 사용자를
- * 본인보다 *엄격히 낮은* 등급으로만 변경할 수 있다.
- * (예: HR_MANAGER 가 다른 HR_MANAGER 의 역할을 바꿀 수 없으며,
- *      COMPANY_ADMIN 등급으로 승격 시킬 수도 없다.)
+ * SUPER_ADMIN(5) > COMPANY_ADMIN(4) > HR_MANAGER(3) > APPROVER(2) > EMPLOYEE/DOOR(0)
  */
-const ORDER: Role[] = ["EMPLOYEE", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN", "SUPER_ADMIN"];
+const ORDER: Role[] = [
+  "EMPLOYEE",
+  "DOOR",
+  "APPROVER",
+  "HR_MANAGER",
+  "COMPANY_ADMIN",
+  "SUPER_ADMIN",
+];
 
 export function roleRank(role: Role | string | null | undefined): number {
   if (!role) return -1;
@@ -68,7 +69,7 @@ export function canDeleteEmployee(
 /** 회사 컨텍스트에서 호출자가 새 사용자에게 부여할 수 있는 역할 목록 */
 export function assignableRolesForCaller(callerRole: Role | string | null | undefined): Role[] {
   if (callerRole === "SUPER_ADMIN") {
-    return ["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE"];
+    return ["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE", "DOOR"];
   }
   if (!canEditCompanyRoles(callerRole)) return [];
   const callerIdx = roleRank(callerRole);

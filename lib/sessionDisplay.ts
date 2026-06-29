@@ -16,6 +16,7 @@ export function sessionRoleLabel(
       HR_MANAGER: "common.roleHrManager",
       APPROVER: "common.roleApprover",
       EMPLOYEE: "common.roleEmployee",
+      DOOR: "common.roleDoor",
     }[role] ?? null;
   return key ? t(key) : role;
 }

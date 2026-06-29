@@ -31,7 +31,7 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (!loggedIn && (pathname.startsWith("/employee") || pathname.startsWith("/admin") || pathname.startsWith("/super"))) {
+  if (!loggedIn && (pathname.startsWith("/employee") || pathname.startsWith("/admin") || pathname.startsWith("/super") || pathname.startsWith("/door"))) {
     const url = new URL("/login", req.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
@@ -60,7 +60,16 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/super", req.url));
   }
 
+  if (loggedIn && pathname.startsWith("/door")) {
+    if (role !== "DOOR") {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+  }
+
   if (loggedIn && pathname.startsWith("/employee")) {
+    if (role === "DOOR") {
+      return NextResponse.redirect(new URL("/door", req.url));
+    }
     if (role === "SUPER_ADMIN") {
       return NextResponse.redirect(new URL("/super", req.url));
     }

@@ -211,6 +211,8 @@ export default function AdminEmployeesPage() {
         return t("common.roleApprover");
       case "EMPLOYEE":
         return t("common.roleEmployee");
+      case "DOOR":
+        return t("common.roleDoor");
       default:
         return r;
     }

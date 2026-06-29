@@ -12,7 +12,7 @@ const postSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase().trim()),
   name: z.string().min(1).max(120),
   password: z.string().min(MIN_PASSWORD_LENGTH).max(200),
-  role: z.enum(["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE"]),
+  role: z.enum(["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE", "DOOR"]),
 });
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {

@@ -68,7 +68,7 @@ const LOGIN_COL_WIDTH = 120;
 const SCHEDULE_COL_WIDTH = 148;
 const SELECT_COL_WIDTH = 56;
 
-const ROLE_ORDER: Role[] = ["EMPLOYEE", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN"];
+const ROLE_ORDER: Role[] = ["EMPLOYEE", "DOOR", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN"];
 
 function loadStoredWidths(): ColWidths {
   if (typeof window === "undefined") return DEFAULT_WIDTHS;
@@ -539,14 +539,18 @@ export function EmployeeListTable({
                         className="inline-flex whitespace-nowrap rounded-md bg-[var(--apple-green)]/12 px-2 py-0.5 text-[0.75rem] font-medium leading-none text-[var(--apple-green-dark)]"
                         title={
                           e.loginEligibleByAdmin
-                            ? t("admin.employeesLoginEligibleAdmin")
+                            ? e.user.role === "DOOR"
+                              ? t("admin.employeesLoginEligibleDoor")
+                              : t("admin.employeesLoginEligibleAdmin")
                             : e.seatRank != null
                               ? `#${e.seatRank}`
                               : undefined
                         }
                       >
                         {e.loginEligibleByAdmin
-                          ? t("admin.employeesLoginEligibleAdmin")
+                          ? e.user.role === "DOOR"
+                            ? t("admin.employeesLoginEligibleDoor")
+                            : t("admin.employeesLoginEligibleAdmin")
                           : t("admin.employeesLoginEligible")}
                       </span>
                     ) : (

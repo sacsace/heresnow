@@ -5,7 +5,8 @@ export function bypassesSubscriptionGate(role: Role | string | null | undefined)
   return (
     role === "SUPER_ADMIN" ||
     role === "COMPANY_ADMIN" ||
-    role === "HR_MANAGER"
+    role === "HR_MANAGER" ||
+    role === "DOOR"
   );
 }
 

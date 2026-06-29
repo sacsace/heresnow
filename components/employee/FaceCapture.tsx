@@ -8,11 +8,16 @@ import {
   isSecureForCamera,
   probeVideoInputDevice,
   type CameraAccessFailureKind,
+  type FaceProfileKind,
 } from "@/lib/faceDeviceProfile";
+import { averageFaceDescriptors } from "@/lib/faceMatch";
 import {
   descriptorToArray,
+  detectFaceInFrame,
   extractFaceDescriptor,
+  extractFaceDetection,
   loadFaceModels,
+  type FaceExtractOptions,
 } from "@/lib/faceRecognitionClient";
 import { useI18n } from "@/components/LanguageProvider";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -28,9 +33,23 @@ type Props = {
   verifyOnClientOnly?: boolean;
   /** 로그인 등 — 더 자주·빠르게 스캔 */
   fastScan?: boolean;
+  /** true: 얼굴이 프레임에 보일 때만 descriptor 추출·자동 인증 (출입문 단말) */
+  scanWhenFaceVisible?: boolean;
+  /** scanWhenFaceVisible — 얼굴이 없을 때 표시 문구 */
+  scanIdleLabel?: string;
+  /** scanWhenFaceVisible — 얼굴이 프레임에서 사라졌을 때 */
+  onFaceAbsent?: () => void;
   verifyTitle?: string;
   verifyLead?: string;
   verifyButton?: string;
+  /** 카메라 영역 추가 클래스 (출입문 단말 등) */
+  videoClassName?: string;
+  /** 루트 카드 추가 클래스 */
+  rootClassName?: string;
+  /** kiosk: 출입문 단말 — 고해상도 카메라·정밀 감지 */
+  profileKind?: FaceProfileKind;
+  /** 연속 프레임 평균으로 인식 안정화 (출입문 단말) */
+  highAccuracyScan?: boolean;
   onEnrolled?: () => void;
   onVerified?: (descriptor: number[]) => boolean | void | Promise<boolean | void>;
   onError?: (message: string) => void;
@@ -43,10 +62,19 @@ const SCAN_EVERY_N_FRAMES = 2;
 const SCAN_EVERY_N_FRAMES_FAST = 1;
 const AUTO_SCAN_INTERVAL_MS = 650;
 const AUTO_SCAN_INTERVAL_MS_FAST = 420;
+const AUTO_SCAN_INTERVAL_MS_IDLE = 1200;
 const AUTO_SCAN_INITIAL_DELAY_MS = 280;
+const HIGH_ACCURACY_FRAME_COUNT = 3;
 
-async function openCamera(): Promise<MediaStream> {
-  const attempts = buildCameraConstraintAttempts(getFaceDeviceProfile());
+const KIOSK_EXTRACT_OPTIONS: FaceExtractOptions = {
+  profileKind: "kiosk",
+  minDetectionScore: 0.5,
+  minFaceAreaRatio: 0.06,
+};
+
+async function openCamera(profileKind: FaceProfileKind = "default"): Promise<MediaStream> {
+  const profile = getFaceDeviceProfile(profileKind);
+  const attempts = buildCameraConstraintAttempts(profile, profileKind);
   let lastErr: unknown;
   for (const constraints of attempts) {
     try {
@@ -64,9 +92,16 @@ export function FaceCapture({
   autoVerify = false,
   verifyOnClientOnly = false,
   fastScan = false,
+  scanWhenFaceVisible = false,
+  scanIdleLabel,
+  onFaceAbsent,
   verifyTitle,
   verifyLead,
   verifyButton,
+  videoClassName,
+  rootClassName,
+  profileKind = "default",
+  highAccuracyScan = false,
   onEnrolled,
   onVerified,
   onError,
@@ -79,6 +114,15 @@ export function FaceCapture({
   const streamRef = useRef<MediaStream | null>(null);
   const scanStoppedRef = useRef(false);
   const busyRef = useRef(false);
+  const verifyBlockedUntilNoFaceRef = useRef(false);
+  const faceInFrameRef = useRef(false);
+  const qualityBufferRef = useRef<number[][]>([]);
+  const profileKindRef = useRef(profileKind);
+  profileKindRef.current = profileKind;
+  const highAccuracyScanRef = useRef(highAccuracyScan);
+  highAccuracyScanRef.current = highAccuracyScan;
+  const onFaceAbsentRef = useRef(onFaceAbsent);
+  onFaceAbsentRef.current = onFaceAbsent;
   const onVerifiedRef = useRef(onVerified);
   const onEnrolledRef = useRef(onEnrolled);
   const onErrorRef = useRef(onError);
@@ -97,6 +141,7 @@ export function FaceCapture({
   const [needsTap, setNeedsTap] = useState(false);
   const [autoScanDone, setAutoScanDone] = useState(false);
   const [previewReady, setPreviewReady] = useState(false);
+  const [faceInFrame, setFaceInFrame] = useState(false);
 
   const autoVerifyActive = mode === "verify" && autoVerify;
 
@@ -109,7 +154,8 @@ export function FaceCapture({
   useEffect(() => {
     let cancelled = false;
     const tx = tRef.current;
-    const profile = getFaceDeviceProfile();
+    const kind = profileKindRef.current;
+    const profile = getFaceDeviceProfile(kind);
 
     function failCamera(kind: CameraAccessFailureKind, message: string) {
       if (cancelled) return;
@@ -139,7 +185,7 @@ export function FaceCapture({
       const modelsPromise = loadFaceModels();
 
       try {
-        const stream = await openCamera();
+        const stream = await openCamera(kind);
         if (cancelled) {
           stream.getTracks().forEach((tr) => tr.stop());
           return;
@@ -190,7 +236,7 @@ export function FaceCapture({
       cancelled = true;
       stopCamera();
     };
-  }, [stopCamera]);
+  }, [stopCamera, profileKind]);
 
   useEffect(() => {
     if (previewReady || cameraError) return;
@@ -220,6 +266,24 @@ export function FaceCapture({
     setStatus(null);
   }, [autoVerifyActive, disabled]);
 
+  const finishClientVerify = useCallback(
+    async (arr: number[]): Promise<boolean> => {
+      const verified = await onVerifiedRef.current?.(arr);
+      if (verified === false) {
+        setStatus(tRef.current("employee.faceVerifyRetry"));
+        if (scanWhenFaceVisible) {
+          verifyBlockedUntilNoFaceRef.current = true;
+        }
+        return false;
+      }
+      setStatus(tRef.current("employee.faceVerifyOk"));
+      scanStoppedRef.current = true;
+      setAutoScanDone(true);
+      return true;
+    },
+    [scanWhenFaceVisible]
+  );
+
   const runCapture = useCallback(
     async (opts?: { silentNoFace?: boolean }) => {
       if (!videoRef.current || !ready || busyRef.current || disabled) return false;
@@ -237,7 +301,9 @@ export function FaceCapture({
             /* user gesture may be required */
           }
         }
-        const desc = await extractFaceDescriptor(v);
+        const extractOpts =
+          profileKindRef.current === "kiosk" ? KIOSK_EXTRACT_OPTIONS : undefined;
+        const desc = await extractFaceDescriptor(v, extractOpts);
         if (!desc) {
           if (!opts?.silentNoFace) {
             const msg = tRef.current("employee.faceNotDetected");
@@ -271,15 +337,7 @@ export function FaceCapture({
         }
 
         if (verifyOnClientOnly) {
-          const verified = await onVerifiedRef.current?.(arr);
-          if (verified === false) {
-            setStatus(tRef.current("employee.faceVerifyRetry"));
-            return false;
-          }
-          setStatus(tRef.current("employee.faceVerifyOk"));
-          scanStoppedRef.current = true;
-          setAutoScanDone(true);
-          return true;
+          return finishClientVerify(arr);
         }
 
         const r = await fetch("/api/employee/face", {
@@ -314,7 +372,7 @@ export function FaceCapture({
         setBusy(false);
       }
     },
-    [disabled, mode, ready, verifyOnClientOnly, fastScan]
+    [disabled, mode, ready, verifyOnClientOnly, scanWhenFaceVisible, finishClientVerify]
   );
 
   useEffect(() => {
@@ -330,15 +388,89 @@ export function FaceCapture({
       requestVideoFrameCallback?: (cb: () => void) => number;
     };
 
-    const scheduleInterval = () => {
-      timer = setTimeout(() => void tick(), scanInterval);
+    const scheduleInterval = (ms: number) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void tick(), ms);
     };
+
+    async function tryAutoScan() {
+      if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError || busyRef.current) {
+        return;
+      }
+
+      const v = videoRef.current;
+      if (!v) return;
+
+      if (scanWhenFaceVisible) {
+        const kind = profileKindRef.current;
+        const hasFace = await detectFaceInFrame(v, { profileKind: kind });
+        if (cancelled || scanStoppedRef.current) return;
+
+        const wasInFrame = faceInFrameRef.current;
+        faceInFrameRef.current = hasFace;
+        setFaceInFrame(hasFace);
+
+        if (!hasFace) {
+          if (wasInFrame) {
+            onFaceAbsentRef.current?.();
+          }
+          qualityBufferRef.current = [];
+          verifyBlockedUntilNoFaceRef.current = false;
+          setStatus(scanIdleLabel ?? tRef.current("employee.faceScanIdle"));
+          return;
+        }
+
+        if (verifyBlockedUntilNoFaceRef.current) {
+          return;
+        }
+
+        if (highAccuracyScanRef.current && verifyOnClientOnly) {
+          const extracted = await extractFaceDetection(
+            v,
+            kind === "kiosk" ? KIOSK_EXTRACT_OPTIONS : undefined
+          );
+          if (cancelled || scanStoppedRef.current) return;
+
+          if (!extracted) {
+            qualityBufferRef.current = [];
+            setStatus(tRef.current("employee.faceScanning"));
+            return;
+          }
+
+          qualityBufferRef.current.push(descriptorToArray(extracted.descriptor));
+          if (qualityBufferRef.current.length < HIGH_ACCURACY_FRAME_COUNT) {
+            setStatus(tRef.current("employee.faceStabilizing"));
+            return;
+          }
+
+          const averaged = averageFaceDescriptors(qualityBufferRef.current);
+          qualityBufferRef.current = [];
+          if (!averaged) return;
+
+          busyRef.current = true;
+          setBusy(true);
+          try {
+            await finishClientVerify(averaged);
+          } finally {
+            busyRef.current = false;
+            setBusy(false);
+          }
+          return;
+        }
+      }
+
+      await runCapture({ silentNoFace: true });
+    }
 
     async function tick() {
       if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError) return;
-      await runCapture({ silentNoFace: true });
+      await tryAutoScan();
       if (!cancelled && !scanStoppedRef.current) {
-        scheduleInterval();
+        const nextMs =
+          scanWhenFaceVisible && !faceInFrameRef.current
+            ? AUTO_SCAN_INTERVAL_MS_IDLE
+            : scanInterval;
+        scheduleInterval(nextMs);
       }
     }
 
@@ -346,7 +478,7 @@ export function FaceCapture({
       if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError) return;
       frameCounter += 1;
       if (frameCounter % scanEvery === 0 && !busyRef.current) {
-        void runCapture({ silentNoFace: true });
+        void tryAutoScan();
       }
       const v = videoRef.current as VideoWithRvf | null;
       if (v?.requestVideoFrameCallback && !cancelled && !scanStoppedRef.current) {
@@ -357,7 +489,7 @@ export function FaceCapture({
     const initial = setTimeout(() => {
       if (cancelled) return;
       const v = videoRef.current as VideoWithRvf | null;
-      if (v?.requestVideoFrameCallback) {
+      if (v?.requestVideoFrameCallback && !scanWhenFaceVisible) {
         v.requestVideoFrameCallback(onFrame);
       } else {
         void tick();
@@ -369,7 +501,18 @@ export function FaceCapture({
       clearTimeout(initial);
       if (timer) clearTimeout(timer);
     };
-  }, [autoVerifyActive, ready, disabled, cameraError, runCapture, fastScan]);
+  }, [
+    autoVerifyActive,
+    ready,
+    disabled,
+    cameraError,
+    runCapture,
+    fastScan,
+    scanWhenFaceVisible,
+    scanIdleLabel,
+    verifyOnClientOnly,
+    finishClientVerify,
+  ]);
 
   const title =
     mode === "enroll"
@@ -392,9 +535,11 @@ export function FaceCapture({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl bg-[var(--grouped-bg)] p-3 shadow-sm ring-1 ring-black/[0.04] sm:p-4">
-      <p className="text-sm font-semibold text-[var(--foreground)]">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-[var(--apple-label-secondary)]">{lead}</p>
+    <div
+      className={`overflow-hidden rounded-xl bg-[var(--grouped-bg)] p-3 shadow-sm ring-1 ring-black/[0.04] sm:p-4 ${rootClassName ?? ""}`.trim()}
+    >
+      <p className="text-sm font-semibold text-[var(--foreground)] sm:text-base">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--apple-label-secondary)] sm:text-sm">{lead}</p>
 
       {cameraError ? (
         <p className="mt-3 text-sm text-[var(--apple-red)]">{cameraError}</p>
@@ -402,7 +547,7 @@ export function FaceCapture({
         <div className="relative mt-3 overflow-hidden rounded-xl bg-black">
           <video
             ref={videoRef}
-            className="aspect-[4/3] w-full -scale-x-100 cursor-pointer object-cover"
+            className={`aspect-[4/3] w-full -scale-x-100 cursor-pointer object-cover ${videoClassName ?? ""}`.trim()}
             playsInline
             muted
             autoPlay
@@ -440,7 +585,11 @@ export function FaceCapture({
           )}
           {autoVerifyActive && ready && !cameraError && !autoScanDone && (
             <div className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit max-w-[90%] rounded-full bg-black/55 px-3 py-1 text-center text-[0.6875rem] font-medium text-white">
-              {busy ? t("employee.faceProcessing") : t("employee.faceScanning")}
+              {busy
+                ? t("employee.faceProcessing")
+                : scanWhenFaceVisible && !faceInFrame
+                  ? (scanIdleLabel ?? t("employee.faceScanIdle"))
+                  : t("employee.faceScanning")}
             </div>
           )}
           {needsTap && phase !== "loading" && (
