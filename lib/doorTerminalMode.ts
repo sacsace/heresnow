@@ -30,7 +30,9 @@ function nextCalendarDayStr(dayStr: string): string {
 function resolveWorkEndStrForWeekday(weekday: number, schedule: CompanyWorkSchedule): string {
   const byDay = normalizeWorkScheduleByDay(schedule.workScheduleByDay);
   const dayWindow = byDay[weekday];
-  return dayWindow?.workEndTime ?? schedule.workEndTime ?? DEFAULT_WORK_END;
+  // 출입문 단말은 회사 기본 퇴근시간을 우선 사용한다.
+  // (요일별 값은 기본값이 비어 있을 때만 폴백)
+  return schedule.workEndTime ?? dayWindow?.workEndTime ?? DEFAULT_WORK_END;
 }
 
 /** 회사 타임존·오늘 요일 기준 정규 퇴근 시각 */

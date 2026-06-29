@@ -29,6 +29,7 @@ import {
   card,
   cardBody,
   errorText,
+  successText,
   emptyStateCompact,
   hint,
   input,
@@ -88,6 +89,7 @@ export default function AdminEmployeesPage() {
   const [departmentId, setDepartmentId] = useState<string>("");
   const [newRole, setNewRole] = useState<Role>("EMPLOYEE");
   const [error, setError] = useState<string | null>(null);
+  const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [deptModalOpen, setDeptModalOpen] = useState(false);
   const [rowBusyId, setRowBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
@@ -104,6 +106,7 @@ export default function AdminEmployeesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilterId, setDepartmentFilterId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Emp | null>(null);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<string[] | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   const assignableRoles = useMemo(
@@ -114,8 +117,8 @@ export default function AdminEmployeesPage() {
   const loadEmployees = useCallback(async () => {
     try {
       const [er, br] = await Promise.all([
-        fetch("/api/admin/employees"),
-        fetch("/api/admin/billing"),
+        fetch("/api/admin/employees", { cache: "no-store" }),
+        fetch("/api/admin/billing", { cache: "no-store" }),
       ]);
       const ej = await er.json().catch(() => ({}));
       const bj = await br.json().catch(() => ({}));
@@ -184,7 +187,7 @@ export default function AdminEmployeesPage() {
 
   const loadDepartments = useCallback(async () => {
     try {
-      const r = await fetch("/api/admin/departments");
+      const r = await fetch("/api/admin/departments", { cache: "no-store" });
       if (!r.ok) return;
       const j = await r.json().catch(() => ({}));
       setDepartments(Array.isArray(j.departments) ? j.departments : []);
@@ -221,6 +224,7 @@ export default function AdminEmployeesPage() {
   async function addEmployee(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setAddSuccess(null);
     if (!departmentId) {
       setError(t("admin.employeesDepartmentRequired"));
       return;
@@ -247,6 +251,7 @@ export default function AdminEmployeesPage() {
     setDepartmentId("");
     setNewRole("EMPLOYEE");
     await loadAll();
+    setAddSuccess(t("admin.employeesAddSuccess"));
   }
 
   const canEditProfile = callerRole != null && profileEditRoles.has(callerRole);
@@ -454,6 +459,11 @@ export default function AdminEmployeesPage() {
     setDeleteTarget(emp);
   }
 
+  function openBulkDeleteConfirm() {
+    if (selectedIds.size === 0) return;
+    setBulkDeleteIds([...selectedIds]);
+  }
+
   async function confirmDeleteEmployee() {
     const emp = deleteTarget;
     if (!emp) return;
@@ -492,6 +502,43 @@ export default function AdminEmployeesPage() {
       setRowBusyId(null);
       setDeleteBusy(false);
       setDeleteTarget(null);
+    }
+  }
+
+  async function confirmBulkDeleteEmployees() {
+    const ids = bulkDeleteIds;
+    if (!ids || ids.length === 0) return;
+    setDeleteBusy(true);
+    setRowError(null);
+    try {
+      const r = await fetch("/api/admin/employees/bulk-delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeIds: ids }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg =
+          j.error === "CANNOT_DELETE_SELF"
+            ? t("admin.employeesCannotDeleteSelf")
+            : j.error === "LAST_ADMIN"
+              ? t("admin.employeesLastAdmin")
+              : j.error === "ROLE_NOT_ALLOWED"
+                ? t("admin.employeesDeleteNotAllowed")
+                : typeof j.message === "string"
+                  ? j.message
+                  : t("admin.empScheduleBulkDeleteFail");
+        setRowError(msg);
+        return;
+      }
+      setSelectedIds(new Set());
+      await loadEmployees();
+    } catch (err) {
+      console.error("[employees bulk delete]", err);
+      setRowError(t("admin.empScheduleBulkDeleteFail"));
+    } finally {
+      setDeleteBusy(false);
+      setBulkDeleteIds(null);
     }
   }
 
@@ -713,6 +760,7 @@ export default function AdminEmployeesPage() {
                 </button>
               </div>
               {error && <p className={`${errorText} sm:col-span-3`}>{error}</p>}
+              {addSuccess && <p className={`${successText} sm:col-span-3`}>{addSuccess}</p>}
             </form>
           </div>
         </div>
@@ -730,6 +778,8 @@ export default function AdminEmployeesPage() {
             companyDefault={companyDefault}
             onApply={bulkApplySchedule}
             onClearSelection={() => setSelectedIds(new Set())}
+            onDeleteSelected={openBulkDeleteConfirm}
+            deleteBusy={deleteBusy}
           />
         )}
         {rowError && <p className={`mb-3 ${errorText}`}>{rowError}</p>}
@@ -866,20 +916,28 @@ export default function AdminEmployeesPage() {
       />
 
       <AppleConfirmDialog
-        open={deleteTarget != null}
+        open={deleteTarget != null || (bulkDeleteIds?.length ?? 0) > 0}
         title={t("admin.employeesDeleteConfirmTitle")}
         message={
           deleteTarget
             ? t("admin.employeesDeleteConfirmMessage").replace("{name}", deleteTarget.name)
-            : ""
+            : t("admin.empScheduleBulkDeleteConfirm").replace(
+                "{count}",
+                String(bulkDeleteIds?.length ?? 0)
+              )
         }
         confirmLabel={t("admin.employeesDeleteConfirmAction")}
         cancelLabel={t("common.cancel")}
         destructive
         loading={deleteBusy}
-        onConfirm={() => void confirmDeleteEmployee()}
+        onConfirm={() =>
+          void (deleteTarget ? confirmDeleteEmployee() : confirmBulkDeleteEmployees())
+        }
         onCancel={() => {
-          if (!deleteBusy) setDeleteTarget(null);
+          if (!deleteBusy) {
+            setDeleteTarget(null);
+            setBulkDeleteIds(null);
+          }
         }}
       />
     </div>

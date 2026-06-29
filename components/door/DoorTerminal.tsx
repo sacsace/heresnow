@@ -238,7 +238,6 @@ export function DoorTerminal() {
                   scanWhenFaceVisible
                   scanIdleLabel={t("door.faceAwait")}
                   profileKind="kiosk"
-                  highAccuracyScan
                   fastScan
                   disabled={busy}
                   rootClassName="flex min-h-0 flex-1 flex-col"

@@ -61,15 +61,15 @@ type InitPhase = "idle" | "loading" | "warming" | "ready" | "error";
 const SCAN_EVERY_N_FRAMES = 2;
 const SCAN_EVERY_N_FRAMES_FAST = 1;
 const AUTO_SCAN_INTERVAL_MS = 650;
-const AUTO_SCAN_INTERVAL_MS_FAST = 420;
-const AUTO_SCAN_INTERVAL_MS_IDLE = 1200;
-const AUTO_SCAN_INITIAL_DELAY_MS = 280;
-const HIGH_ACCURACY_FRAME_COUNT = 3;
+const AUTO_SCAN_INTERVAL_MS_FAST = 180;
+const AUTO_SCAN_INTERVAL_MS_IDLE = 500;
+const AUTO_SCAN_INITIAL_DELAY_MS = 120;
+const HIGH_ACCURACY_FRAME_COUNT = 2;
 
 const KIOSK_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "kiosk",
-  minDetectionScore: 0.5,
-  minFaceAreaRatio: 0.06,
+  minDetectionScore: 0.35,
+  minFaceAreaRatio: 0.03,
 };
 
 async function openCamera(profileKind: FaceProfileKind = "default"): Promise<MediaStream> {
@@ -402,15 +402,27 @@ export function FaceCapture({
       if (!v) return;
 
       if (scanWhenFaceVisible) {
+        let highAccuracyExtracted: Awaited<ReturnType<typeof extractFaceDetection>> | null = null;
         const kind = profileKindRef.current;
-        const hasFace = await detectFaceInFrame(v, { profileKind: kind });
+        const useHighAccuracy = highAccuracyScanRef.current && verifyOnClientOnly;
+        let faceVisible = false;
+        if (useHighAccuracy) {
+          // 고정 단말은 품질 검사+descriptor 추출 1회로 얼굴 존재 판단까지 함께 처리
+          highAccuracyExtracted = await extractFaceDetection(
+            v,
+            kind === "kiosk" ? KIOSK_EXTRACT_OPTIONS : undefined
+          );
+          faceVisible = !!highAccuracyExtracted;
+        } else {
+          faceVisible = await detectFaceInFrame(v, { profileKind: kind });
+        }
         if (cancelled || scanStoppedRef.current) return;
 
         const wasInFrame = faceInFrameRef.current;
-        faceInFrameRef.current = hasFace;
-        setFaceInFrame(hasFace);
+        faceInFrameRef.current = faceVisible;
+        setFaceInFrame(faceVisible);
 
-        if (!hasFace) {
+        if (!faceVisible) {
           if (wasInFrame) {
             onFaceAbsentRef.current?.();
           }
@@ -424,20 +436,8 @@ export function FaceCapture({
           return;
         }
 
-        if (highAccuracyScanRef.current && verifyOnClientOnly) {
-          const extracted = await extractFaceDetection(
-            v,
-            kind === "kiosk" ? KIOSK_EXTRACT_OPTIONS : undefined
-          );
-          if (cancelled || scanStoppedRef.current) return;
-
-          if (!extracted) {
-            qualityBufferRef.current = [];
-            setStatus(tRef.current("employee.faceScanning"));
-            return;
-          }
-
-          qualityBufferRef.current.push(descriptorToArray(extracted.descriptor));
+        if (useHighAccuracy && highAccuracyExtracted) {
+          qualityBufferRef.current.push(descriptorToArray(highAccuracyExtracted.descriptor));
           if (qualityBufferRef.current.length < HIGH_ACCURACY_FRAME_COUNT) {
             setStatus(tRef.current("employee.faceStabilizing"));
             return;
@@ -489,7 +489,7 @@ export function FaceCapture({
     const initial = setTimeout(() => {
       if (cancelled) return;
       const v = videoRef.current as VideoWithRvf | null;
-      if (v?.requestVideoFrameCallback && !scanWhenFaceVisible) {
+      if (v?.requestVideoFrameCallback) {
         v.requestVideoFrameCallback(onFrame);
       } else {
         void tick();

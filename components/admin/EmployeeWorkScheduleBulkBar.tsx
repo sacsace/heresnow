@@ -25,6 +25,8 @@ type Props = {
     workEndTime?: string;
   }) => Promise<boolean>;
   onClearSelection: () => void;
+  onDeleteSelected: () => void;
+  deleteBusy?: boolean;
 };
 
 export function EmployeeWorkScheduleBulkBar({
@@ -33,6 +35,8 @@ export function EmployeeWorkScheduleBulkBar({
   companyDefault,
   onApply,
   onClearSelection,
+  onDeleteSelected,
+  deleteBusy = false,
 }: Props) {
   const { t, locale } = useI18n();
   const loc: ShiftLocale = locale === "en" ? "en" : "ko";
@@ -125,11 +129,29 @@ export function EmployeeWorkScheduleBulkBar({
               </div>
             </>
           )}
-          <button type="button" className={btnPrimary} disabled={busy} onClick={() => void apply()}>
+          <button
+            type="button"
+            className={btnPrimary}
+            disabled={busy || deleteBusy}
+            onClick={() => void apply()}
+          >
             {busy ? t("common.processing") : t("admin.empScheduleBulkApply")}
           </button>
-          <button type="button" className={btnSecondary} disabled={busy} onClick={onClearSelection}>
+          <button
+            type="button"
+            className={btnSecondary}
+            disabled={busy || deleteBusy}
+            onClick={onClearSelection}
+          >
             {t("admin.empScheduleBulkClear")}
+          </button>
+          <button
+            type="button"
+            className={btnSecondary}
+            disabled={busy || deleteBusy}
+            onClick={onDeleteSelected}
+          >
+            {deleteBusy ? t("common.processing") : t("admin.empScheduleBulkDelete")}
           </button>
         </div>
         {error && <p className={`mt-2 text-[0.875rem] ${errorText}`}>{error}</p>}
