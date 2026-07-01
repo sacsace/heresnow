@@ -6,6 +6,7 @@ import { btnPrimary, groupedCard, hint, sectionLabel } from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
 
 type MvsStatus = {
+  companyId: string;
   enabled: boolean;
   externalCompanyId: string | null;
   pendingOutboxCount: number;
@@ -104,6 +105,9 @@ export function AdminMvsIntegrationHint() {
                     .replace("{failed}", String(status.failedOutboxCount))}
                 </p>
               )}
+              <p className={`text-[0.8125rem] ${hint}`}>
+                {t("admin.mvsCompanyId")}: {status.companyId}
+              </p>
               <p className={`text-[0.8125rem] ${hint}`}>
                 {status.hasApiKey
                   ? t("admin.mvsApiKeySet").replace("{last4}", status.apiKeyLast4 ?? "----")

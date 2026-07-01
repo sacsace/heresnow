@@ -42,6 +42,7 @@ export async function GET() {
   ]);
 
   return NextResponse.json({
+    companyId,
     enabled: integration?.enabled ?? false,
     externalCompanyId: integration?.externalCompanyId ?? null,
     pendingOutboxCount: pending,
