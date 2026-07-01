@@ -2,7 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import { statusBadge } from "@/lib/statusBadge";
-import { groupedCard, hint, sectionLabel } from "@/lib/uiStyles";
+import { btnPrimary, groupedCard, hint, sectionLabel } from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
 
 type MvsStatus = {
@@ -11,16 +11,22 @@ type MvsStatus = {
   pendingOutboxCount: number;
   failedOutboxCount: number;
   configured: boolean;
+  hasApiKey: boolean;
+  apiKeyLast4: string | null;
+  apiKeyUpdatedAt: string | null;
 };
 
 export function AdminMvsIntegrationHint() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [status, setStatus] = useState<MvsStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [newApiKey, setNewApiKey] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await fetch("/api/admin/integrations/mvs");
+    const r = await fetch("/api/admin/integrations/mvs", { cache: "no-store" });
     const j = await r.json().catch(() => ({}));
     setLoading(false);
     if (r.ok) setStatus(j as MvsStatus);
@@ -36,6 +42,37 @@ export function AdminMvsIntegrationHint() {
     : status?.configured
       ? statusBadge("PENDING")
       : statusBadge("MIXED");
+
+  async function generateApiKey() {
+    setGenerating(true);
+    setActionError(null);
+    setNewApiKey(null);
+    try {
+      const r = await fetch("/api/admin/integrations/mvs/key", {
+        method: "POST",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || typeof j.apiKey !== "string") {
+        setActionError(t("admin.mvsApiKeyGenerateFail"));
+        return;
+      }
+      setNewApiKey(j.apiKey);
+      await load();
+    } catch {
+      setActionError(t("admin.mvsApiKeyGenerateFail"));
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function copyApiKey() {
+    if (!newApiKey) return;
+    try {
+      await navigator.clipboard.writeText(newApiKey);
+    } catch {
+      /* noop */
+    }
+  }
 
   return (
     <section>
@@ -67,6 +104,50 @@ export function AdminMvsIntegrationHint() {
                     .replace("{failed}", String(status.failedOutboxCount))}
                 </p>
               )}
+              <p className={`text-[0.8125rem] ${hint}`}>
+                {status.hasApiKey
+                  ? t("admin.mvsApiKeySet").replace("{last4}", status.apiKeyLast4 ?? "----")
+                  : t("admin.mvsApiKeyMissing")}
+                {status.apiKeyUpdatedAt
+                  ? ` · ${new Date(status.apiKeyUpdatedAt).toLocaleString(
+                      locale === "en" ? "en-US" : "ko-KR"
+                    )}`
+                  : ""}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={btnPrimary}
+                  disabled={generating}
+                  onClick={() => void generateApiKey()}
+                >
+                  {generating
+                    ? t("common.processing")
+                    : status.hasApiKey
+                      ? t("admin.mvsApiKeyRegenerate")
+                      : t("admin.mvsApiKeyGenerate")}
+                </button>
+                {newApiKey ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-10 items-center rounded-xl border border-[var(--separator)] px-4 text-[0.875rem] font-medium"
+                    onClick={() => void copyApiKey()}
+                  >
+                    {t("admin.mvsApiKeyCopy")}
+                  </button>
+                ) : null}
+              </div>
+              {newApiKey ? (
+                <div className="rounded-lg bg-[var(--fill-secondary)] p-3">
+                  <p className="text-[0.75rem] text-[var(--apple-label-secondary)]">
+                    {t("admin.mvsApiKeyGeneratedHint")}
+                  </p>
+                  <p className="mt-1 break-all font-mono text-[0.875rem] text-[var(--foreground)]">
+                    {newApiKey}
+                  </p>
+                </div>
+              ) : null}
+              {actionError ? <p className="text-[0.8125rem] text-[var(--apple-red)]">{actionError}</p> : null}
             </div>
           ) : null}
 

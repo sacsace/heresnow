@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { verifyMvsIntegrationApiKey } from "@/lib/integrations/mvsAuth";
+import { verifyMvsApiKeyHash, verifyMvsIntegrationApiKey } from "@/lib/integrations/mvsAuth";
 import { isMvsAttendanceEventV1 } from "@/lib/integrations/mvsTypes";
 import { prisma } from "@/lib/prisma";
 import { IntegrationProvider } from "@prisma/client";
@@ -27,9 +27,7 @@ const querySchema = z.object({
  * Authorization: Bearer {MVS_INTEGRATION_API_KEY}
  */
 export async function GET(req: Request) {
-  if (!verifyMvsIntegrationApiKey(apiKeyFromRequest(req))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const apiKey = apiKeyFromRequest(req);
 
   const url = new URL(req.url);
   const parsed = querySchema.safeParse(Object.fromEntries(url.searchParams));
@@ -51,7 +49,6 @@ export async function GET(req: Request) {
     const integration = await prisma.companyIntegration.findFirst({
       where: {
         provider: IntegrationProvider.MVS,
-        enabled: true,
         externalCompanyId,
       },
       select: { companyId: true },
@@ -69,7 +66,20 @@ export async function GET(req: Request) {
         provider: IntegrationProvider.MVS,
       },
     },
+    select: {
+      enabled: true,
+      externalCompanyId: true,
+      apiKeyHash: true,
+    },
   });
+
+  const authorized =
+    verifyMvsIntegrationApiKey(apiKey) ||
+    verifyMvsApiKeyHash(apiKey, integration?.apiKeyHash);
+  if (!authorized) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (!integration?.enabled) {
     return NextResponse.json({ error: "MVS 연동이 비활성화되어 있습니다." }, { status: 403 });
   }
@@ -102,13 +112,13 @@ export async function GET(req: Request) {
 
 const ackSchema = z.object({
   outboxIds: z.array(z.string().cuid()).min(1).max(500),
+  companyId: z.string().cuid().optional(),
+  externalCompanyId: z.string().min(1).max(200).optional(),
 });
 
 /** MVS가 수신 완료 후 호출 — 아웃박스를 DELIVERED로 표시 */
 export async function POST(req: Request) {
-  if (!verifyMvsIntegrationApiKey(apiKeyFromRequest(req))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const apiKey = apiKeyFromRequest(req);
 
   let json: unknown;
   try {
@@ -121,11 +131,45 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  let resolvedCompanyId: string | null = parsed.data.companyId ?? null;
+  if (!resolvedCompanyId && parsed.data.externalCompanyId) {
+    const integration = await prisma.companyIntegration.findFirst({
+      where: {
+        provider: IntegrationProvider.MVS,
+        externalCompanyId: parsed.data.externalCompanyId,
+      },
+      select: { companyId: true },
+    });
+    if (integration) resolvedCompanyId = integration.companyId;
+  }
+
+  if (!verifyMvsIntegrationApiKey(apiKey)) {
+    if (!resolvedCompanyId) {
+      return NextResponse.json(
+        { error: "companyId 또는 externalCompanyId가 필요합니다." },
+        { status: 400 }
+      );
+    }
+    const integration = await prisma.companyIntegration.findUnique({
+      where: {
+        companyId_provider: {
+          companyId: resolvedCompanyId,
+          provider: IntegrationProvider.MVS,
+        },
+      },
+      select: { apiKeyHash: true },
+    });
+    if (!verifyMvsApiKeyHash(apiKey, integration?.apiKeyHash)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
   const updated = await prisma.integrationOutbox.updateMany({
     where: {
       id: { in: parsed.data.outboxIds },
       provider: IntegrationProvider.MVS,
       status: "PENDING",
+      ...(resolvedCompanyId ? { companyId: resolvedCompanyId } : {}),
     },
     data: {
       status: "DELIVERED",

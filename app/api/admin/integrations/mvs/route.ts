@@ -26,6 +26,8 @@ export async function GET() {
     select: {
       enabled: true,
       externalCompanyId: true,
+      apiKeyLast4: true,
+      apiKeyUpdatedAt: true,
       updatedAt: true,
     },
   });
@@ -44,6 +46,9 @@ export async function GET() {
     externalCompanyId: integration?.externalCompanyId ?? null,
     pendingOutboxCount: pending,
     failedOutboxCount: failed,
+    hasApiKey: Boolean(integration?.apiKeyLast4),
+    apiKeyLast4: integration?.apiKeyLast4 ?? null,
+    apiKeyUpdatedAt: integration?.apiKeyUpdatedAt?.toISOString() ?? null,
     configured: !!integration,
   });
 }

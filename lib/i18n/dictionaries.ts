@@ -725,6 +725,14 @@ export const ko = {
     mvsStep5: "출근·퇴근 저장 시 IntegrationOutbox에 이벤트가 쌓이며, 연동이 켜진 회사만 전송됩니다.",
     mvsNote: "연동 설정 변경은 슈퍼관리자 전용입니다. 위 상태는 조회만 가능합니다.",
     mvsHowToToggle: "연동 방법 보기",
+    mvsApiKeyGenerate: "API 키 생성",
+    mvsApiKeyRegenerate: "API 키 재생성",
+    mvsApiKeyGenerateFail: "API 키 생성에 실패했습니다.",
+    mvsApiKeyMissing: "MVS API 키가 아직 없습니다.",
+    mvsApiKeySet: "MVS API 키 설정됨 (끝 4자리: {last4})",
+    mvsApiKeyGeneratedHint:
+      "새 API 키는 지금 한 번만 표시됩니다. MVS 쪽 설정에 복사해 두세요.",
+    mvsApiKeyCopy: "키 복사",
   },
   super: {
     navCompanies: "회사",
@@ -1704,6 +1712,14 @@ export const en = {
     mvsStep5: "Check-in/out creates IntegrationOutbox entries; only enabled companies are delivered.",
     mvsNote: "Integration settings are super-admin only. Status above is read-only.",
     mvsHowToToggle: "How to integrate",
+    mvsApiKeyGenerate: "Generate API key",
+    mvsApiKeyRegenerate: "Regenerate API key",
+    mvsApiKeyGenerateFail: "Failed to generate API key.",
+    mvsApiKeyMissing: "No MVS API key yet.",
+    mvsApiKeySet: "MVS API key is set (last 4: {last4})",
+    mvsApiKeyGeneratedHint:
+      "The new API key is shown only once. Copy it to your MVS settings now.",
+    mvsApiKeyCopy: "Copy key",
   },
   super: {
     navCompanies: "Companies",
