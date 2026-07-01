@@ -736,6 +736,15 @@ export const ko = {
     mvsApiKeyGeneratedHint:
       "새 API 키는 지금 한 번만 표시됩니다. MVS 쪽 설정에 복사해 두세요.",
     mvsApiKeyCopy: "키 복사",
+    mvsPreviewOpen: "데이터 확인",
+    mvsPreviewTitle: "MVS 전송 데이터 미리보기",
+    mvsPreviewMonth: "조회 월",
+    mvsPreviewReload: "다시 조회",
+    mvsPreviewLoadFail: "미리보기 데이터를 불러오지 못했습니다.",
+    mvsPreviewEmpty: "선택한 월에 전송할 출퇴근 데이터가 없습니다.",
+    mvsPreviewSummary: "{month} · {count}건 · {tz}",
+    mvsPreviewCheckIn: "출근",
+    mvsPreviewCheckOut: "퇴근",
   },
   super: {
     navCompanies: "회사",
@@ -1726,6 +1735,15 @@ export const en = {
     mvsApiKeyGeneratedHint:
       "The new API key is shown only once. Copy it to your MVS settings now.",
     mvsApiKeyCopy: "Copy key",
+    mvsPreviewOpen: "Preview data",
+    mvsPreviewTitle: "MVS export data preview",
+    mvsPreviewMonth: "Month",
+    mvsPreviewReload: "Reload",
+    mvsPreviewLoadFail: "Failed to load preview data.",
+    mvsPreviewEmpty: "No attendance data to export for the selected month.",
+    mvsPreviewSummary: "{month} · {count} rows · {tz}",
+    mvsPreviewCheckIn: "Check-in",
+    mvsPreviewCheckOut: "Check-out",
   },
   super: {
     navCompanies: "Companies",
