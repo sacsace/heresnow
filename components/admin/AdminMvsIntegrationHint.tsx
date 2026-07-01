@@ -24,6 +24,8 @@ export function AdminMvsIntegrationHint() {
   const [generating, setGenerating] = useState(false);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [copiedApiKey, setCopiedApiKey] = useState(false);
+  const [copiedCompanyId, setCopiedCompanyId] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +72,8 @@ export function AdminMvsIntegrationHint() {
     if (!newApiKey) return;
     try {
       await navigator.clipboard.writeText(newApiKey);
+      setCopiedApiKey(true);
+      setTimeout(() => setCopiedApiKey(false), 1200);
     } catch {
       /* noop */
     }
@@ -79,6 +83,8 @@ export function AdminMvsIntegrationHint() {
     if (!status?.companyId) return;
     try {
       await navigator.clipboard.writeText(status.companyId);
+      setCopiedCompanyId(true);
+      setTimeout(() => setCopiedCompanyId(false), 1200);
     } catch {
       /* noop */
     }
@@ -120,10 +126,10 @@ export function AdminMvsIntegrationHint() {
                 </p>
                 <button
                   type="button"
-                  className="inline-flex h-8 items-center rounded-lg border border-[var(--separator)] px-3 text-[0.75rem] font-medium"
+                  className="inline-flex h-8 items-center rounded-lg border border-[var(--separator)] px-3 text-[0.75rem] font-medium transition active:scale-95 active:bg-[var(--fill-secondary)]"
                   onClick={() => void copyCompanyId()}
                 >
-                  {t("admin.mvsCompanyIdCopy")}
+                  {copiedCompanyId ? t("admin.mvsCopied") : t("admin.mvsCompanyIdCopy")}
                 </button>
               </div>
               <p className={`text-[0.8125rem] ${hint}`}>
@@ -152,10 +158,10 @@ export function AdminMvsIntegrationHint() {
                 {newApiKey ? (
                   <button
                     type="button"
-                    className="inline-flex h-10 items-center rounded-xl border border-[var(--separator)] px-4 text-[0.875rem] font-medium"
+                    className="inline-flex h-10 items-center rounded-xl border border-[var(--separator)] px-4 text-[0.875rem] font-medium transition active:scale-95 active:bg-[var(--fill-secondary)]"
                     onClick={() => void copyApiKey()}
                   >
-                    {t("admin.mvsApiKeyCopy")}
+                    {copiedApiKey ? t("admin.mvsCopied") : t("admin.mvsApiKeyCopy")}
                   </button>
                 ) : null}
               </div>
