@@ -32,7 +32,7 @@ export async function POST() {
     create: {
       companyId,
       provider: IntegrationProvider.MVS,
-      enabled: false,
+      enabled: true,
       externalCompanyId: null,
       webhookUrl: null,
       apiKeyHash,
@@ -40,6 +40,7 @@ export async function POST() {
       apiKeyUpdatedAt: now,
     },
     update: {
+      enabled: true,
       apiKeyHash,
       apiKeyLast4,
       apiKeyUpdatedAt: now,

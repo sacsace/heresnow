@@ -75,6 +75,15 @@ export function AdminMvsIntegrationHint() {
     }
   }
 
+  async function copyCompanyId() {
+    if (!status?.companyId) return;
+    try {
+      await navigator.clipboard.writeText(status.companyId);
+    } catch {
+      /* noop */
+    }
+  }
+
   return (
     <section>
       <p className={sectionLabel}>{t("admin.mvsTitle")}</p>
@@ -105,9 +114,18 @@ export function AdminMvsIntegrationHint() {
                     .replace("{failed}", String(status.failedOutboxCount))}
                 </p>
               )}
-              <p className={`text-[0.8125rem] ${hint}`}>
-                {t("admin.mvsCompanyId")}: {status.companyId}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-[0.8125rem]">
+                <p className={hint}>
+                  {t("admin.mvsCompanyId")}: {status.companyId}
+                </p>
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center rounded-lg border border-[var(--separator)] px-3 text-[0.75rem] font-medium"
+                  onClick={() => void copyCompanyId()}
+                >
+                  {t("admin.mvsCompanyIdCopy")}
+                </button>
+              </div>
               <p className={`text-[0.8125rem] ${hint}`}>
                 {status.hasApiKey
                   ? t("admin.mvsApiKeySet").replace("{last4}", status.apiKeyLast4 ?? "----")
