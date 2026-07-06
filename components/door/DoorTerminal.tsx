@@ -239,6 +239,7 @@ export function DoorTerminal() {
                   scanIdleLabel={t("door.faceAwait")}
                   profileKind="kiosk"
                   fastScan
+                  highAccuracyScan
                   disabled={busy}
                   rootClassName="flex min-h-0 flex-1 flex-col"
                   videoClassName="mx-auto max-h-[min(58dvh,720px)] w-full"

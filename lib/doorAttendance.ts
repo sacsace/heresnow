@@ -4,7 +4,7 @@ import {
   FACE_DESCRIPTOR_LENGTH,
   FACE_IDENTIFY_MIN_GAP_DOOR,
   FACE_MATCH_THRESHOLD_DOOR,
-  identifySingleFaceMatch,
+  identifySingleFaceMatchParsed,
   parseFaceDescriptor,
 } from "@/lib/faceMatch";
 import type { AttendanceType, Role } from "@prisma/client";
@@ -23,6 +23,57 @@ export type DoorPunchEligibility = {
   lastType: AttendanceType | null;
   lastTimestamp: string | null;
 };
+
+type CachedDoorEmployee = {
+  id: string;
+  name: string;
+  descriptor: number[];
+};
+
+const DOOR_FACE_CACHE_TTL_MS = 60_000;
+const doorEmployeeCache = new Map<
+  string,
+  { expiresAt: number; employees: CachedDoorEmployee[] }
+>();
+
+async function getDoorEmployeesForMatch(companyId: string): Promise<CachedDoorEmployee[]> {
+  const now = Date.now();
+  const cached = doorEmployeeCache.get(companyId);
+  if (cached && cached.expiresAt > now) {
+    return cached.employees;
+  }
+
+  const employees = await prisma.employee.findMany({
+    where: {
+      companyId,
+      faceEnrolledAt: { not: null },
+      user: { role: { in: DOOR_PUNCHABLE_ROLES } },
+    },
+    select: {
+      id: true,
+      name: true,
+      faceDescriptor: true,
+    },
+  });
+
+  const normalizedEmployees = employees
+    .map((employee) => {
+      const descriptor = parseFaceDescriptor(employee.faceDescriptor);
+      if (!descriptor) return null;
+      return {
+        id: employee.id,
+        name: employee.name,
+        descriptor,
+      };
+    })
+    .filter((employee): employee is CachedDoorEmployee => Boolean(employee));
+
+  doorEmployeeCache.set(companyId, {
+    expiresAt: now + DOOR_FACE_CACHE_TTL_MS,
+    employees: normalizedEmployees,
+  });
+  return normalizedEmployees;
+}
 
 export async function getDoorPunchEligibility(
   companyId: string,
@@ -90,20 +141,9 @@ export async function matchFaceDoorEmployee(
   probe: number[],
   companyId: string
 ): Promise<{ id: string; name: string } | null> {
-  const employees = await prisma.employee.findMany({
-    where: {
-      companyId,
-      faceEnrolledAt: { not: null },
-      user: { role: { in: DOOR_PUNCHABLE_ROLES } },
-    },
-    select: {
-      id: true,
-      name: true,
-      faceDescriptor: true,
-    },
-  });
+  const employees = await getDoorEmployeesForMatch(companyId);
 
-  const identified = identifySingleFaceMatch(
+  const identified = identifySingleFaceMatchParsed(
     employees,
     probe,
     FACE_MATCH_THRESHOLD_DOOR,

@@ -7,7 +7,18 @@ import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTi
 import { lateMinutesFor, overtimeMinutesFor } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { prisma } from "@/lib/prisma";
+import { fromZonedTime } from "date-fns-tz";
 import { NextResponse } from "next/server";
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function safeFromZoned(dateTime: string, tz: string): Date {
+  try {
+    return fromZonedTime(dateTime, tz);
+  } catch {
+    return fromZonedTime(dateTime, "UTC");
+  }
+}
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -71,20 +82,22 @@ export async function GET(req: Request) {
     workDays: companySchedule.workDays,
     workScheduleByDay: companySchedule.workScheduleByDay,
   };
-  const employeeSchedules = await prisma.employee.findMany({
-    where: { companyId },
-    select: {
-      id: true,
-      workScheduleType: true,
-      shiftCode: true,
-      workStartTime: true,
-      workEndTime: true,
-      workScheduleByDay: true,
-    },
-  });
-  const scheduleByEmployee = new Map(
-    employeeSchedules.map((e) => [e.id, resolveEmployeeWorkSchedule(e, companySchedule)])
-  );
+
+  const hasFrom = Boolean(from && DATE_ONLY.test(from));
+  const hasTo = Boolean(to && DATE_ONLY.test(to));
+  const timestampWhere: { gte?: Date; lte?: Date } = {};
+  if (hasFrom && from) {
+    const fromAt = safeFromZoned(`${from} 00:00:00`, tz);
+    // 야간근무 페어를 위해 전날 체크인까지 포함
+    fromAt.setUTCDate(fromAt.getUTCDate() - 1);
+    timestampWhere.gte = fromAt;
+  }
+  if (hasTo && to) {
+    const toAt = safeFromZoned(`${to} 23:59:59.999`, tz);
+    // 야간근무 페어를 위해 다음날 체크아웃까지 포함
+    toAt.setUTCDate(toAt.getUTCDate() + 1);
+    timestampWhere.lte = toAt;
+  }
 
   const records = await prisma.attendanceRecord.findMany({
     where: {
@@ -92,6 +105,7 @@ export async function GET(req: Request) {
       ...(employeeId ? { employeeId } : {}),
       // 부서 필터 — 해당 부서 소속 직원의 기록만
       ...(departmentId ? { employee: { departmentId } } : {}),
+      ...(timestampWhere.gte || timestampWhere.lte ? { timestamp: timestampWhere } : {}),
     },
     orderBy: { timestamp: "desc" },
     take: 5000,
@@ -100,6 +114,25 @@ export async function GET(req: Request) {
       site: { select: { name: true } },
     },
   });
+
+  const employeeIds = Array.from(new Set(records.map((r) => r.employeeId)));
+  const employeeSchedules =
+    employeeIds.length > 0
+      ? await prisma.employee.findMany({
+          where: { id: { in: employeeIds } },
+          select: {
+            id: true,
+            workScheduleType: true,
+            shiftCode: true,
+            workStartTime: true,
+            workEndTime: true,
+            workScheduleByDay: true,
+          },
+        })
+      : [];
+  const scheduleByEmployee = new Map(
+    employeeSchedules.map((e) => [e.id, resolveEmployeeWorkSchedule(e, companySchedule)])
+  );
 
   // 마이그레이션 이전 기록 보정 — isLate/isOvertime 만 있고 분 정보가 0 이면 회사 스케줄로 즉석 계산
   const augmented = records.map((r) => {

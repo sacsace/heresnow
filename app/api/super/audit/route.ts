@@ -14,7 +14,7 @@ export async function GET() {
 
   const logs = await prisma.approvalLog.findMany({
     orderBy: { timestamp: "desc" },
-    take: 200,
+    take: 10,
     include: {
       approver: { select: { email: true, role: true } },
       company: { select: { name: true } },

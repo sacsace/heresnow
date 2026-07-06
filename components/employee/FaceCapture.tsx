@@ -68,7 +68,7 @@ const HIGH_ACCURACY_FRAME_COUNT = 2;
 
 const KIOSK_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "kiosk",
-  minDetectionScore: 0.35,
+  minDetectionScore: 0.4,
   minFaceAreaRatio: 0.03,
 };
 
@@ -402,17 +402,18 @@ export function FaceCapture({
       if (!v) return;
 
       if (scanWhenFaceVisible) {
-        let highAccuracyExtracted: Awaited<ReturnType<typeof extractFaceDetection>> | null = null;
+        let extracted: Awaited<ReturnType<typeof extractFaceDetection>> | null = null;
         const kind = profileKindRef.current;
         const useHighAccuracy = highAccuracyScanRef.current && verifyOnClientOnly;
+        const singlePassExtract = useHighAccuracy || verifyOnClientOnly;
         let faceVisible = false;
-        if (useHighAccuracy) {
-          // 고정 단말은 품질 검사+descriptor 추출 1회로 얼굴 존재 판단까지 함께 처리
-          highAccuracyExtracted = await extractFaceDetection(
+        if (singlePassExtract) {
+          // 출입문 단말: 얼굴 존재 확인 + descriptor 추출을 1회 추론으로 처리
+          extracted = await extractFaceDetection(
             v,
             kind === "kiosk" ? KIOSK_EXTRACT_OPTIONS : undefined
           );
-          faceVisible = !!highAccuracyExtracted;
+          faceVisible = !!extracted;
         } else {
           faceVisible = await detectFaceInFrame(v, { profileKind: kind });
         }
@@ -436,8 +437,20 @@ export function FaceCapture({
           return;
         }
 
-        if (useHighAccuracy && highAccuracyExtracted) {
-          qualityBufferRef.current.push(descriptorToArray(highAccuracyExtracted.descriptor));
+        if (verifyOnClientOnly && extracted) {
+          if (!useHighAccuracy) {
+            busyRef.current = true;
+            setBusy(true);
+            try {
+              await finishClientVerify(descriptorToArray(extracted.descriptor));
+            } finally {
+              busyRef.current = false;
+              setBusy(false);
+            }
+            return;
+          }
+
+          qualityBufferRef.current.push(descriptorToArray(extracted.descriptor));
           if (qualityBufferRef.current.length < HIGH_ACCURACY_FRAME_COUNT) {
             setStatus(tRef.current("employee.faceStabilizing"));
             return;

@@ -53,8 +53,8 @@ export function getFaceDeviceProfile(kind: FaceProfileKind = "default"): FaceDev
   if (kind === "kiosk") {
     return {
       preferWasmBackend: ios,
-      detectorInputSize: ios ? 320 : 416,
-      detectorScoreThreshold: 0.35,
+      detectorInputSize: 320,
+      detectorScoreThreshold: 0.4,
       likelyInAppBrowser: isLikelyInAppBrowser(),
       isMobile: mobile,
     };
@@ -86,8 +86,8 @@ export function buildCameraConstraintAttempts(
       {
         video: {
           facingMode: { ideal: "user" },
-          width: { ideal: 960, min: 480 },
-          height: { ideal: 540, min: 320 },
+          width: { ideal: 640, min: 480 },
+          height: { ideal: 480, min: 320 },
         },
         audio: false,
       },

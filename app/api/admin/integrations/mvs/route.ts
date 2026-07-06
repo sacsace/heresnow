@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { IntegrationProvider } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-/** 회사 관리자: MVS 연동 상태 조회 (설정 변경은 슈퍼 전용) */
+/** 회사 관리자: MVS 연동 상태 조회 */
 export async function GET() {
   const session = await auth();
   const role = session?.user?.role;

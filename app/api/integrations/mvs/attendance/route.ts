@@ -25,6 +25,9 @@ const querySchema = z.object({
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "month must be YYYY-MM")
     .optional(),
   status: z.enum(["PENDING", "DELIVERED", "FAILED"]).default("PENDING"),
+  attendanceStatus: z
+    .enum(["APPROVED", "PENDING", "REJECTED", "ALL"])
+    .default("APPROVED"),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().cuid().optional(),
 });
@@ -42,7 +45,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { companyId, externalCompanyId, month, status, limit, cursor } = parsed.data;
+  const { companyId, externalCompanyId, month, status, attendanceStatus, limit, cursor } =
+    parsed.data;
 
   if (!companyId && !externalCompanyId) {
     return NextResponse.json(
@@ -105,54 +109,63 @@ export async function GET(req: Request) {
     const fromDate = `${month}-01`;
     const toDate = `${month}-${String(daysInMonth).padStart(2, "0")}`;
 
-    const [employees, records] = await Promise.all([
-      prisma.employee.findMany({
-        where: { companyId: resolvedCompanyId! },
-        orderBy: { name: "asc" },
-        select: {
-          id: true,
-          name: true,
-          externalEmployeeId: true,
-          user: { select: { email: true } },
-        },
-      }),
-      prisma.attendanceRecord.findMany({
-        where: {
-          companyId: resolvedCompanyId!,
-          timestamp: { gte: start, lte: end },
-        },
-        orderBy: { timestamp: "asc" },
-        select: {
-          id: true,
-          employeeId: true,
-          type: true,
-          timestamp: true,
-          latitude: true,
-          longitude: true,
-          distanceFromSite: true,
-          outsideGeofence: true,
-          status: true,
-          isLate: true,
-          isEarlyLeave: true,
-          isOvertime: true,
-          isHolidayWork: true,
-          lateMinutes: true,
-          overtimeMinutes: true,
-          memo: true,
-          isBusinessTrip: true,
-          businessTripLocation: true,
-          businessTripReason: true,
-          recordTimezone: true,
-          employee: { select: { name: true } },
-          site: { select: { name: true } },
-        },
-      }),
-    ]);
+    const records = await prisma.attendanceRecord.findMany({
+      where: {
+        companyId: resolvedCompanyId!,
+        timestamp: { gte: start, lte: end },
+        ...(attendanceStatus !== "ALL" ? { status: attendanceStatus } : {}),
+      },
+      orderBy: { timestamp: "asc" },
+      select: {
+        id: true,
+        employeeId: true,
+        type: true,
+        timestamp: true,
+        latitude: true,
+        longitude: true,
+        distanceFromSite: true,
+        outsideGeofence: true,
+        status: true,
+        isLate: true,
+        isEarlyLeave: true,
+        isOvertime: true,
+        isHolidayWork: true,
+        lateMinutes: true,
+        overtimeMinutes: true,
+        memo: true,
+        isBusinessTrip: true,
+        businessTripLocation: true,
+        businessTripReason: true,
+        recordTimezone: true,
+        employee: { select: { name: true } },
+        site: { select: { name: true } },
+      },
+    });
+    const employeeIds = Array.from(new Set(records.map((record) => record.employeeId)));
+    const employees =
+      employeeIds.length > 0
+        ? await prisma.employee.findMany({
+            where: { id: { in: employeeIds } },
+            orderBy: { name: "asc" },
+            select: {
+              id: true,
+              name: true,
+              externalEmployeeId: true,
+              user: { select: { email: true } },
+            },
+          })
+        : [];
 
     const dayRows = filterAttendanceDayRows(aggregateAttendanceByDay(records, timeZone), {
       from: fromDate,
       to: toDate,
     });
+    const rowsByEmployee = new Map<string, (typeof dayRows)[number][]>();
+    for (const row of dayRows) {
+      const list = rowsByEmployee.get(row.employeeId);
+      if (list) list.push(row);
+      else rowsByEmployee.set(row.employeeId, [row]);
+    }
 
     const toMappedPunch = (
       punch: (typeof dayRows)[number]["checkIn"] | (typeof dayRows)[number]["checkOut"]
@@ -185,8 +198,7 @@ export async function GET(req: Request) {
 
     const employeeAttendance = employees
       .map((employee) => {
-        const rows = dayRows
-          .filter((row) => row.employeeId === employee.id)
+        const rows = (rowsByEmployee.get(employee.id) ?? [])
           .map((row) => ({
             date: row.date,
             checkOutDate: row.checkOutDate,
@@ -220,6 +232,7 @@ export async function GET(req: Request) {
       companyId: resolvedCompanyId,
       externalCompanyId: integration.externalCompanyId,
       month,
+      attendanceStatus,
       timezone: timeZone,
       count,
       employeeAttendance,

@@ -6,11 +6,19 @@ export const FACE_MATCH_THRESHOLD_DOOR = 0.58;
 
 export const FACE_DESCRIPTOR_LENGTH = 128;
 
+function l2Normalize(values: number[]): number[] | null {
+  let normSq = 0;
+  for (const v of values) normSq += v * v;
+  const norm = Math.sqrt(normSq);
+  if (!Number.isFinite(norm) || norm <= 0) return null;
+  return values.map((v) => v / norm);
+}
+
 export function parseFaceDescriptor(raw: unknown): number[] | null {
   if (!Array.isArray(raw) || raw.length !== FACE_DESCRIPTOR_LENGTH) return null;
   const arr = raw.map((v) => Number(v));
   if (arr.some((n) => !Number.isFinite(n))) return null;
-  return arr;
+  return l2Normalize(arr);
 }
 
 export function euclideanDistance(a: number[], b: number[]): number {
@@ -41,6 +49,34 @@ export type FaceIdentifyResult<T extends FaceIdentifyCandidate> = {
   match: T;
   distance: number;
 };
+
+export type ParsedFaceIdentifyCandidate = {
+  id: string;
+  descriptor: number[];
+};
+
+export function identifySingleFaceMatchParsed<T extends ParsedFaceIdentifyCandidate>(
+  candidates: T[],
+  probe: number[],
+  threshold = FACE_MATCH_THRESHOLD,
+  minGap = FACE_IDENTIFY_MIN_GAP
+): FaceIdentifyResult<T> | null {
+  const matches: { candidate: T; distance: number }[] = [];
+  for (const candidate of candidates) {
+    if (candidate.descriptor.length !== FACE_DESCRIPTOR_LENGTH) continue;
+    const distance = euclideanDistance(candidate.descriptor, probe);
+    if (distance < threshold) {
+      matches.push({ candidate, distance });
+    }
+  }
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => a.distance - b.distance);
+  const best = matches[0]!;
+  if (matches.length > 1 && best.distance + minGap > matches[1]!.distance) {
+    return null;
+  }
+  return { match: best.candidate, distance: best.distance };
+}
 
 /** 등록된 후보 중 probe와 일치하는 단일 후보를 찾음. 모호하면 null */
 export function identifySingleFaceMatch<T extends FaceIdentifyCandidate>(
