@@ -174,7 +174,8 @@ function LoginForm() {
             <div className={authFieldGroup}>
               <label className={authLabel}>{t("login.email")}</label>
               <input
-                type="email"
+                type="text"
+                inputMode="email"
                 autoComplete="username"
                 className={authInput}
                 value={email}
