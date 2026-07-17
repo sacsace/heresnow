@@ -1,5 +1,5 @@
 /** 플랫폼 루트(슈퍼 전용 운영 계정) — UI에 SUPER_ADMIN 대신 표시 */
-export const PLATFORM_ROOT_EMAIL = "lee@msventures.in";
+export const PLATFORM_ROOT_EMAIL = "root";
 
 export function sessionRoleLabel(
   email: string | null | undefined,

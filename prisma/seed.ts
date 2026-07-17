@@ -77,7 +77,7 @@ async function main() {
 
   await prisma.user.create({
     data: {
-      email: "lee@msventures.in",
+      email: "root",
       passwordHash: adminPasswordHash,
       role: Role.SUPER_ADMIN,
       companyId: null,
@@ -219,7 +219,7 @@ async function main() {
   });
 
   console.log(
-    "Seed OK. 슈퍼(요금 수정): lee@msventures.in / admin123 · ACME 관리자: admin@acme.local / admin123 · 직원 demo1234"
+    "Seed OK. 슈퍼(요금 수정): root / admin123 · ACME 관리자: admin@acme.local / admin123 · 직원 demo1234"
   );
   console.log("동의 미완료 테스트: newhire@globex.local / demo1234");
 }
