@@ -372,7 +372,7 @@ export function FaceCapture({
         setBusy(false);
       }
     },
-    [disabled, mode, ready, verifyOnClientOnly, scanWhenFaceVisible, finishClientVerify]
+    [disabled, mode, ready, verifyOnClientOnly, finishClientVerify]
   );
 
   useEffect(() => {

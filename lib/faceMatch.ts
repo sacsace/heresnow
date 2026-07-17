@@ -45,7 +45,7 @@ export type FaceIdentifyCandidate = {
   faceDescriptor: unknown;
 };
 
-export type FaceIdentifyResult<T extends FaceIdentifyCandidate> = {
+export type FaceIdentifyResult<T> = {
   match: T;
   distance: number;
 };
