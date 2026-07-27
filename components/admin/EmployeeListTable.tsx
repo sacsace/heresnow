@@ -100,6 +100,7 @@ function roleSortIndex(role: string) {
 
 type Props = {
   employees: EmployeeRow[];
+  rowNumberStart?: number;
   departments: Department[];
   canEditProfile: boolean;
   canEditRoles: boolean;
@@ -129,6 +130,7 @@ type Props = {
 
 export function EmployeeListTable({
   employees,
+  rowNumberStart = 0,
   departments,
   canEditProfile,
   canEditRoles,
@@ -399,7 +401,7 @@ export function EmployeeListTable({
                         className="w-4 shrink-0 text-right tabular-nums text-[0.6875rem] text-[var(--apple-label-tertiary)]"
                         aria-hidden
                       >
-                        {rowIndex + 1}
+                        {rowNumberStart + rowIndex + 1}
                       </span>
                       <input
                         type="checkbox"

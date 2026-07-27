@@ -12,14 +12,11 @@ type Props = {
 };
 
 /**
- * 로케일에 맞춰 표기되는 시·분 선택기.
+ * 시·분 선택기.
  *
- * 일부 브라우저(특히 Windows Chrome)는 <input type="time"> 의 표기에
- * OS 로케일을 우선 적용해, 화면 언어가 영어여도 "오전 09:00"처럼 표시됨.
- * 이 컴포넌트는 셀렉트 박스로 직접 그려 화면 언어 100% 통제.
- *
- * - en: 12시간 표기 + AM/PM 셀렉트
- * - ko (그 외): 24시간 표기
+ * 일부 브라우저(특히 Windows Chrome)는 <input type="time"> 표기에
+ * OS 로케일을 우선 적용해 의도치 않은 포맷(예: AM/PM)이 보일 수 있다.
+ * 이 컴포넌트는 셀렉트 박스로 직접 그려 항상 24시간(HH:mm) 표기를 유지한다.
  *
  * 외부와 주고받는 값은 항상 "HH:MM" 24시간 문자열.
  */
@@ -48,69 +45,6 @@ export function LocaleTimeInput({
   };
 
   const minuteOptions = Array.from({ length: 60 }, (_, i) => i);
-
-  if (locale === "en") {
-    const period: "AM" | "PM" = hh >= 12 ? "PM" : "AM";
-    const hour12 = ((hh + 11) % 12) + 1;
-    const hourOptions12 = Array.from({ length: 12 }, (_, i) => i + 1);
-
-    return (
-      <div
-        role="group"
-        aria-label={ariaLabel}
-        aria-disabled={disabled || undefined}
-        className={`${inputShellClass} ${className}`.trim()}
-      >
-        <select
-          disabled={disabled}
-          aria-label="Hour"
-          value={hour12}
-          onChange={(e) => {
-            const h12 = Number(e.target.value);
-            const next = period === "AM" ? (h12 === 12 ? 0 : h12) : h12 === 12 ? 12 : h12 + 12;
-            setTime(next, mm);
-          }}
-          className={segmentClass}
-        >
-          {hourOptions12.map((h) => (
-            <option key={h} value={h}>
-              {pad2(h)}
-            </option>
-          ))}
-        </select>
-        <span aria-hidden>:</span>
-        <select
-          disabled={disabled}
-          aria-label="Minute"
-          value={mm}
-          onChange={(e) => setTime(hh, Number(e.target.value))}
-          className={segmentClass}
-        >
-          {minuteOptions.map((m) => (
-            <option key={m} value={m}>
-              {pad2(m)}
-            </option>
-          ))}
-        </select>
-        <select
-          disabled={disabled}
-          aria-label="AM/PM"
-          value={period}
-          onChange={(e) => {
-            const next = e.target.value as "AM" | "PM";
-            const newHh = next === "AM" ? (hh >= 12 ? hh - 12 : hh) : hh < 12 ? hh + 12 : hh;
-            setTime(newHh, mm);
-          }}
-          className={`${segmentClass} ml-1`}
-        >
-          <option value="AM">AM</option>
-          <option value="PM">PM</option>
-        </select>
-      </div>
-    );
-  }
-
-  // ko / 기본: 24시간
   const hourOptions24 = Array.from({ length: 24 }, (_, i) => i);
   return (
     <div
@@ -121,7 +55,7 @@ export function LocaleTimeInput({
     >
       <select
         disabled={disabled}
-        aria-label="시"
+        aria-label={locale === "en" ? "Hour" : "시"}
         value={hh}
         onChange={(e) => setTime(Number(e.target.value), mm)}
         className={segmentClass}
@@ -135,7 +69,7 @@ export function LocaleTimeInput({
       <span aria-hidden>:</span>
       <select
         disabled={disabled}
-        aria-label="분"
+        aria-label={locale === "en" ? "Minute" : "분"}
         value={mm}
         onChange={(e) => setTime(hh, Number(e.target.value))}
         className={segmentClass}

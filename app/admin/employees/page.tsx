@@ -295,6 +295,11 @@ export default function AdminEmployeesPage() {
     return filteredEmployees.slice(start, start + EMPLOYEES_PAGE_SIZE);
   }, [filteredEmployees, listViewMode, currentPage]);
 
+  const visibleRowStart = useMemo(() => {
+    if (listViewMode === "all") return 0;
+    return (currentPage - 1) * EMPLOYEES_PAGE_SIZE;
+  }, [listViewMode, currentPage]);
+
   useEffect(() => {
     const visible = new Set(filteredEmployees.map((e) => e.id));
     setSelectedIds((prev) => {
@@ -898,6 +903,7 @@ export default function AdminEmployeesPage() {
           ) : (
             <EmployeeListTable
             employees={visibleEmployees}
+            rowNumberStart={visibleRowStart}
             departments={departments}
             canEditProfile={canEditProfile}
             canEditRoles={canEditRoles}
