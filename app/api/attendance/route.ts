@@ -13,7 +13,11 @@ import {
   type LateCheckOutTimeBasis,
 } from "@/lib/attendancePunchRules";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
-import { evaluateAttendanceWorkFlags, evaluateCheckOutWorkFlags } from "@/lib/companyWorkSchedule";
+import {
+  evaluateAttendanceWorkFlags,
+  evaluateCheckOutWorkFlags,
+  evaluateFreePunchCheckOutWorkFlags,
+} from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { formatInTimeZone } from "date-fns-tz";
 import {
@@ -137,6 +141,8 @@ export async function POST(req: Request) {
       select: {
         timezone: true,
         faceRecognitionEnabled: true,
+        freePunchEnabled: true,
+        freePunchRequiredMinutes: true,
         geofenceMode: true,
         workStartTime: true,
         workEndTime: true,
@@ -174,6 +180,8 @@ export async function POST(req: Request) {
 
   const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const now = new Date();
+  const freePunchEnabled =
+    Boolean(company.freePunchEnabled) && employee.workScheduleType === "FREE";
 
   const faceRequired = company.faceRecognitionEnabled;
   let faceMatched = false;
@@ -217,6 +225,7 @@ export async function POST(req: Request) {
     ? { type: lastRecord.type, timestamp: lastRecord.timestamp }
     : null;
   const eligibility = evaluatePunchEligibility(now, tz, lastPunch);
+  const reCheckInApprovalRequired = freePunchEnabled ? false : eligibility.reCheckInApprovalRequired;
 
   if (type === "CHECK_IN") {
     if (!eligibility.canCheckIn) {
@@ -308,8 +317,20 @@ export async function POST(req: Request) {
 
   const workFlags =
     type === "CHECK_OUT" && checkInAt
-      ? evaluateCheckOutWorkFlags(recordTimestamp, checkInAt, tz, effectiveSchedule)
+      ? freePunchEnabled
+        ? evaluateFreePunchCheckOutWorkFlags(
+            recordTimestamp,
+            checkInAt,
+            tz,
+            effectiveSchedule,
+            company.freePunchRequiredMinutes
+          )
+        : evaluateCheckOutWorkFlags(recordTimestamp, checkInAt, tz, effectiveSchedule)
       : evaluateAttendanceWorkFlags(recordTimestamp, tz, type, effectiveSchedule);
+  const normalizedWorkFlags =
+    freePunchEnabled && type === "CHECK_IN"
+      ? { ...workFlags, isLate: false, lateMinutes: 0 }
+      : workFlags;
 
   const siteId = siteCtx.siteId;
   const distanceFromSite = siteCtx.distanceFromSite;
@@ -317,7 +338,7 @@ export async function POST(req: Request) {
 
   // 조퇴(정규 퇴근시각 이전 퇴근) — 48시간 초과 예외 퇴근과 별도
   const earlyLeavePending =
-    type === "CHECK_OUT" && workFlags.isEarlyLeave && !checkOutPastWindow;
+    type === "CHECK_OUT" && normalizedWorkFlags.isEarlyLeave && !checkOutPastWindow && !freePunchEnabled;
   const trimmedEarlyReason = earlyLeaveReason?.trim() || null;
   if (earlyLeavePending && !trimmedEarlyReason) {
     return NextResponse.json(
@@ -330,7 +351,7 @@ export async function POST(req: Request) {
   }
 
   // 퇴근 후 4시간 이내 재출근 — 사유 필수 + 관리자 승인
-  const reCheckInPending = type === "CHECK_IN" && eligibility.reCheckInApprovalRequired;
+  const reCheckInPending = type === "CHECK_IN" && reCheckInApprovalRequired;
   const trimmedReCheckInReason = reCheckInReason?.trim() || null;
   if (reCheckInPending && !trimmedReCheckInReason) {
     return NextResponse.json(
@@ -387,12 +408,12 @@ export async function POST(req: Request) {
           type === "CHECK_IN" && isBusinessTrip ? businessTripReason!.trim() : null,
         photoUrl: photoUrl?.trim() || null,
         deviceInfo: mergedDevice || null,
-        isLate: workFlags.isLate,
-        isEarlyLeave: workFlags.isEarlyLeave,
-        isOvertime: workFlags.isOvertime,
-        isHolidayWork: workFlags.isHolidayWork,
-        lateMinutes: workFlags.lateMinutes,
-        overtimeMinutes: workFlags.overtimeMinutes,
+        isLate: normalizedWorkFlags.isLate,
+        isEarlyLeave: normalizedWorkFlags.isEarlyLeave,
+        isOvertime: normalizedWorkFlags.isOvertime,
+        isHolidayWork: normalizedWorkFlags.isHolidayWork,
+        lateMinutes: normalizedWorkFlags.lateMinutes,
+        overtimeMinutes: normalizedWorkFlags.overtimeMinutes,
         recordTimezone: tz,
       },
       include: { site: { select: { name: true } } },

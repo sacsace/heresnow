@@ -1,5 +1,4 @@
-import { AdminNavBar } from "@/components/AdminNavBar";
-import { AppShell } from "@/components/AppShell";
+import { AdminChrome } from "@/components/admin/AdminChrome";
 import { requireConsent } from "@/lib/requireConsent";
 import { appContainerAdmin } from "@/lib/uiStyles";
 import type { Metadata } from "next";
@@ -13,12 +12,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireConsent();
 
   return (
-    <AppShell
-      header={<AdminNavBar />}
-      bodyClassName={appContainerAdmin}
-      shellClassName="min-w-0 overflow-x-hidden pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
-    >
+    <AdminChrome bodyClassName={appContainerAdmin}>
       {children}
-    </AppShell>
+    </AdminChrome>
   );
 }

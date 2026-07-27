@@ -53,6 +53,8 @@ function buildDayScheduleState(
 type Settings = {
   timezone: string;
   faceRecognitionEnabled: boolean;
+  freePunchEnabled: boolean;
+  freePunchRequiredWorkTime?: string;
   geofenceMode: string;
   workStartTime: string | null;
   workEndTime: string | null;
@@ -74,6 +76,7 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
   const [timezone, setTimezone] = useState<string>(DEFAULT_COMPANY_TIMEZONE);
   const [workStart, setWorkStart] = useState("09:00");
   const [workEnd, setWorkEnd] = useState("18:00");
+  const [freePunchRequiredWorkTime, setFreePunchRequiredWorkTime] = useState("09:00");
   const [workDaySet, setWorkDaySet] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [workScheduleByDay, setWorkScheduleByDay] = useState<WorkScheduleByDayState>(
     buildDayScheduleState("09:00", "18:00")
@@ -101,6 +104,8 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
       workStartTime?: string | null;
       workEndTime?: string | null;
       faceRecognitionEnabled?: boolean;
+      freePunchEnabled?: boolean;
+      freePunchRequiredWorkTime?: string;
       workScheduleByDay?: unknown;
       shiftPresets?: ShiftPresetsMap;
     };
@@ -109,6 +114,8 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
     setSettings({
       timezone: tz,
       faceRecognitionEnabled: Boolean(s.faceRecognitionEnabled),
+      freePunchEnabled: Boolean(s.freePunchEnabled),
+      freePunchRequiredWorkTime: s.freePunchRequiredWorkTime ?? "09:00",
       geofenceMode: typeof s.geofenceMode === "string" ? s.geofenceMode : "OFF",
       workStartTime: s.workStartTime ?? "09:00",
       workEndTime: s.workEndTime ?? "18:00",
@@ -118,6 +125,7 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
     setTimezone(tz);
     setWorkStart(s.workStartTime ?? "09:00");
     setWorkEnd(s.workEndTime ?? "18:00");
+    setFreePunchRequiredWorkTime(s.freePunchRequiredWorkTime ?? "09:00");
     setWorkDaySet(new Set(s.workDaysArray ?? [1, 2, 3, 4, 5]));
     setWorkScheduleByDay(
       buildDayScheduleState(s.workStartTime ?? "09:00", s.workEndTime ?? "18:00", s.workScheduleByDay)
@@ -153,6 +161,9 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
       const err = j.error as { fieldErrors?: Record<string, string[]> } | string | undefined;
       if (typeof err === "string") setError(err);
       else if (err?.fieldErrors?.workEndTime?.[0]) setError(err.fieldErrors.workEndTime[0]);
+      else if (err?.fieldErrors?.freePunchRequiredWorkTime?.[0]) {
+        setError(err.fieldErrors.freePunchRequiredWorkTime[0]);
+      }
       else setError(t("admin.settingsSaveFail"));
       return;
     }
@@ -187,6 +198,7 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
     }
     await patch({
       timezone,
+      freePunchRequiredWorkTime,
       workStartTime: workStart,
       workEndTime: workEnd,
       workDays: [...workDaySet].sort((a, b) => a - b).join(","),
@@ -276,133 +288,172 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
                 <p className="mt-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
                   {t("admin.settingsWorkLead")}
                 </p>
-
-                <label className="mt-4 block">
-                  <span className={label}>{t("admin.settingsTimezone")}</span>
-                  <select
-                    className={`${select} mt-1.5 bg-[var(--fill-secondary)]`}
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    disabled={!settings.canEdit || saving}
-                    aria-label={t("admin.settingsTimezone")}
-                  >
-                    {timezoneOptions.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {formatTimezoneOptionLabel(tz, dateLocale)}
-                      </option>
-                    ))}
-                  </select>
-                  <p className={`mt-1.5 ${hint}`}>{t("admin.settingsTimezoneHint")}</p>
-                </label>
-
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <label className="block">
-                    <span className={label}>{t("admin.settingsWorkStart")}</span>
-                    <LocaleTimeInput
-                      value={workStart}
-                      onChange={setWorkStart}
+                <div className="mt-4 rounded-xl border border-[var(--apple-separator)] bg-[var(--fill-quaternary)] p-3.5 sm:p-4">
+                  <p className="text-[0.8125rem] font-semibold text-[var(--apple-label-secondary)]">
+                    {t("admin.settingsFreePunch")}
+                  </p>
+                  <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3 sm:items-center">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-0 bg-[var(--fill-secondary)] text-[var(--apple-blue)] accent-[var(--apple-blue)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-50 sm:mt-0"
+                      checked={settings.freePunchEnabled}
                       disabled={!settings.canEdit || saving}
-                      ariaLabel={t("admin.settingsWorkStart")}
-                      className="mt-1.5"
+                      onChange={(e) => void patch({ freePunchEnabled: e.target.checked })}
                     />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
+                        {t("admin.settingsFreePunch")}
+                      </span>
+                      <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
+                        {settings.freePunchEnabled
+                          ? t("admin.settingsFreePunchOnHint")
+                          : t("admin.settingsFreePunchOffHint")}
+                      </span>
+                    </span>
                   </label>
-                  <label className="block">
-                    <span className={label}>{t("admin.settingsWorkEnd")}</span>
+                  <label className="mt-3 block">
+                    <span className={label}>{t("admin.settingsFreePunchRequiredWorkTime")}</span>
                     <LocaleTimeInput
-                      value={workEnd}
-                      onChange={setWorkEnd}
+                      value={freePunchRequiredWorkTime}
+                      onChange={setFreePunchRequiredWorkTime}
                       disabled={!settings.canEdit || saving}
-                      ariaLabel={t("admin.settingsWorkEnd")}
+                      ariaLabel={t("admin.settingsFreePunchRequiredWorkTime")}
                       className="mt-1.5"
                     />
+                    <p className={`mt-1.5 ${hint}`}>{t("admin.settingsFreePunchRequiredWorkTimeHint")}</p>
                   </label>
                 </div>
 
-                <p className="mt-4 text-[0.9375rem] font-semibold text-[var(--foreground)]">
-                  {t("admin.settingsWorkDays")}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {WEEKDAYS.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
+                <div className="mt-4 rounded-xl border border-[var(--apple-separator)] bg-[var(--fill-quaternary)] p-3.5 sm:p-4">
+                  <p className="text-[0.8125rem] font-semibold text-[var(--apple-label-secondary)]">
+                    {t("admin.settingsWorkDays")}
+                  </p>
+                  <label className="mt-3 block">
+                    <span className={label}>{t("admin.settingsTimezone")}</span>
+                    <select
+                      className={`${select} mt-1.5 bg-[var(--fill-secondary)]`}
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
                       disabled={!settings.canEdit || saving}
-                      onClick={() => toggleDay(d)}
-                      className={chipBtn(workDaySet.has(d))}
+                      aria-label={t("admin.settingsTimezone")}
                     >
-                      {weekdayShortLabel(d, locale)}
-                    </button>
-                  ))}
+                      {timezoneOptions.map((tz) => (
+                        <option key={tz} value={tz}>
+                          {formatTimezoneOptionLabel(tz, dateLocale)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className={`mt-1.5 ${hint}`}>{t("admin.settingsTimezoneHint")}</p>
+                  </label>
+
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="block">
+                      <span className={label}>{t("admin.settingsWorkStart")}</span>
+                      <LocaleTimeInput
+                        value={workStart}
+                        onChange={setWorkStart}
+                        disabled={!settings.canEdit || saving}
+                        ariaLabel={t("admin.settingsWorkStart")}
+                        className="mt-1.5"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className={label}>{t("admin.settingsWorkEnd")}</span>
+                      <LocaleTimeInput
+                        value={workEnd}
+                        onChange={setWorkEnd}
+                        disabled={!settings.canEdit || saving}
+                        ariaLabel={t("admin.settingsWorkEnd")}
+                        className="mt-1.5"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {WEEKDAYS.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={!settings.canEdit || saving}
+                        onClick={() => toggleDay(d)}
+                        className={chipBtn(workDaySet.has(d))}
+                      >
+                        {weekdayShortLabel(d, locale)}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {WEEKDAYS.map((day) => {
+                      const dayWindow = workScheduleByDay[day] ?? {
+                        workStartTime: workStart,
+                        workEndTime: workEnd,
+                      };
+                      const active = workDaySet.has(day);
+                      return (
+                        <div
+                          key={`time-${day}`}
+                          className="grid items-center gap-2 rounded-lg bg-[var(--fill-secondary)] px-3 py-2 sm:grid-cols-[3rem_1fr_1fr]"
+                        >
+                          <span className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
+                            {weekdayShortLabel(day, locale)}
+                          </span>
+                          <LocaleTimeInput
+                            value={dayWindow.workStartTime}
+                            onChange={(v) => setDayTime(day, "workStartTime", v)}
+                            disabled={!settings.canEdit || saving || !active}
+                            ariaLabel={`${weekdayShortLabel(day, locale)} ${t("admin.settingsWorkStart")}`}
+                          />
+                          <LocaleTimeInput
+                            value={dayWindow.workEndTime}
+                            onChange={(v) => setDayTime(day, "workEndTime", v)}
+                            disabled={!settings.canEdit || saving || !active}
+                            ariaLabel={`${weekdayShortLabel(day, locale)} ${t("admin.settingsWorkEnd")}`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="mt-4 space-y-2">
-                  {WEEKDAYS.map((day) => {
-                    const dayWindow = workScheduleByDay[day] ?? {
-                      workStartTime: workStart,
-                      workEndTime: workEnd,
-                    };
-                    const active = workDaySet.has(day);
-                    return (
+                <div className="mt-4 rounded-xl border border-[var(--apple-separator)] bg-[var(--fill-quaternary)] p-3.5 sm:p-4">
+                  <p className="text-[0.8125rem] font-semibold text-[var(--apple-label-secondary)]">
+                    {t("admin.settingsShiftPresetsTitle")}
+                  </p>
+                  <p className="mt-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
+                    {t("admin.settingsShiftPresetsLead")}
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    {SHIFT_CODES.map((code) => (
                       <div
-                        key={`time-${day}`}
-                        className="grid items-center gap-2 rounded-lg bg-[var(--fill-secondary)] px-3 py-2 sm:grid-cols-[3rem_1fr_1fr]"
+                        key={code}
+                        className="grid gap-2 rounded-lg bg-[var(--fill-secondary)] px-3 py-3 sm:grid-cols-[4rem_1fr_1fr_1fr]"
                       >
                         <span className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
-                          {weekdayShortLabel(day, locale)}
+                          {code}
                         </span>
-                        <LocaleTimeInput
-                          value={dayWindow.workStartTime}
-                          onChange={(v) => setDayTime(day, "workStartTime", v)}
-                          disabled={!settings.canEdit || saving || !active}
-                          ariaLabel={`${weekdayShortLabel(day, locale)} ${t("admin.settingsWorkStart")}`}
+                        <input
+                          className="h-8 rounded-[0.5rem] bg-[var(--background)] px-2 text-[0.8125rem]"
+                          value={shiftPresets[code].label}
+                          onChange={(e) => setShiftPresetField(code, "label", e.target.value)}
+                          disabled={!settings.canEdit || saving}
+                          aria-label={t("admin.settingsShiftLabel")}
                         />
                         <LocaleTimeInput
-                          value={dayWindow.workEndTime}
-                          onChange={(v) => setDayTime(day, "workEndTime", v)}
-                          disabled={!settings.canEdit || saving || !active}
-                          ariaLabel={`${weekdayShortLabel(day, locale)} ${t("admin.settingsWorkEnd")}`}
+                          value={shiftPresets[code].workStartTime}
+                          onChange={(v) => setShiftPresetField(code, "workStartTime", v)}
+                          disabled={!settings.canEdit || saving}
+                          ariaLabel={`${code} ${t("admin.settingsWorkStart")}`}
+                        />
+                        <LocaleTimeInput
+                          value={shiftPresets[code].workEndTime}
+                          onChange={(v) => setShiftPresetField(code, "workEndTime", v)}
+                          disabled={!settings.canEdit || saving}
+                          ariaLabel={`${code} ${t("admin.settingsWorkEnd")}`}
                         />
                       </div>
-                    );
-                  })}
-                </div>
-
-                <p className="mt-5 text-[0.9375rem] font-semibold text-[var(--foreground)]">
-                  {t("admin.settingsShiftPresetsTitle")}
-                </p>
-                <p className="mt-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
-                  {t("admin.settingsShiftPresetsLead")}
-                </p>
-                <div className="mt-3 space-y-3">
-                  {SHIFT_CODES.map((code) => (
-                    <div
-                      key={code}
-                      className="grid gap-2 rounded-lg bg-[var(--fill-secondary)] px-3 py-3 sm:grid-cols-[4rem_1fr_1fr_1fr]"
-                    >
-                      <span className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
-                        {code}
-                      </span>
-                      <input
-                        className="h-8 rounded-[0.5rem] bg-[var(--background)] px-2 text-[0.8125rem]"
-                        value={shiftPresets[code].label}
-                        onChange={(e) => setShiftPresetField(code, "label", e.target.value)}
-                        disabled={!settings.canEdit || saving}
-                        aria-label={t("admin.settingsShiftLabel")}
-                      />
-                      <LocaleTimeInput
-                        value={shiftPresets[code].workStartTime}
-                        onChange={(v) => setShiftPresetField(code, "workStartTime", v)}
-                        disabled={!settings.canEdit || saving}
-                        ariaLabel={`${code} ${t("admin.settingsWorkStart")}`}
-                      />
-                      <LocaleTimeInput
-                        value={shiftPresets[code].workEndTime}
-                        onChange={(v) => setShiftPresetField(code, "workEndTime", v)}
-                        disabled={!settings.canEdit || saving}
-                        ariaLabel={`${code} ${t("admin.settingsWorkEnd")}`}
-                      />
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
 
                 <ul className="mt-3 list-inside list-disc text-[0.8125rem] text-[var(--apple-label-secondary)]">

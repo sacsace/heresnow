@@ -16,6 +16,17 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+function minutesToHHmm(totalMinutes: number | null | undefined): string {
+  const n = Number.isFinite(totalMinutes) ? Math.max(0, Number(totalMinutes)) : 540;
+  const h = Math.floor(n / 60)
+    .toString()
+    .padStart(2, "0");
+  const m = Math.floor(n % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${h}:${m}`;
+}
+
 function resolveCompanyId(
   role: string | undefined,
   sessionCompanyId: string | null | undefined,
@@ -38,6 +49,8 @@ const companySelect = {
   name: true,
   timezone: true,
   faceRecognitionEnabled: true,
+  freePunchEnabled: true,
+  freePunchRequiredMinutes: true,
   workStartTime: true,
   workEndTime: true,
   workDays: true,
@@ -52,6 +65,8 @@ function settingsPayload(
     name: string;
     timezone: string;
     faceRecognitionEnabled: boolean;
+    freePunchEnabled: boolean;
+    freePunchRequiredMinutes: number;
     workStartTime: string | null;
     workEndTime: string | null;
     workDays: string | null;
@@ -66,6 +81,8 @@ function settingsPayload(
     companyName: company.name,
     timezone: company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE,
     faceRecognitionEnabled: company.faceRecognitionEnabled,
+    freePunchEnabled: company.freePunchEnabled,
+    freePunchRequiredWorkTime: minutesToHHmm(company.freePunchRequiredMinutes),
     workStartTime: company.workStartTime,
     workEndTime: company.workEndTime,
     workDays: company.workDays,
@@ -146,6 +163,8 @@ const patchSchema = z
       })
       .optional(),
     faceRecognitionEnabled: z.boolean().optional(),
+    freePunchEnabled: z.boolean().optional(),
+    freePunchRequiredWorkTime: hhmm.optional(),
     workStartTime: hhmm.nullable().optional(),
     workEndTime: hhmm.nullable().optional(),
     workDays: z
@@ -202,6 +221,19 @@ export async function PATCH(req: Request) {
   }
   if (parsed.data.faceRecognitionEnabled !== undefined) {
     data.faceRecognitionEnabled = parsed.data.faceRecognitionEnabled;
+  }
+  if (parsed.data.freePunchEnabled !== undefined) {
+    data.freePunchEnabled = parsed.data.freePunchEnabled;
+  }
+  if (parsed.data.freePunchRequiredWorkTime !== undefined) {
+    const mins = parseHHmm(parsed.data.freePunchRequiredWorkTime);
+    if (mins == null || mins <= 0) {
+      return NextResponse.json(
+        { error: { fieldErrors: { freePunchRequiredWorkTime: ["총 근무 시간은 00:01 이상이어야 합니다."] } } },
+        { status: 400 }
+      );
+    }
+    data.freePunchRequiredMinutes = mins;
   }
   if (parsed.data.workStartTime !== undefined) {
     data.workStartTime = parsed.data.workStartTime;

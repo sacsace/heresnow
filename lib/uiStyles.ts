@@ -22,7 +22,7 @@ export const appFooterText =
 
 export const appContainer = "px-5 py-8 sm:px-8 sm:py-10 lg:px-10";
 export const appContainerAdmin =
-  "px-5 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-6 lg:px-10";
+  "px-4 pb-7 pt-4 sm:px-5 sm:pb-8 sm:pt-5 lg:px-6 2xl:px-8";
 /** Super/admin 본문 — 네비 직후 콘텐츠 시작 (상단 패딩 축소) */
 export const appContainerSuper =
   "px-4 pb-6 pt-4 sm:px-6 sm:pb-8 sm:pt-5 lg:px-8";

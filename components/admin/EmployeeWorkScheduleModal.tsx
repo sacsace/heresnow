@@ -29,6 +29,7 @@ type Props = {
   employee: EmployeeScheduleTarget | null;
   shiftPresets: ShiftPresetsMap;
   companyDefault: { workStartTime: string; workEndTime: string };
+  allowFreePunchMode: boolean;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -38,6 +39,7 @@ export function EmployeeWorkScheduleModal({
   employee,
   shiftPresets,
   companyDefault,
+  allowFreePunchMode,
   onClose,
   onSaved,
 }: Props) {
@@ -54,7 +56,9 @@ export function EmployeeWorkScheduleModal({
   useEffect(() => {
     if (!open || !employee) return;
     const type =
-      employee.workScheduleType === "SHIFT" || employee.workScheduleType === "CUSTOM"
+      employee.workScheduleType === "SHIFT" ||
+      employee.workScheduleType === "CUSTOM" ||
+      employee.workScheduleType === "FREE"
         ? employee.workScheduleType
         : "COMPANY";
     setMode(type);
@@ -76,6 +80,8 @@ export function EmployeeWorkScheduleModal({
         ? { workScheduleType: "COMPANY" as const }
         : mode === "SHIFT"
           ? { workScheduleType: "SHIFT" as const, shiftCode }
+          : mode === "FREE"
+            ? { workScheduleType: "FREE" as const }
           : {
               workScheduleType: "CUSTOM" as const,
               workStartTime: workStart,
@@ -90,7 +96,13 @@ export function EmployeeWorkScheduleModal({
     const j = await r.json().catch(() => ({}));
     setSaving(false);
     if (!r.ok) {
-      setError(typeof j.error === "string" ? j.error : t("admin.empScheduleSaveFail"));
+      setError(
+        j.error === "FREE_PUNCH_DISABLED"
+          ? t("admin.empScheduleFreeDisabled")
+          : typeof j.error === "string"
+            ? j.error
+            : t("admin.empScheduleSaveFail")
+      );
       return;
     }
     onSaved();
@@ -123,6 +135,9 @@ export function EmployeeWorkScheduleModal({
             <option value="COMPANY">{t("admin.empScheduleModeCompany")}</option>
             <option value="SHIFT">{t("admin.empScheduleModeShift")}</option>
             <option value="CUSTOM">{t("admin.empScheduleModeCustom")}</option>
+            {allowFreePunchMode ? (
+              <option value="FREE">{t("admin.empScheduleModeFree")}</option>
+            ) : null}
           </select>
 
           {mode === "SHIFT" && (

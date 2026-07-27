@@ -5,12 +5,14 @@ import { sessionRoleLabel } from "@/lib/sessionDisplay";
 import { headerUserEmail, headerUserPanel } from "@/lib/uiStyles";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 type Props = { className?: string };
 
 export function HeaderSessionUser({ className = "" }: Props) {
   const { data, status } = useSession();
   const { t } = useI18n();
+  const pathname = usePathname();
 
   if (status === "loading") {
     return (
@@ -25,10 +27,11 @@ export function HeaderSessionUser({ className = "" }: Props) {
 
   const { email, role } = data.user;
   const roleLabel = sessionRoleLabel(email, role, t);
+  const accountHref = pathname.startsWith("/admin") ? "/admin/account" : "/account";
 
   return (
     <Link
-      href="/account"
+      href={accountHref}
       className={`hidden sm:flex ${headerUserPanel} ${className} rounded-md transition-colors hover:bg-[var(--fill-secondary)]`.trim()}
       title={`${email} · ${roleLabel} — ${t("common.myAccount")}`}
       aria-label={t("common.myAccount")}

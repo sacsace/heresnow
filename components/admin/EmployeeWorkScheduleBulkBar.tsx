@@ -18,6 +18,7 @@ type Props = {
   selectedCount: number;
   shiftPresets: ShiftPresetsMap;
   companyDefault: { workStartTime: string; workEndTime: string };
+  allowFreePunchMode: boolean;
   onApply: (payload: {
     workScheduleType: WorkScheduleType;
     shiftCode?: ShiftCode;
@@ -33,6 +34,7 @@ export function EmployeeWorkScheduleBulkBar({
   selectedCount,
   shiftPresets,
   companyDefault,
+  allowFreePunchMode,
   onApply,
   onClearSelection,
   onDeleteSelected,
@@ -58,6 +60,8 @@ export function EmployeeWorkScheduleBulkBar({
         ? { workScheduleType: "COMPANY" }
         : mode === "SHIFT"
           ? { workScheduleType: "SHIFT", shiftCode }
+          : mode === "FREE"
+            ? { workScheduleType: "FREE" }
           : {
               workScheduleType: "CUSTOM",
               workStartTime: workStart,
@@ -86,6 +90,9 @@ export function EmployeeWorkScheduleBulkBar({
               <option value="COMPANY">{t("admin.empScheduleModeCompany")}</option>
               <option value="SHIFT">{t("admin.empScheduleModeShift")}</option>
               <option value="CUSTOM">{t("admin.empScheduleModeCustom")}</option>
+              {allowFreePunchMode ? (
+                <option value="FREE">{t("admin.empScheduleModeFree")}</option>
+              ) : null}
             </select>
           </div>
           {mode === "SHIFT" && (

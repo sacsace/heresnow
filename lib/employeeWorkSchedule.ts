@@ -13,7 +13,7 @@ import {
   type SiteScheduleFields,
 } from "@/lib/siteWorkSchedule";
 
-export type WorkScheduleType = "COMPANY" | "SHIFT" | "CUSTOM";
+export type WorkScheduleType = "COMPANY" | "SHIFT" | "CUSTOM" | "FREE";
 
 export type EmployeeScheduleFields = {
   workScheduleType?: string | null;
@@ -32,7 +32,7 @@ export type CompanyScheduleFields = {
 };
 
 export function parseWorkScheduleType(raw: string | null | undefined): WorkScheduleType {
-  if (raw === "SHIFT" || raw === "CUSTOM") return raw;
+  if (raw === "SHIFT" || raw === "CUSTOM" || raw === "FREE") return raw;
   return "COMPANY";
 }
 
@@ -73,6 +73,15 @@ export function resolveEmployeeWorkSchedule(
       workEndTime: employee.workEndTime ?? companyBase.workEndTime,
       workDays,
       workScheduleByDay: hasByDay ? byDay : employee.workScheduleByDay,
+    };
+  }
+
+  if (type === "FREE") {
+    return {
+      workStartTime: companyBase.workStartTime,
+      workEndTime: companyBase.workEndTime,
+      workDays,
+      workScheduleByDay: companyBase.workScheduleByDay,
     };
   }
 
@@ -117,6 +126,13 @@ export function employeeScheduleSummary(
   const resolved = resolveEmployeeWorkSchedule(employee, company);
   const start = resolved.workStartTime ?? "09:00";
   const end = resolved.workEndTime ?? "18:00";
+  if (type === "FREE") {
+    return {
+      workScheduleType: "FREE",
+      shiftCode: null,
+      label: locale === "en" ? "Free check-in/out" : "자유 출퇴근",
+    };
+  }
   return {
     workScheduleType: "CUSTOM",
     shiftCode: null,

@@ -1,0 +1,6 @@
+DO $$
+BEGIN
+  ALTER TYPE "Role" ADD VALUE 'DRIVER';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;

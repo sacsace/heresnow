@@ -3,6 +3,7 @@
 import { useI18n } from "@/components/LanguageProvider";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 /**
  * 모바일 전용(sm:hidden) "내 계정" 아이콘 버튼.
@@ -11,12 +12,14 @@ import Link from "next/link";
 export function HeaderAccountIconLink() {
   const { t } = useI18n();
   const { status } = useSession();
+  const pathname = usePathname();
 
   if (status !== "authenticated") return null;
+  const accountHref = pathname.startsWith("/admin") ? "/admin/account" : "/account";
 
   return (
     <Link
-      href="/account"
+      href={accountHref}
       aria-label={t("common.myAccount")}
       title={t("common.myAccount")}
       className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.625rem] bg-[var(--fill-secondary)] text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] sm:hidden"

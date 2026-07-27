@@ -30,6 +30,7 @@ export async function GET() {
       where: { id: session.user.companyId },
       select: {
         timezone: true,
+        freePunchEnabled: true,
         workStartTime: true,
         workEndTime: true,
         workDays: true,
@@ -56,6 +57,8 @@ export async function GET() {
 
   const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const now = new Date();
+  const freePunchEnabled =
+    Boolean(company.freePunchEnabled) && employee.workScheduleType === "FREE";
 
   const lastRecord = await prisma.attendanceRecord.findFirst({
     where: {
@@ -74,6 +77,7 @@ export async function GET() {
 
   // "지금 퇴근하면 조퇴인가?" — 클라이언트가 사유 입력 UI 를 노출할지 결정
   const earlyLeaveExpected =
+    !freePunchEnabled &&
     eligibility.canCheckOut &&
     lastRecord?.type === "CHECK_IN" &&
     isCheckOutEarly(now, lastRecord.timestamp, tz, effectiveSchedule);
@@ -102,7 +106,8 @@ export async function GET() {
     lateCheckOutPastWindow,
     lateCheckOutRecordedAt,
     lateCheckOutTimeBasis,
-    reCheckInApprovalRequired: eligibility.reCheckInApprovalRequired,
+    reCheckInApprovalRequired: freePunchEnabled ? false : eligibility.reCheckInApprovalRequired,
+    freePunchEnabled,
     workEndTime: effectiveSchedule.workEndTime ?? company.workEndTime,
   });
 }

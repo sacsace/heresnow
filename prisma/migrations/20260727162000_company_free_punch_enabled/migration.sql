@@ -1,0 +1,2 @@
+ALTER TABLE "Company"
+ADD COLUMN IF NOT EXISTS "freePunchEnabled" BOOLEAN NOT NULL DEFAULT false;

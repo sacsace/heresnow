@@ -38,7 +38,7 @@ const patchSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase().trim()).optional(),
   password: z.string().min(MIN_PASSWORD_LENGTH).max(200).optional(),
   role: z.enum(COMPANY_ROLES).optional(),
-  workScheduleType: z.enum(["COMPANY", "SHIFT", "CUSTOM"]).optional(),
+  workScheduleType: z.enum(["COMPANY", "SHIFT", "CUSTOM", "FREE"]).optional(),
   shiftCode: z.enum(["A", "B", "C"]).nullable().optional(),
   workStartTime: z
     .string()
@@ -148,6 +148,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const wantsPasswordChange = parsed.data.password !== undefined;
+  if (parsed.data.workScheduleType === "FREE") {
+    const company = await prisma.company.findUnique({
+      where: { id: resolved.companyId },
+      select: { freePunchEnabled: true },
+    });
+    if (!company?.freePunchEnabled) {
+      return NextResponse.json({ error: "FREE_PUNCH_DISABLED" }, { status: 400 });
+    }
+  }
 
   const schedulePatch: Prisma.EmployeeUpdateInput = {};
 
@@ -181,6 +190,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             ? Prisma.JsonNull
             : (normalizeWorkScheduleByDay(parsed.data.workScheduleByDay) as Prisma.InputJsonValue);
       }
+    } else if (parsed.data.workScheduleType === "FREE") {
+      schedulePatch.shiftCode = null;
+      schedulePatch.workStartTime = null;
+      schedulePatch.workEndTime = null;
+      schedulePatch.workScheduleByDay = Prisma.JsonNull;
     }
   } else if (parsed.data.shiftCode !== undefined) {
     if (parsed.data.shiftCode && !isShiftCode(parsed.data.shiftCode)) {

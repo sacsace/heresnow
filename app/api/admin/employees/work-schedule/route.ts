@@ -14,7 +14,7 @@ const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
 const bulkSchema = z.object({
   employeeIds: z.array(z.string().min(1)).min(1).max(500),
-  workScheduleType: z.enum(["COMPANY", "SHIFT", "CUSTOM"]),
+  workScheduleType: z.enum(["COMPANY", "SHIFT", "CUSTOM", "FREE"]),
   shiftCode: z.enum(["A", "B", "C"]).optional(),
   workStartTime: hhmm.optional(),
   workEndTime: hhmm.optional(),
@@ -59,6 +59,15 @@ export async function PATCH(req: Request) {
   if (workScheduleType === "CUSTOM" && (!workStartTime || !workEndTime)) {
     return NextResponse.json({ error: "CUSTOM_TIMES_REQUIRED" }, { status: 400 });
   }
+  if (workScheduleType === "FREE") {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { freePunchEnabled: true },
+    });
+    if (!company?.freePunchEnabled) {
+      return NextResponse.json({ error: "FREE_PUNCH_DISABLED" }, { status: 400 });
+    }
+  }
 
   const count = await prisma.employee.count({
     where: { companyId, id: { in: employeeIds } },
@@ -84,7 +93,15 @@ export async function PATCH(req: Request) {
             workEndTime: null,
             workScheduleByDay: Prisma.JsonNull,
           }
-        : {
+        : workScheduleType === "FREE"
+          ? {
+              workScheduleType: "FREE",
+              shiftCode: null,
+              workStartTime: null,
+              workEndTime: null,
+              workScheduleByDay: Prisma.JsonNull,
+            }
+          : {
             workScheduleType: "CUSTOM",
             shiftCode: null,
             workStartTime: workStartTime!,

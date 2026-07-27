@@ -20,7 +20,7 @@ export async function GET() {
   const orders = await prisma.paymentOrder.findMany({
     where: { companyId, status: "PAID" },
     orderBy: { paidAt: "desc" },
-    take: 100,
+    take: 5,
   });
 
   return NextResponse.json({

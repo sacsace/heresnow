@@ -200,6 +200,46 @@ export function evaluateCheckOutWorkFlags(
   };
 }
 
+/**
+ * 자유 출퇴근 모드 퇴근 판정.
+ * - 조퇴/지각 개념 없이 자유 출퇴근 허용
+ * - 회사 기본 근무 시간 구간 밖에서 근무한 분을 초과근무로 계산
+ */
+export function evaluateFreePunchCheckOutWorkFlags(
+  checkOutAt: Date,
+  checkInAt: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule,
+  requiredMinutes: number
+): AttendanceWorkFlags {
+  const totalMinutes = Math.max(0, Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60_000));
+  const baseMinutes = Math.max(1, Math.floor(requiredMinutes));
+  const tz = timeZone.trim() || "UTC";
+  const onWorkDay = isWorkDay(checkInAt, tz, parseWorkDays(schedule.workDays));
+
+  if (!onWorkDay) {
+    return {
+      isLate: false,
+      isEarlyLeave: false,
+      isOvertime: totalMinutes > 0,
+      isHolidayWork: true,
+      lateMinutes: 0,
+      overtimeMinutes: totalMinutes,
+    };
+  }
+
+  const overtimeMinutes = Math.max(0, totalMinutes - baseMinutes);
+
+  return {
+    isLate: false,
+    isEarlyLeave: false,
+    isOvertime: overtimeMinutes > 0,
+    isHolidayWork: false,
+    lateMinutes: 0,
+    overtimeMinutes,
+  };
+}
+
 export function evaluateAttendanceWorkFlags(
   timestamp: Date,
   timeZone: string,

@@ -547,7 +547,7 @@ export function EmployeeListTable({
                               : undefined
                         }
                       >
-                        {e.loginEligibleByAdmin
+                          {e.loginEligibleByAdmin
                           ? e.user.role === "DOOR"
                             ? t("admin.employeesLoginEligibleDoor")
                             : t("admin.employeesLoginEligibleAdmin")

@@ -1,6 +1,7 @@
 import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { randomUUID } from "crypto";
 
 export async function authorizeCredentials(credentials: Partial<Record<"email" | "password", unknown>>) {
   const email = credentials?.email as string | undefined;
@@ -14,7 +15,9 @@ export async function authorizeCredentials(credentials: Partial<Record<"email" |
       include: { employee: true },
     });
   } catch (e) {
-    console.error("[auth] DB 연결 실패 — .env 의 DATABASE_URL(비밀번호·호스트)을 확인하세요.", e);
+    if (process.env.NODE_ENV === "development") {
+      console.error("[auth] DB 연결 실패 — DATABASE_URL 확인", e);
+    }
     return null;
   }
   if (!user) return null;
@@ -22,11 +25,18 @@ export async function authorizeCredentials(credentials: Partial<Record<"email" |
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return null;
 
+  const sessionNonce = randomUUID();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { sessionNonce },
+  });
+
   return {
     id: user.id,
     email: user.email,
     role: user.role as Role,
     companyId: user.companyId,
     employeeId: user.employee?.id ?? null,
+    sessionNonce,
   };
 }

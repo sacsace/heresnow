@@ -23,7 +23,9 @@ export const authConfig = {
       console.error("[auth]", error);
     },
     warn(code) {
-      console.warn("[auth]", code);
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[auth]", code);
+      }
     },
     debug(message, metadata) {
       if (process.env.NODE_ENV === "development") {
@@ -54,6 +56,25 @@ export const authConfig = {
         token.role = (user as { role: Role }).role;
         token.companyId = (user as { companyId: string | null }).companyId;
         token.employeeId = (user as { employeeId: string | null }).employeeId;
+        token.sessionNonce = (user as { sessionNonce?: string | null }).sessionNonce ?? null;
+      }
+
+      const runtime = (globalThis as { EdgeRuntime?: string }).EdgeRuntime;
+      const isEdgeRuntime = typeof runtime === "string" && runtime.length > 0;
+      if (!isEdgeRuntime && token.sub && typeof token.sessionNonce === "string") {
+        try {
+          const { prisma } = await import("@/lib/prisma");
+          const current = await prisma.user.findUnique({
+            where: { id: token.sub },
+            select: { sessionNonce: true },
+          });
+          if (!current?.sessionNonce || current.sessionNonce !== token.sessionNonce) {
+            return {};
+          }
+        } catch {
+          // 인증 검증 실패 시 기존 토큰 유지(가용성 우선)
+          return token;
+        }
       }
       return token;
     },

@@ -263,6 +263,10 @@ export const ko = {
     employeesDepartmentFilter: "부서",
     employeesDepartmentAll: "전체 부서",
     employeesDepartmentUnassigned: "부서 미배정",
+    employeesViewAll: "전체보기",
+    employeesViewPaged: "페이지로 보기",
+    employeesPagePrev: "이전",
+    employeesPageNext: "다음",
     employeesSearchClear: "초기화",
     employeesSearchResultCount: "{shown} / {total}명 표시",
     employeesPaidSeatCapacity:
@@ -282,10 +286,12 @@ export const ko = {
     empScheduleModeCompany: "회사 기본",
     empScheduleModeShift: "교대(3교대)",
     empScheduleModeCustom: "개별 지정",
+    empScheduleModeFree: "자유 출퇴근",
     empScheduleShiftLabel: "교대",
     empScheduleSave: "저장",
     empScheduleCancel: "취소",
     empScheduleSaveFail: "근무 시간 저장에 실패했습니다.",
+    empScheduleFreeDisabled: "회사 설정에서 자유 출퇴근을 먼저 켜주세요.",
     empScheduleBulkTitle: "선택 {count}명 — 근무 시간 일괄 적용",
     empScheduleBulkApply: "일괄 적용",
     empScheduleBulkClear: "선택 해제",
@@ -642,6 +648,14 @@ export const ko = {
     settingsSaved: "저장되었습니다.",
     settingsWorkTitle: "근무 시간·요일",
     settingsWorkLead: "회사 타임존 기준으로 지각·조퇴·초과근무·휴일근무를 자동 판정합니다.",
+    settingsFreePunch: "자유 출퇴근",
+    settingsFreePunchOnHint:
+      "켜짐: 체크인/체크아웃 승인 제약 없이 자유롭게 기록합니다. 기본 근무시간 밖은 초과근무로 계산됩니다.",
+    settingsFreePunchOffHint:
+      "꺼짐: 조퇴 사유·재출근 승인 등 기본 정책을 적용합니다.",
+    settingsFreePunchRequiredWorkTime: "총 근무 시간 (자유 출퇴근 기준)",
+    settingsFreePunchRequiredWorkTimeHint:
+      "예: 08:00 입력 시 8시간을 초과한 근무만 추가 근무로 계산됩니다.",
     settingsTimezone: "시간대 (타임존)",
     settingsTimezoneHint:
       "기본은 인도 표준시(IST, Asia/Kolkata)입니다. 출퇴근·오늘 현황·월간 통계·지각/조퇴 판정에 사용됩니다.",
@@ -1256,6 +1270,10 @@ export const en = {
     employeesDepartmentFilter: "Department",
     employeesDepartmentAll: "All departments",
     employeesDepartmentUnassigned: "Unassigned",
+    employeesViewAll: "View all",
+    employeesViewPaged: "Paginated view",
+    employeesPagePrev: "Prev",
+    employeesPageNext: "Next",
     employeesSearchClear: "Clear",
     employeesSearchResultCount: "Showing {shown} of {total}",
     employeesPaidSeatCapacity:
@@ -1275,10 +1293,12 @@ export const en = {
     empScheduleModeCompany: "Company default",
     empScheduleModeShift: "Shift (3-shift)",
     empScheduleModeCustom: "Custom",
+    empScheduleModeFree: "Free check-in/out",
     empScheduleShiftLabel: "Shift",
     empScheduleSave: "Save",
     empScheduleCancel: "Cancel",
     empScheduleSaveFail: "Could not save work schedule.",
+    empScheduleFreeDisabled: "Enable free check-in/out in company settings first.",
     empScheduleBulkTitle: "{count} selected — apply schedule",
     empScheduleBulkApply: "Apply to selected",
     empScheduleBulkClear: "Clear selection",
@@ -1641,6 +1661,14 @@ export const en = {
     settingsSaved: "Saved.",
     settingsWorkTitle: "Work hours & days",
     settingsWorkLead: "Late, early leave, overtime, and holiday work are judged in the company timezone.",
+    settingsFreePunch: "Free check-in/out",
+    settingsFreePunchOnHint:
+      "On: check-in/check-out can be recorded freely without approval constraints. Time outside scheduled hours is counted as overtime.",
+    settingsFreePunchOffHint:
+      "Off: default rules such as early-leave reason and re-check-in approval are applied.",
+    settingsFreePunchRequiredWorkTime: "Total work hours (for free check-in/out)",
+    settingsFreePunchRequiredWorkTimeHint:
+      "Example: with 08:00, only work beyond 8 hours is counted as overtime.",
     settingsTimezone: "Time zone",
     settingsTimezoneHint:
       "Default is India Standard Time (IST, Asia/Kolkata). Used for attendance, today’s overview, monthly stats, and late/early-leave rules.",

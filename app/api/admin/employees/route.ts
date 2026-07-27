@@ -49,6 +49,7 @@ export async function GET(req: Request) {
         where: { id: companyId },
         select: {
           seatLimit: true,
+          freePunchEnabled: true,
           workStartTime: true,
           workEndTime: true,
           workDays: true,
@@ -80,6 +81,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       employees: employeesWithLogin,
       seatLimit: company.seatLimit,
+      freePunchEnabled: company.freePunchEnabled,
       shiftPresets,
       companySchedule,
     });

@@ -69,6 +69,7 @@ type Emp = {
 };
 
 const profileEditRoles = new Set<Role>(["COMPANY_ADMIN", "HR_MANAGER", "SUPER_ADMIN"]);
+const EMPLOYEES_PAGE_SIZE = 10;
 
 export default function AdminEmployeesPage() {
   const { t, locale } = useI18n();
@@ -100,11 +101,14 @@ export default function AdminEmployeesPage() {
     workStartTime: "09:00",
     workEndTime: "18:00",
   });
+  const [companyFreePunchEnabled, setCompanyFreePunchEnabled] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [scheduleModalEmp, setScheduleModalEmp] = useState<EmployeeScheduleTarget | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilterId, setDepartmentFilterId] = useState("");
+  const [listViewMode, setListViewMode] = useState<"all" | "paged">("paged");
+  const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<Emp | null>(null);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<string[] | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -142,6 +146,7 @@ export default function AdminEmployeesPage() {
           workStartTime: companySchedule.workStartTime ?? "09:00",
           workEndTime: companySchedule.workEndTime ?? "18:00",
         });
+        setCompanyFreePunchEnabled(Boolean(ej.freePunchEnabled));
         const loc: ShiftLocale = locale === "en" ? "en" : "ko";
         setShiftPresets(
           localizeShiftPresetsMap(
@@ -274,6 +279,22 @@ export default function AdminEmployeesPage() {
     });
   }, [employees, searchQuery, departmentFilterId]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / EMPLOYEES_PAGE_SIZE));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, departmentFilterId, listViewMode]);
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
+
+  const visibleEmployees = useMemo(() => {
+    if (listViewMode === "all") return filteredEmployees;
+    const start = (currentPage - 1) * EMPLOYEES_PAGE_SIZE;
+    return filteredEmployees.slice(start, start + EMPLOYEES_PAGE_SIZE);
+  }, [filteredEmployees, listViewMode, currentPage]);
+
   useEffect(() => {
     const visible = new Set(filteredEmployees.map((e) => e.id));
     setSelectedIds((prev) => {
@@ -307,7 +328,7 @@ export default function AdminEmployeesPage() {
   }
 
   async function bulkApplySchedule(payload: {
-    workScheduleType: "COMPANY" | "SHIFT" | "CUSTOM";
+    workScheduleType: "COMPANY" | "SHIFT" | "CUSTOM" | "FREE";
     shiftCode?: "A" | "B" | "C";
     workStartTime?: string;
     workEndTime?: string;
@@ -776,6 +797,7 @@ export default function AdminEmployeesPage() {
             selectedCount={selectedIds.size}
             shiftPresets={shiftPresets}
             companyDefault={companyDefault}
+            allowFreePunchMode={companyFreePunchEnabled}
             onApply={bulkApplySchedule}
             onClearSelection={() => setSelectedIds(new Set())}
             onDeleteSelected={openBulkDeleteConfirm}
@@ -832,6 +854,22 @@ export default function AdminEmployeesPage() {
                   {t("admin.employeesSearchClear")}
                 </button>
               )}
+              <div className="ml-auto flex items-end gap-2">
+                <button
+                  type="button"
+                  className={listViewMode === "all" ? btnPrimary : btnSecondary}
+                  onClick={() => setListViewMode("all")}
+                >
+                  {t("admin.employeesViewAll")}
+                </button>
+                <button
+                  type="button"
+                  className={listViewMode === "paged" ? btnPrimary : btnSecondary}
+                  onClick={() => setListViewMode("paged")}
+                >
+                  {t("admin.employeesViewPaged")}
+                </button>
+              </div>
             </div>
             {paidSeatLine && (
               <p className="mt-3 text-[0.8125rem] font-medium leading-relaxed text-[var(--apple-label-secondary)]">
@@ -859,7 +897,7 @@ export default function AdminEmployeesPage() {
             </p>
           ) : (
             <EmployeeListTable
-            employees={filteredEmployees}
+            employees={visibleEmployees}
             departments={departments}
             canEditProfile={canEditProfile}
             canEditRoles={canEditRoles}
@@ -894,6 +932,37 @@ export default function AdminEmployeesPage() {
             onToggleSelectAll={canEditProfile ? toggleSelectAll : undefined}
           />
           )}
+
+          {filteredEmployees.length > 0 && listViewMode === "paged" && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+              <button
+                type="button"
+                className={btnSecondary}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+              >
+                {t("admin.employeesPagePrev")}
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={page === currentPage ? btnPrimary : btnSecondary}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={btnSecondary}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                {t("admin.employeesPageNext")}
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -902,6 +971,7 @@ export default function AdminEmployeesPage() {
         employee={scheduleModalEmp}
         shiftPresets={shiftPresets}
         companyDefault={companyDefault}
+        allowFreePunchMode={companyFreePunchEnabled}
         onClose={() => {
           setScheduleModalOpen(false);
           setScheduleModalEmp(null);

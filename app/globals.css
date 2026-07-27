@@ -11,31 +11,32 @@
 @tailwind utilities;
 
 :root {
-  --foreground: #1d1d1f;
-  --background: #f2f2f7;
+  --foreground: #2f3b4c;
+  --background: #ffffff;
   --grouped-bg: #ffffff;
-  --bar-bg: rgba(255, 255, 255, 0.82);
+  --bar-bg: rgba(255, 252, 247, 0.9);
   --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
 
-  /* Apple system colors */
-  --apple-blue: #007aff;
-  --apple-green: #34c759;
-  --apple-green-dark: #248a3d;
-  --apple-red: #ff3b30;
-  --apple-orange: #ff9500;
+  /* Warm + cool pastel accents */
+  --apple-blue: #6e98cf;
+  --apple-green: #6ca79a;
+  --apple-green-dark: #467268;
+  --apple-red: #d78a79;
+  --apple-orange: #d9ad72;
   --apple-orange-dark: #8a6100;
+  --pastel-blue-strong: #e9f2ff;
 
   /* Labels & fills */
-  --apple-label-secondary: rgba(60, 60, 67, 0.6);
-  --apple-label-tertiary: rgba(60, 60, 67, 0.4);
-  --fill-secondary: rgba(120, 120, 128, 0.12);
-  --fill-secondary-hover: rgba(120, 120, 128, 0.16);
-  --fill-tertiary: rgba(120, 120, 128, 0.08);
+  --apple-label-secondary: rgba(72, 86, 108, 0.74);
+  --apple-label-tertiary: rgba(83, 96, 118, 0.5);
+  --fill-secondary: rgba(164, 190, 224, 0.18);
+  --fill-secondary-hover: rgba(152, 180, 218, 0.26);
+  --fill-tertiary: rgba(195, 214, 238, 0.16);
 
   /* Hairline separators (HIG) */
-  --separator: rgba(60, 60, 67, 0.29);
-  --separator-opaque: #c6c6c8;
+  --separator: rgba(126, 143, 169, 0.24);
+  --separator-opaque: #d8e3f1;
 
   /**
    * App shell content column — viewport 전체를 쓰고 max-width 로만 상한.

@@ -40,11 +40,12 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
+  const accountHref = pathname.startsWith("/admin") ? "/admin/account" : "/account";
   const userEmail = session?.user?.email ?? null;
   const roleLabel = userEmail
     ? sessionRoleLabel(userEmail, session?.user?.role ?? "EMPLOYEE", t)
     : null;
-  const accountActive = isActive("/account");
+  const accountActive = isActive(accountHref);
 
   useEffect(() => {
     setMounted(true);
@@ -136,7 +137,7 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
           {userEmail && (
             <div className="border-t border-[var(--separator)] p-2">
               <Link
-                href="/account"
+                href={accountHref}
                 onClick={() => setOpen(false)}
                 aria-current={accountActive ? "page" : undefined}
                 className={`block rounded-[0.625rem] px-3 py-2.5 transition-colors ${
