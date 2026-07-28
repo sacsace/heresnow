@@ -70,7 +70,7 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
         <div className="mx-auto flex w-full min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8 2xl:px-10">
           <div className="flex min-w-0 items-center gap-2.5">
             <MobileNavDrawer items={links} />
-            <AppLogo href="/admin" title="Minsub Ventures" className="min-w-0" />
+            <AppLogo href="/admin" title="HeresNow" className="min-w-0" />
           </div>
           <AppHeaderActions />
         </div>
