@@ -398,6 +398,7 @@ export default function SuperPage() {
             <table className={table}>
               <thead className={tableHead}>
                 <tr>
+                  <th className={`${th} w-[4.5rem]`}>#</th>
                   <th className={th}>{t("super.thName")}</th>
                   <th className={`${th} w-[7rem] min-w-[7rem]`}>{t("super.thSeatCap")}</th>
                   <th className={`${th} w-[10.5rem]`}>{t("super.thSubscriptionEnd")}</th>
@@ -408,13 +409,16 @@ export default function SuperPage() {
               <tbody>
                 {filteredCompanies.length === 0 ? (
                   <tr className={tableRow}>
-                    <td className={`${td} py-6 text-center text-[var(--apple-label-tertiary)]`} colSpan={5}>
+                    <td className={`${td} py-6 text-center text-[var(--apple-label-tertiary)]`} colSpan={6}>
                       {t("super.searchNoResults")}
                     </td>
                   </tr>
                 ) : (
-                  filteredCompanies.map((c) => (
+                  filteredCompanies.map((c, idx) => (
                     <tr key={c.id} className={tableRow}>
+                      <td className={`${td} w-[4.5rem] text-[var(--apple-label-secondary)] tabular-nums`}>
+                        {idx + 1}
+                      </td>
                       <td className={td}>
                         <div className="flex min-w-[12rem] max-w-md items-center gap-2">
                           {editingNameId === c.id ? (

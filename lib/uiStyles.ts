@@ -282,10 +282,10 @@ export const segmentedBtn = (active: boolean) =>
 
 /** Language toggle (app header — compact, h-9 to match sign-out) */
 export const langSegmentedWrap =
-  "inline-flex h-9 shrink-0 overflow-hidden rounded-[0.625rem] bg-[var(--fill-secondary)] p-0.5";
+  "inline-flex h-7 shrink-0 overflow-hidden rounded-[0.5rem] bg-[var(--fill-secondary)] p-0.5";
 
 export const langSegmentedBtn = (active: boolean) =>
-  `flex h-8 min-w-[2.25rem] shrink-0 items-center justify-center whitespace-nowrap rounded-[0.4375rem] px-2 text-[0.75rem] font-semibold transition-colors sm:min-w-[4rem] sm:px-2.5 sm:text-[0.8125rem] ${
+  `flex h-6 min-w-[1.75rem] shrink-0 items-center justify-center whitespace-nowrap rounded-[0.375rem] px-1.5 text-[0.625rem] font-semibold transition-colors sm:min-w-[2rem] sm:px-1.5 sm:text-[0.6875rem] ${
     active
       ? "bg-white text-[var(--foreground)]"
       : "text-[var(--apple-label-secondary)] hover:text-[var(--foreground)]"
