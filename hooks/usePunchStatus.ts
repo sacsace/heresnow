@@ -7,8 +7,11 @@ export type PunchStatus = {
   canCheckIn: boolean;
   canCheckOut: boolean;
   checkInBlock: "ALREADY_CHECKED_IN" | "COOLDOWN" | null;
+  checkOutBlock?: "NOT_CHECKED_IN" | "MIN_INTERVAL" | null;
   checkInMessage: string | null;
+  checkOutMessage?: string | null;
   nextCheckInAt: string | null;
+  nextCheckOutAt?: string | null;
   lastType: "CHECK_IN" | "CHECK_OUT" | null;
   lastTimestamp: string | null;
   today: string;

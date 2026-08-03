@@ -65,14 +65,14 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
   const activeLabel = activeItem?.label ?? t("admin.navDashboard");
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)]">
-      <header className="z-40 shrink-0 border-b border-[#cfd9e8] bg-[var(--bar-bg)] pt-[env(safe-area-inset-top,0px)] backdrop-blur-xl">
+    <div className="flex min-h-dvh flex-col bg-[#f5f6f8] text-[var(--foreground)]">
+      <header className="z-40 shrink-0 border-b border-[#d7dce4] bg-white pt-[env(safe-area-inset-top,0px)]">
         <div className="mx-auto flex w-full max-w-[1366px] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <MobileNavDrawer items={links} />
             <AppLogo href="/admin" title="HeresNow" className="min-w-0" />
             <nav
-              className="hidden min-w-0 flex-1 rounded-xl bg-white/95 px-2 py-1.5 lg:flex"
+              className="hidden min-w-0 flex-1 rounded-lg border border-[#dde2ea] bg-[#f3f5f8] px-2 py-1.5 lg:flex"
               aria-label={t("admin.navDashboard")}
             >
               <div className="grid w-full min-w-0 grid-cols-8 items-center gap-1">
@@ -82,10 +82,10 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`relative inline-flex h-9 min-w-0 items-center justify-center rounded-[0.625rem] px-2 text-[0.75rem] font-semibold transition-colors xl:px-3 xl:text-[0.8125rem] ${
+                      className={`relative inline-flex h-9 min-w-0 items-center justify-center rounded-[0.55rem] px-2 text-[0.75rem] font-semibold transition-colors xl:px-3 xl:text-[0.8125rem] ${
                         active
-                          ? "bg-[#2f5ea8] text-white shadow-sm"
-                          : "text-[#324763] hover:bg-[#edf3fb] hover:text-[#1f2f46]"
+                          ? "bg-[#2f4f80] text-white"
+                          : "text-[#3a4b63] hover:bg-white hover:text-[#1f2a3a]"
                       }`}
                     >
                       <span className="truncate">{link.label}</span>
@@ -101,8 +101,8 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
 
       <div className="flex-1">
         <div className="mx-auto flex w-full max-w-[1366px] min-w-0 px-3 pb-3 pt-4 sm:px-4 lg:px-5">
-          <section className="flex min-w-0 flex-1 flex-col rounded-2xl border border-[#cfd9e8] bg-white shadow-[0_10px_24px_rgba(49,69,102,0.12)]">
-            <div className="flex items-center justify-between border-b border-[#cfd9e8] bg-[#f0f4fa] px-4 py-3 sm:px-5">
+          <section className="flex min-w-0 flex-1 flex-col rounded-2xl border border-[#d7dce4] bg-white shadow-[0_6px_16px_rgba(31,42,58,0.08)]">
+            <div className="flex items-center justify-between border-b border-[#d7dce4] bg-[#f7f9fc] px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <p className="truncate text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--apple-label-tertiary)]">
                   {activeGroup?.label ?? "Core"}
@@ -116,7 +116,7 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
             <main className="flex-1">
               <div className={`w-full min-w-0 ${bodyClassName}`.trim()}>{children}</div>
             </main>
-            <div className="border-t border-[#cfd9e8] bg-[#f8fbff] px-3 py-3 sm:px-5">
+            <div className="border-t border-[#d7dce4] bg-[#fafbfc] px-3 py-3 sm:px-5">
               <div className="flex w-full flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                 <LegalFooterLinks
                   layout="inline"

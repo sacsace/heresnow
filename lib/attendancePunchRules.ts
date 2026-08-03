@@ -1,8 +1,10 @@
 import type { AttendanceType } from "@prisma/client";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
-/** 퇴근 후 이 시간 이내 재출근 시 관리자 승인 필요 */
+/** 퇴근 후 이 시간 이내 재출근 차단 */
 export const FOUR_H_MS = 4 * 60 * 60 * 1000;
+/** 출근/퇴근 직후 반대 펀치를 잠시 차단(연속 오조작 방지) */
+export const MIN_PUNCH_GAP_MS = 3 * 60 * 1000;
 /** @deprecated 6시간 쿨다운 — 4시간 승인 규칙으로 대체됨 */
 export const SIX_H_MS = 6 * 60 * 60 * 1000;
 /** 출근 후 최대 퇴근 가능 시간 (철야·익일 퇴근 포함) */
@@ -36,10 +38,13 @@ export type PunchEligibility = {
   canCheckIn: boolean;
   canCheckOut: boolean;
   checkInBlock: "ALREADY_CHECKED_IN" | "COOLDOWN" | null;
-  /** 퇴근 후 4시간 이내 재출근 — 사유·관리자 승인 필요 */
+  checkOutBlock: "NOT_CHECKED_IN" | "MIN_INTERVAL" | null;
+  /** 레거시 호환: 이전 승인 플로우 플래그(현재는 항상 false) */
   reCheckInApprovalRequired: boolean;
   /** COOLDOWN 일 때 다음 출근 가능 시각 (ISO) — 레거시 */
   nextCheckInAt: string | null;
+  /** MIN_INTERVAL 일 때 다음 퇴근 가능 시각 (ISO) */
+  nextCheckOutAt: string | null;
 };
 
 /**
@@ -47,8 +52,8 @@ export type PunchEligibility = {
  * 규칙
  *  - 마지막 기록이 출근이면: 출근 불가, 퇴근 가능
  *  - 마지막 기록이 퇴근이면:
- *      · 퇴근 후 4시간 이내(같은 회사일) → 재출근 가능, 관리자 승인 필요
- *      · 4시간 경과 또는 회사 시간대 기준 날짜 변경 → 재출근 가능(승인 불필요)
+ *      · 퇴근 후 4시간 이내(같은 회사일) → 출근 불가(COOLDOWN)
+ *      · 4시간 경과 또는 회사 시간대 기준 날짜 변경 → 재출근 가능
  *  - 기록이 없으면: 출근 가능
  */
 export function evaluatePunchEligibility(
@@ -62,19 +67,28 @@ export function evaluatePunchEligibility(
       canCheckIn: true,
       canCheckOut: false,
       checkInBlock: null,
+      checkOutBlock: "NOT_CHECKED_IN",
       reCheckInApprovalRequired: false,
       nextCheckInAt: null,
+      nextCheckOutAt: null,
     };
   }
 
   if (lastRecord.type === "CHECK_IN") {
+    const elapsed = now.getTime() - lastRecord.timestamp.getTime();
+    const minGapPass = elapsed >= MIN_PUNCH_GAP_MS;
+    const nextCheckOutAt = minGapPass
+      ? null
+      : new Date(lastRecord.timestamp.getTime() + MIN_PUNCH_GAP_MS).toISOString();
     return {
       isCheckedIn: true,
       canCheckIn: false,
-      canCheckOut: true,
+      canCheckOut: minGapPass,
       checkInBlock: "ALREADY_CHECKED_IN",
+      checkOutBlock: minGapPass ? null : "MIN_INTERVAL",
       reCheckInApprovalRequired: false,
       nextCheckInAt: null,
+      nextCheckOutAt,
     };
   }
 
@@ -90,8 +104,10 @@ export function evaluatePunchEligibility(
       canCheckIn: true,
       canCheckOut: false,
       checkInBlock: null,
+      checkOutBlock: "NOT_CHECKED_IN",
       reCheckInApprovalRequired: false,
       nextCheckInAt: null,
+      nextCheckOutAt: null,
     };
   }
 
@@ -109,11 +125,13 @@ export function evaluatePunchEligibility(
 
   return {
     isCheckedIn: false,
-    canCheckIn: true,
+    canCheckIn: false,
     canCheckOut: false,
-    checkInBlock: null,
-    reCheckInApprovalRequired: true,
+    checkInBlock: "COOLDOWN",
+    checkOutBlock: "NOT_CHECKED_IN",
+    reCheckInApprovalRequired: false,
     nextCheckInAt: nextAt.toISOString(),
+    nextCheckOutAt: null,
   };
 }
 
@@ -124,13 +142,25 @@ export function checkInErrorMessage(
     return "이미 출근하였습니다. 먼저 퇴근해 주세요.";
   }
   if (block === "COOLDOWN") {
-    return "퇴근 후 4시간이 지나거나 자정이 지나야 승인 없이 다시 출근할 수 있습니다.";
+    return "퇴근 후 4시간이 지나거나 자정이 지나야 다시 출근할 수 있습니다.";
   }
   return null;
 }
 
 export function checkOutWindowErrorMessage(): string {
   return "출근 후 48시간이 지났습니다. 퇴근은 가능하며, 퇴근 시각은 출근일 기준 출근 후 최대 21시간 또는 23:59 중 이른 시각으로 기록됩니다.";
+}
+
+export function checkOutErrorMessage(
+  block: PunchEligibility["checkOutBlock"]
+): string | null {
+  if (block === "NOT_CHECKED_IN") {
+    return "먼저 출근해 주세요.";
+  }
+  if (block === "MIN_INTERVAL") {
+    return "출근 처리 직후에는 바로 퇴근할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  return null;
 }
 
 /** 출근 후 48시간 초과 여부 */

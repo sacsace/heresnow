@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
+import { evaluatePunchEligibility } from "@/lib/attendancePunchRules";
 import {
   FACE_DESCRIPTOR_LENGTH,
   FACE_IDENTIFY_MIN_GAP_DOOR,
@@ -20,6 +21,10 @@ export type DoorPunchEligibility = {
   isCheckedIn: boolean;
   canCheckIn: boolean;
   canCheckOut: boolean;
+  checkInBlock: "ALREADY_CHECKED_IN" | "COOLDOWN" | null;
+  checkOutBlock: "NOT_CHECKED_IN" | "MIN_INTERVAL" | null;
+  nextCheckInAt: string | null;
+  nextCheckOutAt: string | null;
   lastType: AttendanceType | null;
   lastTimestamp: string | null;
 };
@@ -79,18 +84,32 @@ export async function getDoorPunchEligibility(
   companyId: string,
   employeeId: string
 ): Promise<DoorPunchEligibility> {
-  const lastRecord = await prisma.attendanceRecord.findFirst({
-    where: { companyId, employeeId },
-    orderBy: { timestamp: "desc" },
-    select: { type: true, timestamp: true },
-  });
-
-  const isCheckedIn = lastRecord?.type === "CHECK_IN";
+  const [company, lastRecord] = await Promise.all([
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: { timezone: true },
+    }),
+    prisma.attendanceRecord.findFirst({
+      where: { companyId, employeeId },
+      orderBy: { timestamp: "desc" },
+      select: { type: true, timestamp: true },
+    }),
+  ]);
+  const tz = company?.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
+  const eligibility = evaluatePunchEligibility(
+    new Date(),
+    tz,
+    lastRecord ? { type: lastRecord.type, timestamp: lastRecord.timestamp } : null
+  );
 
   return {
-    isCheckedIn,
-    canCheckIn: !isCheckedIn,
-    canCheckOut: isCheckedIn,
+    isCheckedIn: eligibility.isCheckedIn,
+    canCheckIn: eligibility.canCheckIn,
+    canCheckOut: eligibility.canCheckOut,
+    checkInBlock: eligibility.checkInBlock,
+    checkOutBlock: eligibility.checkOutBlock,
+    nextCheckInAt: eligibility.nextCheckInAt,
+    nextCheckOutAt: eligibility.nextCheckOutAt,
     lastType: lastRecord?.type ?? null,
     lastTimestamp: lastRecord?.timestamp.toISOString() ?? null,
   };
@@ -101,6 +120,8 @@ export async function createDoorAttendanceRecord(input: {
   employeeId: string;
   type: AttendanceType;
   timestamp?: Date;
+  expectedLastType?: AttendanceType | null;
+  expectedLastTimestamp?: string | null;
 }): Promise<{ id: string; type: AttendanceType; timestamp: Date }> {
   const company = await prisma.company.findUnique({
     where: { id: input.companyId },
@@ -108,30 +129,59 @@ export async function createDoorAttendanceRecord(input: {
   });
   const tz = company?.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const timestamp = input.timestamp ?? new Date();
+  const expectedLastTsMs = input.expectedLastTimestamp
+    ? new Date(input.expectedLastTimestamp).getTime()
+    : null;
 
-  const record = await prisma.attendanceRecord.create({
-    data: {
-      companyId: input.companyId,
-      employeeId: input.employeeId,
-      type: input.type,
+  const record = await prisma.$transaction(async (tx) => {
+    const latest = await tx.attendanceRecord.findFirst({
+      where: { companyId: input.companyId, employeeId: input.employeeId },
+      orderBy: { timestamp: "desc" },
+      select: { type: true, timestamp: true },
+    });
+
+    const latestType = latest?.type ?? null;
+    const latestTsMs = latest?.timestamp.getTime() ?? null;
+    if (latestType !== (input.expectedLastType ?? null) || latestTsMs !== expectedLastTsMs) {
+      throw { code: "PUNCH_STATE_CHANGED" } as const;
+    }
+
+    const eligibility = evaluatePunchEligibility(
       timestamp,
-      recordTimezone: tz,
-      latitude: 0,
-      longitude: 0,
-      accuracy: null,
-      distanceFromSite: 0,
-      outsideGeofence: false,
-      status: "APPROVED",
-      memo: null,
-      deviceInfo: "DOOR_TERMINAL",
-      isLate: false,
-      isEarlyLeave: false,
-      isOvertime: false,
-      isHolidayWork: false,
-      lateMinutes: 0,
-      overtimeMinutes: 0,
-    },
-    select: { id: true, type: true, timestamp: true },
+      tz,
+      latest ? { type: latest.type, timestamp: latest.timestamp } : null
+    );
+    if (input.type === "CHECK_IN" && !eligibility.canCheckIn) {
+      throw { code: "CHECK_IN_BLOCKED" } as const;
+    }
+    if (input.type === "CHECK_OUT" && !eligibility.canCheckOut) {
+      throw { code: "CHECK_OUT_BLOCKED" } as const;
+    }
+
+    return tx.attendanceRecord.create({
+      data: {
+        companyId: input.companyId,
+        employeeId: input.employeeId,
+        type: input.type,
+        timestamp,
+        recordTimezone: tz,
+        latitude: 0,
+        longitude: 0,
+        accuracy: null,
+        distanceFromSite: 0,
+        outsideGeofence: false,
+        status: "APPROVED",
+        memo: null,
+        deviceInfo: "DOOR_TERMINAL",
+        isLate: false,
+        isEarlyLeave: false,
+        isOvertime: false,
+        isHolidayWork: false,
+        lateMinutes: 0,
+        overtimeMinutes: 0,
+      },
+      select: { id: true, type: true, timestamp: true },
+    });
   });
 
   return record;

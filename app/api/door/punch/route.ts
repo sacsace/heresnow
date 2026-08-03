@@ -75,17 +75,41 @@ export async function POST(req: Request) {
 
   if (type === "CHECK_IN") {
     if (!eligibility.canCheckIn) {
+      if (eligibility.checkInBlock === "ALREADY_CHECKED_IN") {
+        return NextResponse.json(
+          {
+            error: "already_checked_in",
+            code: "ALREADY_CHECKED_IN",
+            employee,
+            mode: type,
+          },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
         {
-          error: "checkout_too_early",
-          code: "CHECK_OUT_TOO_EARLY",
+          error: "checkin_cooldown",
+          code: "CHECK_IN_COOLDOWN",
           employee,
           mode: type,
+          nextCheckInAt: eligibility.nextCheckInAt,
         },
         { status: 409 }
       );
     }
   } else if (!eligibility.canCheckOut) {
+    if (eligibility.checkOutBlock === "MIN_INTERVAL") {
+      return NextResponse.json(
+        {
+          error: "checkout_cooldown",
+          code: "CHECK_OUT_COOLDOWN",
+          employee,
+          mode: type,
+          nextCheckOutAt: eligibility.nextCheckOutAt,
+        },
+        { status: 409 }
+      );
+    }
     if (eligibility.lastType === "CHECK_OUT") {
       return NextResponse.json(
         {
@@ -108,11 +132,52 @@ export async function POST(req: Request) {
     );
   }
 
-  const record = await createDoorAttendanceRecord({
-    companyId,
-    employeeId: employee.id,
-    type,
-  });
+  let record;
+  try {
+    record = await createDoorAttendanceRecord({
+      companyId,
+      employeeId: employee.id,
+      type,
+      expectedLastType: eligibility.lastType,
+      expectedLastTimestamp: eligibility.lastTimestamp,
+    });
+  } catch (error: unknown) {
+    if (error && typeof error === "object" && "code" in error) {
+      const code = (error as { code?: string }).code;
+      if (code === "PUNCH_STATE_CHANGED") {
+        return NextResponse.json(
+          {
+            error: "punch_state_changed",
+            code,
+          },
+          { status: 409 }
+        );
+      }
+      if (code === "CHECK_IN_BLOCKED") {
+        return NextResponse.json(
+          {
+            error: "checkin_cooldown",
+            code: "CHECK_IN_COOLDOWN",
+            employee,
+            mode: type,
+          },
+          { status: 409 }
+        );
+      }
+      if (code === "CHECK_OUT_BLOCKED") {
+        return NextResponse.json(
+          {
+            error: "checkout_cooldown",
+            code: "CHECK_OUT_COOLDOWN",
+            employee,
+            mode: type,
+          },
+          { status: 409 }
+        );
+      }
+    }
+    throw error;
+  }
 
   const next = await getDoorPunchEligibility(companyId, employee.id);
 

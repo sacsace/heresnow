@@ -6,6 +6,7 @@ import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import {
   capCheckOutTimestamp,
   checkInErrorMessage,
+  checkOutErrorMessage,
   evaluatePunchEligibility,
   formatLateCheckOutBasisLabel,
   isCheckOutPastWindow,
@@ -233,8 +234,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
   } else {
-    if (!lastRecord || lastRecord.type === "CHECK_OUT") {
-      return NextResponse.json({ error: "먼저 출근해 주세요." }, { status: 400 });
+    if (!eligibility.canCheckOut) {
+      const msg = checkOutErrorMessage(eligibility.checkOutBlock) ?? "퇴근할 수 없습니다.";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
   }
 
@@ -385,56 +387,133 @@ export async function POST(req: Request) {
     }
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const record = await tx.attendanceRecord.create({
-      data: {
-        company: { connect: { id: session.user.companyId! } },
-        employee: { connect: { id: employee.id } },
-        ...(siteId ? { site: { connect: { id: siteId } } } : {}),
-        type,
-        timestamp: recordTimestamp,
-        latitude,
-        longitude,
-        accuracy: accuracy ?? null,
-        distanceFromSite,
-        outsideGeofence,
-        // 조퇴·단기 재출근 시 PENDING — 관리자 승인 후 APPROVED 로 전환
-        status: pendingApproval ? "PENDING" : "APPROVED",
-        memo: recordMemo || null,
-        isBusinessTrip: type === "CHECK_IN" ? isBusinessTrip : false,
-        businessTripLocation:
-          type === "CHECK_IN" && isBusinessTrip ? businessTripLocation?.trim() || null : null,
-        businessTripReason:
-          type === "CHECK_IN" && isBusinessTrip ? businessTripReason!.trim() : null,
-        photoUrl: photoUrl?.trim() || null,
-        deviceInfo: mergedDevice || null,
-        isLate: normalizedWorkFlags.isLate,
-        isEarlyLeave: normalizedWorkFlags.isEarlyLeave,
-        isOvertime: normalizedWorkFlags.isOvertime,
-        isHolidayWork: normalizedWorkFlags.isHolidayWork,
-        lateMinutes: normalizedWorkFlags.lateMinutes,
-        overtimeMinutes: normalizedWorkFlags.overtimeMinutes,
-        recordTimezone: tz,
-      },
-      include: { site: { select: { name: true } } },
-    });
-
-    let exceptionId: string | null = null;
-    if (pendingApproval && pendingReason) {
-      const ex = await tx.attendanceException.create({
-        data: {
-          companyId: session.user.companyId!,
-          attendanceId: record.id,
-          reason: pendingReason,
-          status: "PENDING",
-        },
-        select: { id: true },
+  const baselineLastType = lastRecord?.type ?? null;
+  const baselineLastTs = lastRecord?.timestamp.getTime() ?? null;
+  let result: {
+    record: {
+      id: string;
+      status: "APPROVED" | "PENDING" | "REJECTED";
+      timestamp: Date;
+      distanceFromSite: number;
+      outsideGeofence: boolean;
+      site: { name: string } | null;
+      isBusinessTrip: boolean;
+      businessTripLocation: string | null;
+      type: AttendanceType;
+      isLate: boolean;
+      isEarlyLeave: boolean;
+      isOvertime: boolean;
+      isHolidayWork: boolean;
+      lateMinutes: number;
+      overtimeMinutes: number;
+    };
+    exceptionId: string | null;
+  };
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const latest = await tx.attendanceRecord.findFirst({
+        where: { employeeId: employee.id, companyId: session.user.companyId! },
+        orderBy: { timestamp: "desc" },
+        select: { type: true, timestamp: true },
       });
-      exceptionId = ex.id;
-    }
+      const latestType = latest?.type ?? null;
+      const latestTs = latest?.timestamp.getTime() ?? null;
+      if (latestType !== baselineLastType || latestTs !== baselineLastTs) {
+        throw { code: "PUNCH_STATE_CHANGED" } as const;
+      }
 
-    return { record, exceptionId };
-  });
+      const txEligibility = evaluatePunchEligibility(
+        new Date(),
+        tz,
+        latest ? { type: latest.type, timestamp: latest.timestamp } : null
+      );
+      if (type === "CHECK_IN" && !txEligibility.canCheckIn) {
+        throw {
+          code: "CHECK_IN_BLOCKED",
+          message: checkInErrorMessage(txEligibility.checkInBlock) ?? "출근할 수 없습니다.",
+        } as const;
+      }
+      if (type === "CHECK_OUT" && !txEligibility.canCheckOut) {
+        throw {
+          code: "CHECK_OUT_BLOCKED",
+          message: checkOutErrorMessage(txEligibility.checkOutBlock) ?? "퇴근할 수 없습니다.",
+        } as const;
+      }
+
+      const record = await tx.attendanceRecord.create({
+        data: {
+          company: { connect: { id: session.user.companyId! } },
+          employee: { connect: { id: employee.id } },
+          ...(siteId ? { site: { connect: { id: siteId } } } : {}),
+          type,
+          timestamp: recordTimestamp,
+          latitude,
+          longitude,
+          accuracy: accuracy ?? null,
+          distanceFromSite,
+          outsideGeofence,
+          // 조퇴·단기 재출근 시 PENDING — 관리자 승인 후 APPROVED 로 전환
+          status: pendingApproval ? "PENDING" : "APPROVED",
+          memo: recordMemo || null,
+          isBusinessTrip: type === "CHECK_IN" ? isBusinessTrip : false,
+          businessTripLocation:
+            type === "CHECK_IN" && isBusinessTrip ? businessTripLocation?.trim() || null : null,
+          businessTripReason:
+            type === "CHECK_IN" && isBusinessTrip ? businessTripReason!.trim() : null,
+          photoUrl: photoUrl?.trim() || null,
+          deviceInfo: mergedDevice || null,
+          isLate: normalizedWorkFlags.isLate,
+          isEarlyLeave: normalizedWorkFlags.isEarlyLeave,
+          isOvertime: normalizedWorkFlags.isOvertime,
+          isHolidayWork: normalizedWorkFlags.isHolidayWork,
+          lateMinutes: normalizedWorkFlags.lateMinutes,
+          overtimeMinutes: normalizedWorkFlags.overtimeMinutes,
+          recordTimezone: tz,
+        },
+        include: { site: { select: { name: true } } },
+      });
+
+      let exceptionId: string | null = null;
+      if (pendingApproval && pendingReason) {
+        const ex = await tx.attendanceException.create({
+          data: {
+            companyId: session.user.companyId!,
+            attendanceId: record.id,
+            reason: pendingReason,
+            status: "PENDING",
+          },
+          select: { id: true },
+        });
+        exceptionId = ex.id;
+      }
+
+      return { record, exceptionId };
+    });
+  } catch (error: unknown) {
+    if (error && typeof error === "object" && "code" in error) {
+      const code = (error as { code?: string }).code;
+      if (code === "PUNCH_STATE_CHANGED") {
+        return NextResponse.json(
+          {
+            error: "직전 출퇴근 상태가 방금 변경되었습니다. 상태를 새로고침한 뒤 다시 시도해 주세요.",
+            code,
+          },
+          { status: 409 }
+        );
+      }
+      if (
+        (code === "CHECK_IN_BLOCKED" || code === "CHECK_OUT_BLOCKED") &&
+        "message" in error &&
+        typeof (error as { message?: unknown }).message === "string"
+      ) {
+        return NextResponse.json(
+          { error: (error as { message: string }).message, code },
+          { status: 409 }
+        );
+      }
+    }
+    throw error;
+  }
 
   void enqueueMvsAttendanceIfEnabled(
     result.record.id,

@@ -652,6 +652,14 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
           <p className={`${bannerInfo} mt-4`}>{t("employee.alreadyCheckedIn")}</p>
         )}
 
+        {!punchStatusLoading &&
+          punchStatus?.isCheckedIn &&
+          !canCheckOut &&
+          punchStatus?.checkOutBlock === "MIN_INTERVAL" &&
+          punchStatus?.checkOutMessage && (
+            <p className={`${bannerWarning} mt-4`}>{punchStatus.checkOutMessage}</p>
+          )}
+
         {!punchStatusLoading && !canCheckIn && checkInNotice && !punchStatus?.isCheckedIn && (
           <p className={`${bannerInfo} mt-4`}>{checkInNotice}</p>
         )}

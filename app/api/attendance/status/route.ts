@@ -6,6 +6,7 @@ import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import {
   calendarDayInTz,
   checkInErrorMessage,
+  checkOutErrorMessage,
   evaluatePunchEligibility,
   isCheckOutPastWindow,
   resolveLateCheckOutTimestamp,
@@ -99,6 +100,7 @@ export async function GET() {
   return NextResponse.json({
     ...eligibility,
     checkInMessage: checkInErrorMessage(eligibility.checkInBlock),
+    checkOutMessage: checkOutErrorMessage(eligibility.checkOutBlock),
     lastType: lastRecord?.type ?? null,
     lastTimestamp: lastRecord?.timestamp.toISOString() ?? null,
     today: calendarDayInTz(now, tz),
