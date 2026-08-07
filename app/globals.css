@@ -11,32 +11,32 @@
 @tailwind utilities;
 
 :root {
-  --foreground: #1f2a3a;
-  --background: #f4f7fb;
+  --foreground: #1e293b;
+  --background: #f8fafc;
   --grouped-bg: #ffffff;
-  --bar-bg: rgba(255, 255, 255, 0.96);
+  --bar-bg: rgba(255, 255, 255, 0.92);
   --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
 
-  /* High-contrast 3-tone system: blue, mint, peach */
-  --apple-blue: #2f5ea8;
-  --apple-green: #2f8c74;
-  --apple-green-dark: #1f6352;
-  --apple-red: #c2637a;
-  --apple-orange: #c67a34;
-  --apple-orange-dark: #8b5621;
-  --pastel-blue-strong: #e4ecf8;
+  /* Primary accent + semantic colors (neutral-first palette) */
+  --apple-blue: #2563eb;
+  --apple-green: #15803d;
+  --apple-green-dark: #166534;
+  --apple-red: #b91c1c;
+  --apple-orange: #c2410c;
+  --apple-orange-dark: #9a3412;
+  --pastel-blue-strong: #dbeafe;
 
   /* Labels & fills */
-  --apple-label-secondary: rgba(40, 56, 79, 0.8);
-  --apple-label-tertiary: rgba(58, 76, 104, 0.58);
-  --fill-secondary: rgba(152, 174, 205, 0.22);
-  --fill-secondary-hover: rgba(135, 161, 198, 0.34);
-  --fill-tertiary: rgba(214, 226, 244, 0.66);
+  --apple-label-secondary: rgba(30, 41, 59, 0.74);
+  --apple-label-tertiary: rgba(51, 65, 85, 0.54);
+  --fill-secondary: rgba(148, 163, 184, 0.16);
+  --fill-secondary-hover: rgba(148, 163, 184, 0.24);
+  --fill-tertiary: rgba(226, 232, 240, 0.65);
 
   /* Hairline separators (HIG) */
-  --separator: rgba(110, 132, 166, 0.34);
-  --separator-opaque: #cdd9eb;
+  --separator: rgba(100, 116, 139, 0.28);
+  --separator-opaque: #dbe3ef;
 
   /**
    * App shell content column — viewport 전체를 쓰고 max-width 로만 상한.
@@ -55,9 +55,9 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-system);
-  font-size: 15px;
-  line-height: 1.4;
-  letter-spacing: -0.016em;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

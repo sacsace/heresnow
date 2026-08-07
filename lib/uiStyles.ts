@@ -43,13 +43,13 @@ export const navBarInnerEmployee =
 
 /** Segmented nav track (admin header) */
 export const navSegmentedWrap =
-  "inline-flex h-9 min-w-0 max-w-full overflow-x-auto rounded-[0.625rem] bg-[var(--fill-secondary)] p-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+  "inline-flex h-9 min-w-0 max-w-full overflow-x-auto rounded-[0.625rem] border border-[var(--separator)] bg-white p-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 export const navSegmentedBtn = (active: boolean) =>
   `inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-[0.4375rem] px-2.5 text-[0.75rem] font-semibold transition-colors sm:px-3 sm:text-[0.8125rem] ${
     active
-      ? "bg-white text-[var(--foreground)] shadow-sm"
-      : "text-[var(--apple-label-secondary)] hover:text-[var(--foreground)]"
+      ? "bg-[var(--fill-tertiary)] text-[var(--foreground)]"
+      : "text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary)] hover:text-[var(--foreground)]"
   }`;
 
 export const navBrand =
@@ -72,10 +72,10 @@ const navLinkBase =
   "inline-flex h-9 min-w-[4.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-[0.625rem] px-3 text-center text-[0.8125rem] transition-colors sm:min-w-[5.75rem] sm:px-3.5 sm:text-[0.875rem]";
 
 export const navLink =
-  `${navLinkBase} font-medium text-[var(--apple-label-secondary)] hover:bg-[var(--fill-tertiary)] hover:text-[var(--foreground)]`;
+  `${navLinkBase} font-medium text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary)] hover:text-[var(--foreground)]`;
 
 export const navLinkActive =
-  `${navLinkBase} bg-[var(--fill-tertiary)] font-semibold text-[var(--foreground)]`;
+  `${navLinkBase} border border-[var(--separator)] bg-white font-semibold text-[var(--foreground)]`;
 
 /** Super nav — equal-width items on wider screens */
 export const navLinkEqual = "flex-1 basis-0 sm:flex-none";
@@ -114,7 +114,7 @@ export const sectionLabelCompact =
 
 /** Grouped inset list container (Settings-style) */
 export const groupedCard =
-  "overflow-hidden rounded-2xl bg-[var(--grouped-bg)] shadow-sm ring-1 ring-black/[0.04]";
+  "overflow-hidden rounded-2xl border border-[var(--separator)] bg-[var(--grouped-bg)]";
 
 export const groupedRow = "px-5 py-3.5 text-[0.9375rem] leading-snug text-[var(--foreground)] sm:px-6 sm:py-4";
 
@@ -137,12 +137,12 @@ export const label =
   "block text-[0.8125rem] font-medium leading-snug text-[var(--apple-label-secondary)]";
 
 export const input =
-  "w-full rounded-[0.625rem] border-0 bg-[var(--fill-secondary)] px-3.5 py-2.5 text-[0.9375rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color] placeholder:text-[var(--apple-label-tertiary)] focus:bg-[var(--fill-secondary-hover)] focus:ring-2 focus:ring-[var(--apple-blue)]/25";
+  "w-full rounded-[0.625rem] border border-transparent bg-[var(--fill-secondary)] px-3.5 py-2.5 text-[0.9375rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color,border-color] placeholder:text-[var(--apple-label-tertiary)] focus:bg-white focus:border-[var(--separator-opaque)] focus:ring-2 focus:ring-[var(--apple-blue)]/18";
 
 export const inputSm = `${input} px-3.5 py-2.5 text-[0.9375rem]`;
 
 export const select =
-  "auth-select-field w-full rounded-[0.625rem] border-0 px-3.5 py-2.5 pr-10 text-[0.9375rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25";
+  "auth-select-field w-full rounded-[0.625rem] border border-transparent px-3.5 py-2.5 pr-10 text-[0.9375rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color,border-color] focus:bg-white focus:border-[var(--separator-opaque)] focus:ring-2 focus:ring-[var(--apple-blue)]/18";
 
 export const selectSm = `${select} w-auto min-w-[8rem] py-2.5 text-[0.9375rem] sm:min-w-[9rem]`;
 
@@ -168,12 +168,12 @@ export const bannerInfo = "rounded-[0.625rem] bg-[var(--apple-blue)]/10 px-3.5 p
 
 /** Buttons */
 export const btnPrimary =
-  "inline-flex min-h-[2.25rem] touch-manipulation items-center justify-center rounded-[0.625rem] bg-[var(--apple-blue)] px-5 py-2.5 text-[0.9375rem] font-semibold text-white transition-colors hover:bg-[#0071e3] active:bg-[#0066cc] disabled:opacity-40";
+  "inline-flex min-h-[2.25rem] touch-manipulation items-center justify-center rounded-[0.625rem] bg-[var(--apple-blue)] px-5 py-2.5 text-[0.9375rem] font-semibold text-white transition-colors hover:bg-[#1d4ed8] active:bg-[#1e40af] disabled:opacity-40";
 
 export const btnPrimaryFull = `w-full ${btnPrimary} py-2.5`;
 
 export const btnSecondary =
-  "inline-flex h-9 min-h-[2.25rem] touch-manipulation items-center justify-center rounded-[0.625rem] bg-[var(--fill-secondary)] px-4 text-[0.8125rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] active:opacity-80 disabled:opacity-40 sm:text-[0.875rem]";
+  "inline-flex h-9 min-h-[2.25rem] touch-manipulation items-center justify-center rounded-[0.625rem] border border-[var(--separator)] bg-white px-4 text-[0.8125rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-tertiary)] active:opacity-80 disabled:opacity-40 sm:text-[0.875rem]";
 
 export const btnDestructive =
   "text-[0.8125rem] font-medium text-[var(--apple-red)] hover:underline";
@@ -260,8 +260,8 @@ export const btnIcon =
 export const chipBtn = (active: boolean) =>
   `min-w-[2.5rem] touch-manipulation rounded-xl px-3.5 py-2 text-[0.9375rem] font-semibold transition-colors disabled:opacity-40 ${
     active
-      ? "bg-[var(--apple-blue)] text-white shadow-sm"
-      : "bg-[var(--fill-secondary)] text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary-hover)] hover:text-[var(--foreground)]"
+      ? "bg-[var(--apple-blue)] text-white"
+      : "border border-[var(--separator)] bg-white text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary)] hover:text-[var(--foreground)]"
   }`;
 
 /** Map / media surface */
@@ -276,7 +276,7 @@ export const segmentedWrap = "inline-flex gap-1 rounded-xl bg-[var(--fill-second
 export const segmentedBtn = (active: boolean) =>
   `min-w-[4.5rem] shrink-0 rounded-[0.5rem] px-3 py-2 text-[0.8125rem] font-semibold transition-colors sm:min-w-[5.5rem] sm:text-[0.875rem] ${
     active
-      ? "bg-white text-[var(--foreground)] shadow-sm"
+      ? "bg-white text-[var(--foreground)]"
       : "text-[var(--apple-label-secondary)] hover:text-[var(--foreground)]"
   }`;
 
@@ -306,11 +306,11 @@ export const authLangSegmentedBtn = (active: boolean) =>
 export const tableWrap = `${groupedCard} overflow-x-auto`;
 export const table = "min-w-full text-left text-[0.9375rem] sm:text-[1rem]";
 export const tableHead =
-  "border-b border-[var(--separator)] bg-[var(--fill-tertiary)] text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-[var(--apple-label-secondary)] sm:text-[0.75rem]";
+  "border-b border-[var(--separator)] bg-[var(--fill-tertiary)] text-[0.6875rem] font-semibold tracking-[0.04em] text-[var(--apple-label-secondary)] sm:text-[0.75rem]";
 export const th = "px-5 py-2.5 whitespace-nowrap sm:px-6";
 export const td = "px-5 py-3 align-middle text-[var(--foreground)] sm:px-6";
 export const trDivider = "border-t border-[var(--separator)]";
-export const tableRow = `${trDivider} transition-colors hover:bg-[var(--fill-tertiary)]/45`;
+export const tableRow = `${trDivider} transition-colors hover:bg-[var(--fill-tertiary)]/35`;
 
 /** Editable pricing tier table */
 export const tablePricing = `${table} table-fixed w-full max-w-[52rem]`;
