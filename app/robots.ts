@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.AUTH_URL ||
-  "https://heresnow-production.up.railway.app"
+  "https://www.heresnow.in"
 ).replace(/\/+$/, "");
 
 export default function robots(): MetadataRoute.Robots {

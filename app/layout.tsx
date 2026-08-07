@@ -5,7 +5,7 @@ import { Providers } from "@/components/Providers";
 const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.AUTH_URL ||
-  "https://heresnow-production.up.railway.app"
+  "https://www.heresnow.in"
 ).replace(/\/+$/, "");
 
 const SITE_NAME = "HeresNow";

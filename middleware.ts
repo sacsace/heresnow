@@ -1,10 +1,40 @@
 import { auth } from "@/auth.edge";
 import { NextResponse } from "next/server";
 
+const CANONICAL_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
+
+function normalizeHost(raw: string): string {
+  return raw.trim().toLowerCase().replace(/:80$|:443$/, "");
+}
+
+function canonicalHostFromEnv(): string | null {
+  if (!CANONICAL_SITE_URL) return null;
+  try {
+    return normalizeHost(new URL(CANONICAL_SITE_URL).host);
+  } catch {
+    return null;
+  }
+}
+
+function canonicalProtocolFromEnv(): "http" | "https" | null {
+  if (!CANONICAL_SITE_URL) return null;
+  try {
+    return new URL(CANONICAL_SITE_URL).protocol === "http:" ? "http" : "https";
+  } catch {
+    return null;
+  }
+}
+
+const CANONICAL_HOST = canonicalHostFromEnv();
+const CANONICAL_PROTOCOL = canonicalProtocolFromEnv();
+
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const loggedIn = !!req.auth;
   const role = req.auth?.user?.role;
+  const hostHeader = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  const protoHeader = (req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "")).toLowerCase();
+  const reqHost = normalizeHost(hostHeader);
 
   const isAuthPage = pathname.startsWith("/login");
   const isDevHealth =
@@ -20,6 +50,22 @@ export default auth((req) => {
     pathname === "/apple-touch-icon.png" ||
     pathname.startsWith("/icons/") ||
     isDevHealth;
+
+  // Railway 기본 도메인 접근 방지: 운영에서는 지정한 정식 도메인으로 강제 이동
+  if (
+    process.env.NODE_ENV === "production" &&
+    CANONICAL_HOST &&
+    !isPublicApi &&
+    reqHost &&
+    (reqHost !== CANONICAL_HOST || (CANONICAL_PROTOCOL != null && protoHeader !== CANONICAL_PROTOCOL))
+  ) {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.host = CANONICAL_HOST;
+    if (CANONICAL_PROTOCOL && protoHeader !== CANONICAL_PROTOCOL) {
+      redirectUrl.protocol = `${CANONICAL_PROTOCOL}:`;
+    }
+    return NextResponse.redirect(redirectUrl, 308);
+  }
 
   if (isPublicApi) return NextResponse.next();
 
