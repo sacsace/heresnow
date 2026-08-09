@@ -65,12 +65,29 @@ const AUTO_SCAN_INTERVAL_MS_FAST = 160;
 const AUTO_SCAN_INTERVAL_MS_IDLE = 500;
 const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
+const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 3;
+const HIGH_ACCURACY_MAX_SPREAD = 0.2;
 
 const KIOSK_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "kiosk",
-  minDetectionScore: 0.5,
-  minFaceAreaRatio: 0.04,
+  minDetectionScore: 0.62,
+  minFaceAreaRatio: 0.08,
 };
+
+function descriptorSpread(descriptors: number[][], averaged: number[]): number {
+  let max = 0;
+  for (const d of descriptors) {
+    if (d.length !== averaged.length) continue;
+    let sum = 0;
+    for (let i = 0; i < d.length; i++) {
+      const diff = d[i]! - averaged[i]!;
+      sum += diff * diff;
+    }
+    const dist = Math.sqrt(sum);
+    if (dist > max) max = dist;
+  }
+  return max;
+}
 
 async function openCamera(profileKind: FaceProfileKind = "default"): Promise<MediaStream> {
   const profile = getFaceDeviceProfile(profileKind);
@@ -451,14 +468,24 @@ export function FaceCapture({
           }
 
           qualityBufferRef.current.push(descriptorToArray(extracted.descriptor));
-          if (qualityBufferRef.current.length < HIGH_ACCURACY_FRAME_COUNT) {
+          const requiredFrames =
+            profileKindRef.current === "kiosk"
+              ? HIGH_ACCURACY_FRAME_COUNT_KIOSK
+              : HIGH_ACCURACY_FRAME_COUNT;
+          if (qualityBufferRef.current.length < requiredFrames) {
             setStatus(tRef.current("employee.faceStabilizing"));
             return;
           }
 
           const averaged = averageFaceDescriptors(qualityBufferRef.current);
+          const sampled = [...qualityBufferRef.current];
           qualityBufferRef.current = [];
           if (!averaged) return;
+          const spread = descriptorSpread(sampled, averaged);
+          if (spread > HIGH_ACCURACY_MAX_SPREAD) {
+            setStatus(tRef.current("employee.faceStabilizing"));
+            return;
+          }
 
           busyRef.current = true;
           setBusy(true);
