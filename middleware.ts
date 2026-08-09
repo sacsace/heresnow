@@ -10,7 +10,15 @@ const CANONICAL_SITE_URL = (
   .replace(/\/+$/, "");
 
 function normalizeHost(raw: string): string {
-  return raw.trim().toLowerCase().replace(/:80$|:443$/, "");
+  const first = raw.split(",")[0] ?? "";
+  return first.trim().toLowerCase().replace(/\.$/, "").replace(/:80$|:443$/, "");
+}
+
+function normalizeProto(raw: string): "http" | "https" | "" {
+  const first = (raw.split(",")[0] ?? "").trim().toLowerCase().replace(":", "");
+  if (first === "https") return "https";
+  if (first === "http") return "http";
+  return "";
 }
 
 function canonicalHostFromEnv(): string | null {
@@ -39,7 +47,9 @@ export default auth((req) => {
   const loggedIn = !!req.auth;
   const role = req.auth?.user?.role;
   const hostHeader = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
-  const protoHeader = (req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "")).toLowerCase();
+  const protoHeader = normalizeProto(
+    req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol
+  );
   const reqHost = normalizeHost(hostHeader);
 
   const isAuthPage = pathname.startsWith("/login");
