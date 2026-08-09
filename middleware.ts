@@ -1,7 +1,13 @@
 import { auth } from "@/auth.edge";
 import { NextResponse } from "next/server";
 
-const CANONICAL_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
+const CANONICAL_SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.AUTH_URL ||
+  "https://www.heresnow.in"
+)
+  .trim()
+  .replace(/\/+$/, "");
 
 function normalizeHost(raw: string): string {
   return raw.trim().toLowerCase().replace(/:80$|:443$/, "");
