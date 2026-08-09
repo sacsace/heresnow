@@ -62,7 +62,9 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("[public/support POST]", e);
+    if (process.env.NODE_ENV === "development") {
+      console.error("[public/support POST]", e);
+    }
     return NextResponse.json({ error: "send_failed" }, { status: 500 });
   }
 }

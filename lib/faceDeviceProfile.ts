@@ -53,8 +53,9 @@ export function getFaceDeviceProfile(kind: FaceProfileKind = "default"): FaceDev
   if (kind === "kiosk") {
     return {
       preferWasmBackend: ios,
-      detectorInputSize: 320,
-      detectorScoreThreshold: 0.4,
+      // 단말 모드: 감지 자체는 경량화해 속도 확보, 최종 판정은 매칭 임계값으로 엄격히 보정
+      detectorInputSize: 256,
+      detectorScoreThreshold: 0.5,
       likelyInAppBrowser: isLikelyInAppBrowser(),
       isMobile: mobile,
     };

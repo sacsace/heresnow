@@ -2,7 +2,7 @@
 export const FACE_MATCH_THRESHOLD = 0.55;
 
 /** 출입문 단말 — 고정 카메라·다중 프레임 평균과 함께 사용 */
-export const FACE_MATCH_THRESHOLD_DOOR = 0.58;
+export const FACE_MATCH_THRESHOLD_DOOR = 0.54;
 
 export const FACE_DESCRIPTOR_LENGTH = 128;
 
@@ -38,7 +38,7 @@ export function isFaceMatch(stored: number[], probe: number[], threshold = FACE_
 /** 1:N 식별 시 1·2위 거리 차이가 이보다 작으면 동일인으로 확정하지 않음 */
 export const FACE_IDENTIFY_MIN_GAP = 0.06;
 
-export const FACE_IDENTIFY_MIN_GAP_DOOR = 0.05;
+export const FACE_IDENTIFY_MIN_GAP_DOOR = 0.08;
 
 export type FaceIdentifyCandidate = {
   id: string;

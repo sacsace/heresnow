@@ -61,15 +61,15 @@ type InitPhase = "idle" | "loading" | "warming" | "ready" | "error";
 const SCAN_EVERY_N_FRAMES = 2;
 const SCAN_EVERY_N_FRAMES_FAST = 1;
 const AUTO_SCAN_INTERVAL_MS = 650;
-const AUTO_SCAN_INTERVAL_MS_FAST = 180;
+const AUTO_SCAN_INTERVAL_MS_FAST = 160;
 const AUTO_SCAN_INTERVAL_MS_IDLE = 500;
 const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
 
 const KIOSK_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "kiosk",
-  minDetectionScore: 0.4,
-  minFaceAreaRatio: 0.03,
+  minDetectionScore: 0.5,
+  minFaceAreaRatio: 0.04,
 };
 
 async function openCamera(profileKind: FaceProfileKind = "default"): Promise<MediaStream> {

@@ -20,7 +20,12 @@ export const authConfig = {
       if (type === "JWTSessionError") {
         return;
       }
-      console.error("[auth]", error);
+      if (process.env.NODE_ENV === "development") {
+        console.error("[auth]", error);
+        return;
+      }
+      // 운영 로그에는 에러 객체 원문 대신 최소 분류값만 남겨 민감정보 노출을 줄인다.
+      console.error("[auth]", type || "UnknownAuthError");
     },
     warn(code) {
       if (process.env.NODE_ENV === "development") {

@@ -65,7 +65,9 @@ export async function POST(req: Request) {
     const loginToken = createFaceLoginToken(user.id);
     return NextResponse.json({ loginToken });
   } catch (e) {
-    console.error("[face-login]", e);
+    if (process.env.NODE_ENV === "development") {
+      console.error("[face-login]", e);
+    }
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
 }
