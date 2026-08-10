@@ -7,6 +7,7 @@ import {
   translate,
   type Messages,
 } from "@/lib/i18n/dictionaries";
+import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n/locale";
 import {
   createContext,
   useCallback,
@@ -26,25 +27,42 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-function readStoredLocale(): Locale {
-  if (typeof window === "undefined") return "ko";
+function detectBrowserLocale(): Locale {
+  if (typeof navigator === "undefined") return DEFAULT_LOCALE;
+  const candidates = [...(navigator.languages ?? []), navigator.language];
+  for (const candidate of candidates) {
+    const normalized = normalizeLocale(candidate);
+    if (normalized) return normalized;
+  }
+  return DEFAULT_LOCALE;
+}
+
+function readStoredLocale(initialLocale: Locale): Locale {
+  if (typeof window === "undefined") return initialLocale;
   try {
     const s = localStorage.getItem(STORAGE_KEY);
-    if (s === "en" || s === "ko") return s;
+    const normalized = normalizeLocale(s);
+    if (normalized) return normalized;
   } catch {
     /* ignore */
   }
-  return "ko";
+  return detectBrowserLocale();
 }
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("ko");
+export function LanguageProvider({
+  children,
+  initialLocale = DEFAULT_LOCALE,
+}: {
+  children: ReactNode;
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setLocaleState(readStoredLocale());
+    setLocaleState(readStoredLocale(initialLocale));
     setMounted(true);
-  }, []);
+  }, [initialLocale]);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);

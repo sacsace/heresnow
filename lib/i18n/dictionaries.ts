@@ -92,7 +92,7 @@ export const ko = {
     pillVerified: "시간·좌표 스탬프",
   },
   login: {
-    title: "HeresNow",
+    title: "히어스나우",
     subtitle: "사무실/현장 도착 후 출근 버튼을 눌러주세요.\n현재 위치(GPS)가 함께 저장됩니다.",
     registered: "가입이 완료되었습니다. 동의 절차 후 로그인하세요.",
     sessionInvalid:

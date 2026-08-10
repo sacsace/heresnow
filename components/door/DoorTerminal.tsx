@@ -187,7 +187,7 @@ export function DoorTerminal() {
     <div className="flex min-h-[100dvh] flex-col bg-[var(--background)]">
       <header className={`${navBar} shrink-0 pt-[env(safe-area-inset-top,0px)]`}>
         <div className={navBarInnerEmployee}>
-          <AppLogo title="HeresNow" />
+          <AppLogo title={t("login.title")} />
           <div className={headerActions}>
             <LanguageSwitcher variant="door" />
             <button

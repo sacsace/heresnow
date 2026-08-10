@@ -70,7 +70,7 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
         <div className="mx-auto flex w-full max-w-[1366px] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <MobileNavDrawer items={links} />
-            <AppLogo href="/admin" title="HeresNow" className="min-w-0" />
+            <AppLogo href="/admin" title={t("login.title")} className="min-w-0" />
             <nav
               className="hidden min-w-0 flex-1 rounded-lg border border-[var(--separator)] bg-white px-2 py-1.5 lg:flex"
               aria-label={t("admin.navDashboard")}

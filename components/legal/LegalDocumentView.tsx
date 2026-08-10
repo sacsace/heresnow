@@ -39,7 +39,7 @@ export function LegalDocumentView({ content }: Props) {
     >
       <article className={consentCard}>
         <div className="mb-4 flex justify-center sm:mb-5">
-          <AppLogo variant="auth" title="HeresNow" />
+          <AppLogo variant="auth" title={t("login.title")} />
         </div>
         <h1 className={consentTitle}>{doc.title}</h1>
         <p className={consentIntro}>
