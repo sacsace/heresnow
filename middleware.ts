@@ -73,13 +73,12 @@ export default auth((req) => {
     CANONICAL_HOST &&
     !isPublicApi &&
     reqHost &&
-    (reqHost !== CANONICAL_HOST || (CANONICAL_PROTOCOL != null && protoHeader !== CANONICAL_PROTOCOL))
+    reqHost !== CANONICAL_HOST
   ) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.host = CANONICAL_HOST;
-    if (CANONICAL_PROTOCOL && protoHeader !== CANONICAL_PROTOCOL) {
-      redirectUrl.protocol = `${CANONICAL_PROTOCOL}:`;
-    }
+    // 일부 프록시 환경에서는 x-forwarded-proto가 고정값(http)으로 들어와
+    // https 요청도 무한 리다이렉트될 수 있어, 프로토콜 강제는 비활성화한다.
     return NextResponse.redirect(redirectUrl, 308);
   }
 

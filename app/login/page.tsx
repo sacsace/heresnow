@@ -22,10 +22,11 @@ import { useI18n } from "@/components/LanguageProvider";
 import { prefetchFaceRecognition } from "@/lib/faceRecognitionClient";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { signIn } from "next-auth/react";
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState, Suspense, useEffect } from "react";
+import { useState, Suspense, useEffect, useMemo } from "react";
 
 const FaceLoginSection = dynamic(
   () => import("@/components/auth/FaceLoginSection").then((m) => m.FaceLoginSection),
@@ -37,17 +38,7 @@ const FaceLoginSection = dynamic(
   }
 );
 
-const PasskeyLoginSection = dynamic(
-  () => import("@/components/auth/PasskeyLoginSection").then((m) => m.PasskeyLoginSection),
-  {
-    ssr: false,
-    loading: () => (
-      <p className="text-center text-[0.8125rem] text-[var(--apple-label-secondary)]">…</p>
-    ),
-  }
-);
-
-type LoginMode = "password" | "face" | "passkey";
+type LoginMode = "password" | "face";
 
 function LoginForm() {
   const { t } = useI18n();
@@ -62,6 +53,10 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [dbHint, setDbHint] = useState<string | null>(null);
+  const passkeySupported = useMemo(
+    () => typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined",
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +79,91 @@ function LoginForm() {
     };
   }, [t]);
 
+  async function registerPasskeyAfterLogin(normalizedEmail: string) {
+    if (!passkeySupported) return;
+    const shouldEnroll = window.confirm(t("login.passkeyEnrollAsk"));
+    if (!shouldEnroll) return;
+    try {
+      const optionsRes = await fetch("/api/user/passkeys/register/options", { method: "POST" });
+      const optionsJson = (await optionsRes.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!optionsRes.ok) return;
+      const registrationResponse = await startRegistration(
+        optionsJson as unknown as Parameters<typeof startRegistration>[0]
+      );
+      await fetch("/api/user/passkeys/register/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response: registrationResponse, nickname: normalizedEmail }),
+      });
+    } catch {
+      /* 로그인 흐름 차단하지 않음 */
+    }
+  }
+
+  async function onPasskeyLogin() {
+    setError(null);
+    if (!passkeySupported) {
+      setError(t("login.passkeyNoSupport"));
+      return;
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError(t("login.passkeyEmailRequired"));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const optionsRes = await fetch("/api/public/passkey-login/options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      const optionsJson = (await optionsRes.json().catch(() => ({}))) as {
+        error?: string;
+      } & Record<string, unknown>;
+      if (!optionsRes.ok) {
+        if (optionsJson.error === "NO_PASSKEY") {
+          setError(t("login.passkeyNoPasskey"));
+        } else {
+          setError(t("login.passkeyFailed"));
+        }
+        return;
+      }
+
+      const authenticationResponse = await startAuthentication(
+        optionsJson as unknown as Parameters<typeof startAuthentication>[0]
+      );
+      const verifyRes = await fetch("/api/public/passkey-login/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response: authenticationResponse }),
+      });
+      const verifyJson = (await verifyRes.json().catch(() => ({}))) as {
+        loginToken?: string;
+      };
+      if (!verifyRes.ok || !verifyJson.loginToken) {
+        setError(t("login.passkeyFailed"));
+        return;
+      }
+
+      const signInRes = await signIn("passkey-login", {
+        loginToken: verifyJson.loginToken,
+        redirect: false,
+        callbackUrl,
+      });
+      if (signInRes?.error) {
+        setError(t("login.errorCredentials"));
+        return;
+      }
+      window.location.href = callbackUrl;
+    } catch {
+      setError(t("login.passkeyFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -92,8 +172,9 @@ function LoginForm() {
       return;
     }
     setLoading(true);
+    const normalizedEmail = email.trim().toLowerCase();
     const res = await signIn("credentials", {
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       password,
       redirect: false,
       callbackUrl,
@@ -103,6 +184,7 @@ function LoginForm() {
       setError(t("login.errorCredentials"));
       return;
     }
+    await registerPasskeyAfterLogin(normalizedEmail);
     window.location.href = callbackUrl;
   }
 
@@ -143,11 +225,7 @@ function LoginForm() {
         {seatLimitError && <p className={authBannerWarning}>{t("login.errorSeatLimit")}</p>}
         {dbHint && <p className={authBannerWarning}>{dbHint}</p>}
 
-        <div
-          className="mt-5 flex rounded-[0.625rem] bg-[var(--fill-secondary)] p-0.5"
-          role="tablist"
-          aria-label={t("login.submit")}
-        >
+        <div className="mt-5 flex rounded-[0.625rem] bg-[var(--fill-secondary)] p-0.5" role="tablist" aria-label={t("login.submit")}>
           <button
             type="button"
             role="tab"
@@ -160,19 +238,6 @@ function LoginForm() {
             onClick={() => switchMode("password")}
           >
             {t("login.modePassword")}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "passkey"}
-            className={`flex-1 rounded-[0.5rem] py-2 text-[0.8125rem] font-medium transition-colors sm:text-[0.875rem] ${
-              mode === "passkey"
-                ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
-                : "text-[var(--apple-label-secondary)]"
-            }`}
-            onClick={() => switchMode("passkey")}
-          >
-            {t("login.modePasskey")}
           </button>
           <button
             type="button"
@@ -224,20 +289,23 @@ function LoginForm() {
             <button type="submit" disabled={loading} className={authButtonPrimary}>
               {loading ? t("login.submitting") : t("login.submit")}
             </button>
+            <button
+              type="button"
+              disabled={loading || !passkeySupported}
+              className="w-full rounded-[0.625rem] border border-[var(--separator)] bg-[var(--fill-secondary)] py-2 text-[0.875rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] disabled:opacity-50 sm:text-[0.9375rem]"
+              onClick={() => void onPasskeyLogin()}
+            >
+              {loading ? t("login.passkeyChecking") : t("login.passkeySubmit")}
+            </button>
+            {!passkeySupported ? (
+              <p className="text-center text-[0.75rem] text-[var(--apple-label-secondary)]">
+                {t("login.passkeyNoSupport")}
+              </p>
+            ) : null}
           </form>
-        ) : mode === "face" ? (
-          <div className={authFormLogin}>
-            <FaceLoginSection
-              callbackUrl={callbackUrl}
-              disabled={loading}
-              error={error}
-              onLoadingChange={setLoading}
-              onError={setError}
-            />
-          </div>
         ) : (
           <div className={authFormLogin}>
-            <PasskeyLoginSection
+            <FaceLoginSection
               callbackUrl={callbackUrl}
               disabled={loading}
               error={error}
