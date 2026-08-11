@@ -56,6 +56,15 @@ function LoginForm() {
   const [dbHint, setDbHint] = useState<string | null>(null);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const enrollDecisionRef = useRef<((ok: boolean) => void) | null>(null);
+  const isMobileOrTablet = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const ua = window.navigator.userAgent.toLowerCase();
+    const uaMobile =
+      /android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/.test(ua);
+    const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+    const touchCapable = (window.navigator.maxTouchPoints ?? 0) > 0;
+    return uaMobile || (coarsePointer && touchCapable);
+  }, []);
   const passkeySupported = useMemo(
     () => typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined",
     []
@@ -107,7 +116,7 @@ function LoginForm() {
   }
 
   async function registerPasskeyAfterLogin(normalizedEmail: string) {
-    if (!passkeySupported) return;
+    if (!passkeySupported || !isMobileOrTablet) return;
     const shouldEnroll = await askPasskeyEnroll();
     if (!shouldEnroll) return;
     try {
@@ -237,7 +246,7 @@ function LoginForm() {
       className={shellWidth}
       footer={
         <div className="pointer-events-auto text-center">
-          <LegalFooterLinks className="mb-2" />
+          <LegalFooterLinks wrap={false} className="mb-2 max-w-full text-[0.6875rem] sm:text-[0.75rem]" />
           <p className={authCopyright}>© 2026 Minsub Ventures Private Limited</p>
         </div>
       }
@@ -316,18 +325,22 @@ function LoginForm() {
             <button type="submit" disabled={loading} className={authButtonPrimary}>
               {loading ? t("login.submitting") : t("login.submit")}
             </button>
-            <button
-              type="button"
-              disabled={loading || !passkeySupported}
-              className="w-full rounded-[0.625rem] border border-[var(--separator)] bg-[var(--fill-secondary)] py-2 text-[0.875rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] disabled:opacity-50 sm:text-[0.9375rem]"
-              onClick={() => void onPasskeyLogin()}
-            >
-              {loading ? t("login.passkeyChecking") : t("login.passkeySubmit")}
-            </button>
-            {!passkeySupported ? (
-              <p className="text-center text-[0.75rem] text-[var(--apple-label-secondary)]">
-                {t("login.passkeyNoSupport")}
-              </p>
+            {isMobileOrTablet ? (
+              <>
+                <button
+                  type="button"
+                  disabled={loading || !passkeySupported}
+                  className="w-full rounded-[0.625rem] border border-[var(--separator)] bg-[var(--fill-secondary)] py-2 text-[0.875rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] disabled:opacity-50 sm:text-[0.9375rem]"
+                  onClick={() => void onPasskeyLogin()}
+                >
+                  {loading ? t("login.passkeyChecking") : t("login.passkeySubmit")}
+                </button>
+                {!passkeySupported ? (
+                  <p className="text-center text-[0.75rem] text-[var(--apple-label-secondary)]">
+                    {t("login.passkeyNoSupport")}
+                  </p>
+                ) : null}
+              </>
             ) : null}
           </form>
         ) : (

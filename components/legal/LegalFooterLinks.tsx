@@ -10,6 +10,7 @@ import { useState } from "react";
 type Props = {
   className?: string;
   layout?: "inline" | "stack";
+  wrap?: boolean;
 };
 
 function FooterDot() {
@@ -20,7 +21,7 @@ function FooterDot() {
   );
 }
 
-export function LegalFooterLinks({ className = "", layout = "inline" }: Props) {
+export function LegalFooterLinks({ className = "", layout = "inline", wrap = true }: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
   const [supportOpen, setSupportOpen] = useState(false);
@@ -38,7 +39,7 @@ export function LegalFooterLinks({ className = "", layout = "inline" }: Props) {
         className={
           isStack
             ? `flex flex-col items-start gap-y-1.5 ${className}`
-            : `flex flex-wrap items-center justify-center gap-x-2 gap-y-1 ${className}`
+            : `flex ${wrap ? "flex-wrap gap-y-1" : "flex-nowrap whitespace-nowrap"} items-center justify-center gap-x-2 ${className}`
         }
         aria-label={t("legal.navLabel")}
       >
