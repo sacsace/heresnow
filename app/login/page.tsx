@@ -56,6 +56,7 @@ function LoginForm() {
   const [dbHint, setDbHint] = useState<string | null>(null);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const enrollDecisionRef = useRef<((ok: boolean) => void) | null>(null);
+  const autoPasskeyAttemptedRef = useRef(false);
   const isMobileOrTablet = useMemo(() => {
     if (typeof window === "undefined") return false;
     const ua = window.navigator.userAgent.toLowerCase();
@@ -135,9 +136,9 @@ function LoginForm() {
       const optionsRes = await fetch("/api/user/passkeys/register/options", { method: "POST" });
       const optionsJson = (await optionsRes.json().catch(() => ({}))) as Record<string, unknown>;
       if (!optionsRes.ok) return;
-      const registrationResponse = await startRegistration(
-        optionsJson as unknown as Parameters<typeof startRegistration>[0]
-      );
+      const registrationResponse = await startRegistration({
+        optionsJSON: optionsJson as unknown as Parameters<typeof startRegistration>[0]["optionsJSON"],
+      });
       const verifyRes = await fetch("/api/user/passkeys/register/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,10 +150,13 @@ function LoginForm() {
     }
   }
 
-  async function onPasskeyLogin() {
-    setError(null);
+  async function onPasskeyLogin(options?: { silent?: boolean; autofill?: boolean }) {
+    const silent = options?.silent === true;
+    const autofill = options?.autofill === true;
+    if (!silent) setError(null);
+    if (loading) return;
     if (!passkeySupported) {
-      setError(t("login.passkeyNoSupport"));
+      if (!silent) setError(t("login.passkeyNoSupport"));
       return;
     }
     const normalizedEmail = email.trim().toLowerCase();
@@ -169,17 +173,21 @@ function LoginForm() {
         error?: string;
       } & Record<string, unknown>;
       if (!optionsRes.ok) {
-        if (optionsJson.error === "NO_PASSKEY") {
-          setError(t("login.passkeyNoPasskey"));
-        } else {
-          setError(t("login.passkeyFailed"));
+        if (!silent) {
+          if (optionsJson.error === "NO_PASSKEY") {
+            setError(t("login.passkeyNoPasskey"));
+          } else {
+            setError(t("login.passkeyFailed"));
+          }
         }
         return;
       }
 
-      const authenticationResponse = await startAuthentication(
-        optionsJson as unknown as Parameters<typeof startAuthentication>[0]
-      );
+      const authenticationResponse = await startAuthentication({
+        optionsJSON:
+          optionsJson as unknown as Parameters<typeof startAuthentication>[0]["optionsJSON"],
+        useBrowserAutofill: autofill,
+      });
       const verifyRes = await fetch("/api/public/passkey-login/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -199,16 +207,32 @@ function LoginForm() {
         callbackUrl,
       });
       if (signInRes?.error) {
-        setError(t("login.errorCredentials"));
+        if (!silent) setError(t("login.errorCredentials"));
         return;
       }
       window.location.href = callbackUrl;
-    } catch {
-      setError(t("login.passkeyFailed"));
+    } catch (err) {
+      const errorName =
+        err && typeof err === "object" && "name" in err ? String((err as { name?: unknown }).name) : "";
+      const cancelled = errorName === "NotAllowedError" || errorName === "AbortError";
+      if (!silent || !cancelled) {
+        setError(t("login.passkeyFailed"));
+      }
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (mode !== "password") return;
+    if (!isMobileOrTablet || !passkeySupported) return;
+    if (autoPasskeyAttemptedRef.current) return;
+    autoPasskeyAttemptedRef.current = true;
+    const timer = window.setTimeout(() => {
+      void onPasskeyLogin({ silent: true, autofill: true });
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [mode, isMobileOrTablet, passkeySupported]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -314,7 +338,7 @@ function LoginForm() {
               <input
                 type="text"
                 inputMode="email"
-                autoComplete="username"
+                autoComplete="username webauthn"
                 className={authInput}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

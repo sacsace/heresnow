@@ -16,13 +16,13 @@ export type MobileNavItem = {
 
 type Props = {
   items: MobileNavItem[];
-  /** 햄버거 버튼만 보이는 분기점 (기본: sm:hidden) */
+  /** 햄버거 버튼만 보이는 분기점 (기본: lg 미만 표시) */
   buttonClassName?: string;
 };
 
 /**
- * 모바일 전용 좌측 슬라이드 드로어 + 햄버거 트리거.
- * 데스크톱(sm: 이상)에서는 자동으로 숨겨진다.
+ * 모바일/태블릿 전용 좌측 슬라이드 드로어 + 햄버거 트리거.
+ * 데스크톱(lg: 이상)에서는 자동으로 숨겨진다.
  *
  * 헤더에 적용된 backdrop-filter 가 fixed positioning 의 containing block 을
  * 만들어 드로어가 헤더 영역에 갇히는 문제를 막기 위해, 오버레이는 portal 로
@@ -73,7 +73,7 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
     open && mounted ? (
       <div
         id="mobile-nav-drawer"
-        className="fixed inset-0 z-[100] sm:hidden"
+        className="fixed inset-0 z-[100] lg:hidden"
         role="dialog"
         aria-modal="true"
         aria-label={t("common.menu")}
@@ -172,7 +172,7 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
         aria-expanded={open}
         aria-controls="mobile-nav-drawer"
         onClick={() => setOpen(true)}
-        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.625rem] bg-[var(--fill-secondary)] text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] sm:hidden ${buttonClassName}`.trim()}
+        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.625rem] bg-[var(--fill-secondary)] text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] lg:hidden ${buttonClassName}`.trim()}
       >
         <svg
           width="18"

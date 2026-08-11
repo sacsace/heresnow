@@ -138,7 +138,7 @@ export const ko = {
     errorFaceRateLimit: "안면 로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
     errorFaceCredentials: "등록된 얼굴을 찾지 못했습니다. 안면 등록 후 다시 시도하거나 비밀번호로 로그인하세요.",
     passkeyLead:
-      "스마트폰·태블릿의 지문/Face ID 또는 기기 잠금 인증으로 로그인합니다. 먼저 이메일을 입력하세요.",
+      "스마트폰·태블릿의 지문/Face ID 또는 기기 잠금 인증으로 로그인합니다. 등록된 기기가 있으면 바로 인증할 수 있습니다.",
     passkeySubmit: "지문/기기 인증으로 로그인",
     passkeyChecking: "기기 인증 확인 중…",
     passkeyNoSupport: "이 기기/브라우저는 생체인증 로그인을 지원하지 않습니다.",
@@ -1175,7 +1175,7 @@ export const en = {
     errorFaceCredentials:
       "No enrolled face matched. Enroll your face first or sign in with your password.",
     passkeyLead:
-      "Sign in with fingerprint, Face ID, or your device screen lock on mobile/tablet. Enter your email first.",
+      "Sign in with fingerprint, Face ID, or your device screen lock on mobile/tablet. If a passkey is available on this device, authentication can start right away.",
     passkeySubmit: "Sign in with biometric",
     passkeyChecking: "Verifying device authentication…",
     passkeyNoSupport: "This device/browser does not support biometric sign-in.",
