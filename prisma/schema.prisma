@@ -261,6 +261,28 @@ model User {
   employee       Employee?
   approvalLogs   ApprovalLog[] @relation("ApproverUser")
   resolvedBillingRequests BillingRequest[] @relation("BillingResolver")
+  passkeys      UserPasskeyCredential[]
+}
+
+model UserPasskeyCredential {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// WebAuthn credential ID (base64url)
+  credentialId  String   @unique
+  /// WebAuthn credential public key (base64url)
+  publicKey     String
+  counter       Int      @default(0)
+  /// comma-separated transports (usb,nfc,ble,internal,hybrid)
+  transports    String?
+  deviceType    String?
+  backedUp      Boolean  @default(false)
+  nickname      String?
+  lastUsedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Employee {

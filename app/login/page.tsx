@@ -37,7 +37,17 @@ const FaceLoginSection = dynamic(
   }
 );
 
-type LoginMode = "password" | "face";
+const PasskeyLoginSection = dynamic(
+  () => import("@/components/auth/PasskeyLoginSection").then((m) => m.PasskeyLoginSection),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-center text-[0.8125rem] text-[var(--apple-label-secondary)]">…</p>
+    ),
+  }
+);
+
+type LoginMode = "password" | "face" | "passkey";
 
 function LoginForm() {
   const { t } = useI18n();
@@ -111,8 +121,7 @@ function LoginForm() {
     void import("@/components/auth/FaceLoginSection");
   }
 
-  const shellWidth =
-    mode === "face" ? "!w-[26rem] sm:!w-[28rem]" : "!w-[26rem] sm:!w-[27rem]";
+  const shellWidth = mode === "face" ? "!w-[26rem] sm:!w-[28rem]" : "!w-[26rem] sm:!w-[27rem]";
 
   return (
     <AuthShell
@@ -151,6 +160,19 @@ function LoginForm() {
             onClick={() => switchMode("password")}
           >
             {t("login.modePassword")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "passkey"}
+            className={`flex-1 rounded-[0.5rem] py-2 text-[0.8125rem] font-medium transition-colors sm:text-[0.875rem] ${
+              mode === "passkey"
+                ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--apple-label-secondary)]"
+            }`}
+            onClick={() => switchMode("passkey")}
+          >
+            {t("login.modePasskey")}
           </button>
           <button
             type="button"
@@ -203,9 +225,19 @@ function LoginForm() {
               {loading ? t("login.submitting") : t("login.submit")}
             </button>
           </form>
-        ) : (
+        ) : mode === "face" ? (
           <div className={authFormLogin}>
             <FaceLoginSection
+              callbackUrl={callbackUrl}
+              disabled={loading}
+              error={error}
+              onLoadingChange={setLoading}
+              onError={setError}
+            />
+          </div>
+        ) : (
+          <div className={authFormLogin}>
+            <PasskeyLoginSection
               callbackUrl={callbackUrl}
               disabled={loading}
               error={error}

@@ -41,7 +41,7 @@ export const authConfig = {
   callbacks: {
     async signIn({ user, account }) {
       const provider = account?.provider;
-      if (provider !== "credentials" && provider !== "face-login") return true;
+      if (provider !== "credentials" && provider !== "face-login" && provider !== "passkey-login") return true;
       const u = user as {
         role?: Role;
         companyId?: string | null;

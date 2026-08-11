@@ -27,5 +27,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return authorizeFaceLogin(credentials);
       },
     }),
+    Credentials({
+      id: "passkey-login",
+      name: "Passkey Login",
+      credentials: {
+        loginToken: { label: "Login Token", type: "text" },
+      },
+      authorize: async (credentials) => {
+        const { authorizePasskeyLogin } = await import("@/lib/authorizePasskeyLogin");
+        return authorizePasskeyLogin(credentials);
+      },
+    }),
   ],
 });
