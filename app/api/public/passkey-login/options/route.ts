@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const Body = z.object({
-  email: z.string().trim().min(1).max(320),
+  email: z.string().trim().max(320).optional(),
 });
 
 export async function POST(req: Request) {
@@ -26,30 +26,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const email = parsed.data.email.toLowerCase();
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: {
-      id: true,
-      passkeys: {
-        select: { credentialId: true, transports: true },
-      },
-    },
-  });
+  const { rpID } = resolvePasskeyConfig(req);
+  const normalizedEmail = parsed.data.email?.trim().toLowerCase();
+  let allowCredentials:
+    | {
+        id: Uint8Array;
+        type: "public-key";
+      }[]
+    | undefined;
 
-  if (!user || user.passkeys.length === 0) {
-    return NextResponse.json({ error: "NO_PASSKEY" }, { status: 404 });
+  if (normalizedEmail) {
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        passkeys: {
+          select: { credentialId: true },
+        },
+      },
+    });
+    if (!user || user.passkeys.length === 0) {
+      return NextResponse.json({ error: "NO_PASSKEY" }, { status: 404 });
+    }
+    allowCredentials = user.passkeys.map((item) => ({
+      id: fromBase64Url(item.credentialId),
+      type: "public-key" as const,
+    }));
   }
 
-  const { rpID } = resolvePasskeyConfig(req);
   const options = await generateAuthenticationOptions({
     rpID,
     timeout: 60_000,
     userVerification: "preferred",
-    allowCredentials: user.passkeys.map((item) => ({
-      id: fromBase64Url(item.credentialId),
-      type: "public-key",
-    })),
+    allowCredentials,
   });
 
   const cookieStore = await cookies();

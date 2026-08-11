@@ -42,7 +42,7 @@ const FaceLoginSection = dynamic(
 type LoginMode = "password" | "face";
 
 function LoginForm() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const registered = searchParams.get("registered") === "1";
@@ -156,17 +156,14 @@ function LoginForm() {
       return;
     }
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      setError(t("login.passkeyEmailRequired"));
-      return;
-    }
 
     setLoading(true);
     try {
+      const body = normalizedEmail ? { email: normalizedEmail } : {};
       const optionsRes = await fetch("/api/public/passkey-login/options", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify(body),
       });
       const optionsJson = (await optionsRes.json().catch(() => ({}))) as {
         error?: string;
@@ -259,7 +256,12 @@ function LoginForm() {
       className={shellWidth}
       footer={
         <div className="pointer-events-auto text-center">
-          <LegalFooterLinks wrap={false} className="mb-2 max-w-full text-[0.6875rem] sm:text-[0.75rem]" />
+          <LegalFooterLinks
+            wrap={locale === "en"}
+            className={`mb-2 text-[0.6875rem] sm:text-[0.75rem] ${
+              locale === "en" ? "mx-auto max-w-[22rem]" : "max-w-full"
+            }`}
+          />
           <p className={authCopyright}>© 2026 Minsub Ventures Private Limited</p>
         </div>
       }
