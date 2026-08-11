@@ -146,7 +146,10 @@ export const ko = {
       "등록된 지문/기기 인증 정보가 없습니다. 로그인 후 내 계정에서 먼저 등록해 주세요.",
     passkeyFailed: "지문/기기 인증 로그인에 실패했습니다.",
     passkeyEmailRequired: "먼저 이메일을 입력해 주세요.",
+    passkeyEnrollTitle: "지문/기기 로그인 등록",
     passkeyEnrollAsk: "다음부터 지문/기기로 로그인하시겠습니까? 지금 이 기기를 등록할 수 있습니다.",
+    passkeyEnrollConfirm: "등록하기",
+    passkeyEnrollSkip: "다음에",
     signupLink: "회사 가입",
   },
   signup: {
@@ -1180,8 +1183,11 @@ export const en = {
       "No passkey is registered for this account yet. Sign in first, then register one in My account.",
     passkeyFailed: "Biometric sign-in failed.",
     passkeyEmailRequired: "Enter your email first.",
+    passkeyEnrollTitle: "Enable biometric sign-in",
     passkeyEnrollAsk:
       "Would you like to use fingerprint/device sign-in next time? You can register this device now.",
+    passkeyEnrollConfirm: "Enable now",
+    passkeyEnrollSkip: "Later",
     signupLink: "Company sign-up",
   },
   signup: {

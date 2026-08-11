@@ -71,11 +71,25 @@ export const authConfig = {
           const { prisma } = await import("@/lib/prisma");
           const current = await prisma.user.findUnique({
             where: { id: token.sub },
-            select: { sessionNonce: true },
+            select: {
+              email: true,
+              role: true,
+              companyId: true,
+              sessionNonce: true,
+              employee: { select: { id: true } },
+            },
           });
           if (!current?.sessionNonce || current.sessionNonce !== token.sessionNonce) {
             return {};
           }
+          // 세션 중 역할이 바뀌어도 즉시 반영한다.
+          // 정책: SUPER_ADMIN은 오직 root 식별자만 허용.
+          token.role =
+            current.role === "SUPER_ADMIN" && (current.email ?? "").trim().toLowerCase() !== "root"
+              ? "COMPANY_ADMIN"
+              : current.role;
+          token.companyId = current.companyId ?? null;
+          token.employeeId = current.employee?.id ?? null;
         } catch {
           // 인증 검증 실패 시 기존 토큰 유지(가용성 우선)
           return token;

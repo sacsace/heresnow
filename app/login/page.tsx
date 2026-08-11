@@ -2,6 +2,7 @@
 
 import { AppLogo } from "@/components/AppLogo";
 import { AuthShell } from "@/components/auth/AuthShell";
+import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import {
   authBannerSuccess,
   authBannerWarning,
@@ -26,7 +27,7 @@ import { startAuthentication, startRegistration } from "@simplewebauthn/browser"
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState, Suspense, useEffect, useMemo } from "react";
+import { useState, Suspense, useEffect, useMemo, useRef } from "react";
 
 const FaceLoginSection = dynamic(
   () => import("@/components/auth/FaceLoginSection").then((m) => m.FaceLoginSection),
@@ -53,6 +54,8 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [dbHint, setDbHint] = useState<string | null>(null);
+  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const enrollDecisionRef = useRef<((ok: boolean) => void) | null>(null);
   const passkeySupported = useMemo(
     () => typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined",
     []
@@ -79,9 +82,33 @@ function LoginForm() {
     };
   }, [t]);
 
+  useEffect(() => {
+    return () => {
+      if (enrollDecisionRef.current) {
+        enrollDecisionRef.current(false);
+        enrollDecisionRef.current = null;
+      }
+    };
+  }, []);
+
+  async function askPasskeyEnroll(): Promise<boolean> {
+    setEnrollDialogOpen(true);
+    return new Promise<boolean>((resolve) => {
+      enrollDecisionRef.current = resolve;
+    });
+  }
+
+  function resolvePasskeyEnrollDecision(ok: boolean) {
+    setEnrollDialogOpen(false);
+    if (!enrollDecisionRef.current) return;
+    const resolve = enrollDecisionRef.current;
+    enrollDecisionRef.current = null;
+    resolve(ok);
+  }
+
   async function registerPasskeyAfterLogin(normalizedEmail: string) {
     if (!passkeySupported) return;
-    const shouldEnroll = window.confirm(t("login.passkeyEnrollAsk"));
+    const shouldEnroll = await askPasskeyEnroll();
     if (!shouldEnroll) return;
     try {
       const optionsRes = await fetch("/api/user/passkeys/register/options", { method: "POST" });
@@ -321,6 +348,15 @@ function LoginForm() {
           </Link>
         </p>
       </div>
+      <AppleConfirmDialog
+        open={enrollDialogOpen}
+        title={t("login.passkeyEnrollTitle")}
+        message={t("login.passkeyEnrollAsk")}
+        confirmLabel={t("login.passkeyEnrollConfirm")}
+        cancelLabel={t("login.passkeyEnrollSkip")}
+        onConfirm={() => resolvePasskeyEnrollDecision(true)}
+        onCancel={() => resolvePasskeyEnrollDecision(false)}
+      />
     </AuthShell>
   );
 }
