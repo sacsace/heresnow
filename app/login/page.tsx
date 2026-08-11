@@ -120,17 +120,30 @@ function LoginForm() {
     const shouldEnroll = await askPasskeyEnroll();
     if (!shouldEnroll) return;
     try {
+      // 로그인 직후에는 세션 쿠키 반영이 늦을 수 있어, 등록 API 접근 가능 시점까지 잠시 대기한다.
+      let sessionReady = false;
+      for (let i = 0; i < 8; i += 1) {
+        const probe = await fetch("/api/user/passkeys", { cache: "no-store" });
+        if (probe.status !== 401 && probe.status !== 403) {
+          sessionReady = true;
+          break;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 180));
+      }
+      if (!sessionReady) return;
+
       const optionsRes = await fetch("/api/user/passkeys/register/options", { method: "POST" });
       const optionsJson = (await optionsRes.json().catch(() => ({}))) as Record<string, unknown>;
       if (!optionsRes.ok) return;
       const registrationResponse = await startRegistration(
         optionsJson as unknown as Parameters<typeof startRegistration>[0]
       );
-      await fetch("/api/user/passkeys/register/verify", {
+      const verifyRes = await fetch("/api/user/passkeys/register/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ response: registrationResponse, nickname: normalizedEmail }),
       });
+      if (!verifyRes.ok) return;
     } catch {
       /* 로그인 흐름 차단하지 않음 */
     }
