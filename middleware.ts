@@ -21,6 +21,10 @@ function normalizeProto(raw: string): "http" | "https" | "" {
   return "";
 }
 
+function isRailwayHost(host: string): boolean {
+  return host.endsWith(".up.railway.app") || host.endsWith(".railway.app");
+}
+
 function canonicalHostFromEnv(): string | null {
   if (!CANONICAL_SITE_URL) return null;
   try {
@@ -67,13 +71,16 @@ export default auth((req) => {
     pathname.startsWith("/icons/") ||
     isDevHealth;
 
-  // Railway 기본 도메인 접근 방지: 운영에서는 지정한 정식 도메인으로 강제 이동
+  // Railway 기본 도메인 접근 방지:
+  // 운영에서는 Railway 기본 도메인 요청에만 정식 도메인으로 강제 이동한다.
+  // (www <-> apex 등 외부 리다이렉트 정책과 충돌해 루프가 나는 것을 방지)
   if (
     process.env.NODE_ENV === "production" &&
     CANONICAL_HOST &&
     !isPublicApi &&
     reqHost &&
-    reqHost !== CANONICAL_HOST
+    reqHost !== CANONICAL_HOST &&
+    isRailwayHost(reqHost)
   ) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.host = CANONICAL_HOST;
