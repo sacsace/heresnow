@@ -27,7 +27,7 @@ import { startAuthentication, startRegistration } from "@simplewebauthn/browser"
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState, Suspense, useEffect, useMemo, useRef } from "react";
+import { useState, Suspense, useEffect, useMemo, useRef, useCallback } from "react";
 
 const FaceLoginSection = dynamic(
   () => import("@/components/auth/FaceLoginSection").then((m) => m.FaceLoginSection),
@@ -136,9 +136,9 @@ function LoginForm() {
       const optionsRes = await fetch("/api/user/passkeys/register/options", { method: "POST" });
       const optionsJson = (await optionsRes.json().catch(() => ({}))) as Record<string, unknown>;
       if (!optionsRes.ok) return;
-      const registrationResponse = await startRegistration({
-        optionsJSON: optionsJson as unknown as Parameters<typeof startRegistration>[0]["optionsJSON"],
-      });
+      const registrationResponse = await startRegistration(
+        optionsJson as unknown as Parameters<typeof startRegistration>[0]
+      );
       const verifyRes = await fetch("/api/user/passkeys/register/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,7 +150,7 @@ function LoginForm() {
     }
   }
 
-  async function onPasskeyLogin(options?: { silent?: boolean; autofill?: boolean }) {
+  const onPasskeyLogin = useCallback(async (options?: { silent?: boolean; autofill?: boolean }) => {
     const silent = options?.silent === true;
     const autofill = options?.autofill === true;
     if (!silent) setError(null);
@@ -183,11 +183,10 @@ function LoginForm() {
         return;
       }
 
-      const authenticationResponse = await startAuthentication({
-        optionsJSON:
-          optionsJson as unknown as Parameters<typeof startAuthentication>[0]["optionsJSON"],
-        useBrowserAutofill: autofill,
-      });
+      const authenticationResponse = await startAuthentication(
+        optionsJson as unknown as Parameters<typeof startAuthentication>[0],
+        autofill
+      );
       const verifyRes = await fetch("/api/public/passkey-login/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -221,7 +220,7 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [callbackUrl, email, loading, passkeySupported, t]);
 
   useEffect(() => {
     if (mode !== "password") return;
@@ -232,7 +231,7 @@ function LoginForm() {
       void onPasskeyLogin({ silent: true, autofill: true });
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [mode, isMobileOrTablet, passkeySupported]);
+  }, [mode, isMobileOrTablet, passkeySupported, onPasskeyLogin]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
