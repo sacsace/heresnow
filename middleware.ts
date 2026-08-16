@@ -105,9 +105,10 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  if (loggedIn && (isAuthPage || pathname === "/signup")) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
+  // 주의:
+  // 세션 쿠키가 오래되어 Node 런타임(session 검증)과 Edge 런타임(auth 토큰 판독) 결과가
+  // 일시적으로 다를 수 있다. 이때 /login -> / 와 / -> /login 이 충돌해
+  // ERR_TOO_MANY_REDIRECTS 루프가 발생할 수 있으므로, 로그인/가입 페이지 강제 리다이렉트는 하지 않는다.
 
   if (loggedIn && pathname.startsWith("/admin")) {
     const ok =
