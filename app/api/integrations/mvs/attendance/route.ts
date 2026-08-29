@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { verifyMvsApiKeyHash, verifyMvsIntegrationApiKey } from "@/lib/integrations/mvsAuth";
+import { verifyMvsApiKeyHash } from "@/lib/integrations/mvsAuth";
 import { isMvsAttendanceEventV1 } from "@/lib/integrations/mvsTypes";
 import { filterAttendanceDayRows, aggregateAttendanceByDay } from "@/lib/adminAttendanceByDay";
 import { monthRangeUtc } from "@/lib/adminMonthlyAttendance";
@@ -34,7 +34,7 @@ const querySchema = z.object({
 
 /**
  * MVS가 HeresNow 출퇴근 이벤트를 폴링할 때 사용.
- * Authorization: Bearer {MVS_INTEGRATION_API_KEY}
+ * Authorization: Bearer {Company MVS API Key}
  */
 export async function GET(req: Request) {
   const apiKey = apiKeyFromRequest(req);
@@ -84,9 +84,7 @@ export async function GET(req: Request) {
     },
   });
 
-  const authorized =
-    verifyMvsIntegrationApiKey(apiKey) ||
-    verifyMvsApiKeyHash(apiKey, integration?.apiKeyHash);
+  const authorized = verifyMvsApiKeyHash(apiKey, integration?.apiKeyHash);
   if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -298,25 +296,23 @@ export async function POST(req: Request) {
     if (integration) resolvedCompanyId = integration.companyId;
   }
 
-  if (!verifyMvsIntegrationApiKey(apiKey)) {
-    if (!resolvedCompanyId) {
-      return NextResponse.json(
-        { error: "companyId 또는 externalCompanyId가 필요합니다." },
-        { status: 400 }
-      );
-    }
-    const integration = await prisma.companyIntegration.findUnique({
-      where: {
-        companyId_provider: {
-          companyId: resolvedCompanyId,
-          provider: IntegrationProvider.MVS,
-        },
+  if (!resolvedCompanyId) {
+    return NextResponse.json(
+      { error: "companyId 또는 externalCompanyId가 필요합니다." },
+      { status: 400 }
+    );
+  }
+  const integration = await prisma.companyIntegration.findUnique({
+    where: {
+      companyId_provider: {
+        companyId: resolvedCompanyId,
+        provider: IntegrationProvider.MVS,
       },
-      select: { apiKeyHash: true },
-    });
-    if (!verifyMvsApiKeyHash(apiKey, integration?.apiKeyHash)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    },
+    select: { apiKeyHash: true },
+  });
+  if (!verifyMvsApiKeyHash(apiKey, integration?.apiKeyHash)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const updated = await prisma.integrationOutbox.updateMany({

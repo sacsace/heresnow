@@ -769,7 +769,8 @@ export const ko = {
     mvsDisabled: "연동 비활성",
     mvsExternalId: "MVS 회사 ID",
     mvsOutbox: "전송 대기 {pending}건 · 실패 {failed}건",
-    mvsStep1: "서버 환경 변수 설정: MVS_INTEGRATION_API_KEY, MVS_DEFAULT_WEBHOOK_URL(선택), MVS_WEBHOOK_BEARER(선택), INTEGRATION_DISPATCH_SECRET",
+    mvsStep1:
+      "서버 환경 변수 설정: INTEGRATION_DISPATCH_SECRET, MVS_DEFAULT_WEBHOOK_URL(선택), MVS_WEBHOOK_BEARER(선택)",
     mvsStep2: "슈퍼관리자 → 회사 상세에서 MVS 연동을 켜고 externalCompanyId·webhookUrl을 설정합니다.",
     mvsStep3: "직원별 MVS 사번은 Employee.externalEmployeeId에 매핑합니다.",
     mvsStep4: "MVS가 이벤트를 가져올 때: GET /api/integrations/mvs/attendance (Authorization: Bearer API키) 또는 웹훅 배치 POST /api/integrations/mvs/dispatch",
@@ -1829,7 +1830,8 @@ export const en = {
     mvsDisabled: "Disabled",
     mvsExternalId: "MVS Company ID",
     mvsOutbox: "Pending {pending} · Failed {failed}",
-    mvsStep1: "Set server env: MVS_INTEGRATION_API_KEY, MVS_DEFAULT_WEBHOOK_URL (optional), MVS_WEBHOOK_BEARER (optional), INTEGRATION_DISPATCH_SECRET",
+    mvsStep1:
+      "Set server env: INTEGRATION_DISPATCH_SECRET, MVS_DEFAULT_WEBHOOK_URL (optional), MVS_WEBHOOK_BEARER (optional)",
     mvsStep2: "Super admin → company detail: enable MVS, set externalCompanyId and webhookUrl.",
     mvsStep3: "Map each employee to MVS ID via Employee.externalEmployeeId.",
     mvsStep4: "MVS pulls events: GET /api/integrations/mvs/attendance (Bearer API key) or webhook batch POST /api/integrations/mvs/dispatch",
