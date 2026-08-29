@@ -80,12 +80,6 @@ function todayYmd(): string {
   return `${y}-${m}-${day}`;
 }
 
-/** 검색 기본값: 시작·종료 모두 오늘 */
-function todayRange(): { from: string; to: string } {
-  const today = todayYmd();
-  return { from: today, to: today };
-}
-
 function parseYmd(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, d ?? 1);
