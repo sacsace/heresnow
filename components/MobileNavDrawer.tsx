@@ -12,6 +12,7 @@ export type MobileNavItem = {
   href: string;
   label: string;
   exact?: boolean;
+  disabled?: boolean;
 };
 
 type Props = {
@@ -116,18 +117,27 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
                 const active = isActive(it.href, it.exact);
                 return (
                   <li key={it.href}>
-                    <Link
-                      href={it.href}
-                      onClick={() => setOpen(false)}
-                      aria-current={active ? "page" : undefined}
-                      className={`block rounded-[0.625rem] px-3 py-2.5 text-[0.9375rem] transition-colors ${
-                        active
-                          ? "bg-[var(--fill-tertiary)] font-semibold text-[var(--foreground)]"
-                          : "font-medium text-[var(--apple-label-secondary)] hover:bg-[var(--fill-tertiary)] hover:text-[var(--foreground)]"
-                      }`}
-                    >
-                      {it.label}
-                    </Link>
+                    {it.disabled ? (
+                      <span
+                        aria-disabled="true"
+                        className="block cursor-not-allowed rounded-[0.625rem] px-3 py-2.5 text-[0.9375rem] font-medium text-[var(--apple-label-tertiary)] opacity-70"
+                      >
+                        {it.label}
+                      </span>
+                    ) : (
+                      <Link
+                        href={it.href}
+                        onClick={() => setOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={`block rounded-[0.625rem] px-3 py-2.5 text-[0.9375rem] transition-colors ${
+                          active
+                            ? "bg-[var(--fill-tertiary)] font-semibold text-[var(--foreground)]"
+                            : "font-medium text-[var(--apple-label-secondary)] hover:bg-[var(--fill-tertiary)] hover:text-[var(--foreground)]"
+                        }`}
+                      >
+                        {it.label}
+                      </Link>
+                    )}
                   </li>
                 );
               })}

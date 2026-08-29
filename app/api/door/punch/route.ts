@@ -15,6 +15,7 @@ import { doorApiForbidden } from "@/lib/requireDoorRole";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { prisma } from "@/lib/prisma";
+import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
 import { AttendanceType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -27,6 +28,8 @@ export async function POST(req: Request) {
   const session = await auth();
   const denied = doorApiForbidden(session);
   if (denied) return denied;
+  const subscriptionDenied = await subscriptionPunchForbiddenResponse(session?.user?.companyId);
+  if (subscriptionDenied) return subscriptionDenied;
 
   const companyId = session!.user!.companyId!;
 

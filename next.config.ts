@@ -85,19 +85,34 @@ const nextConfig: NextConfig = {
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),
       (warning: unknown) => {
+        const isObj = (v: unknown): v is Record<string, unknown> =>
+          typeof v === "object" && v !== null;
+        const asText = (v: unknown): string =>
+          typeof v === "string" ? v : v == null ? "" : String(v);
+
         const message =
           typeof warning === "string"
             ? warning
-            : warning && typeof warning === "object" && "message" in warning
-              ? String((warning as { message?: unknown }).message ?? "")
+            : isObj(warning) && "message" in warning
+              ? asText(warning.message)
               : "";
+
+        const details =
+          isObj(warning) && "details" in warning ? asText(warning.details) : "";
+        const stack = isObj(warning) && "stack" in warning ? asText(warning.stack) : "";
         const moduleName =
-          warning && typeof warning === "object" && "module" in warning
-            ? String((warning as { module?: unknown }).module ?? "")
+          isObj(warning) && "module" in warning ? asText(warning.module) : "";
+        const moduleResource =
+          isObj(warning) &&
+          "module" in warning &&
+          isObj(warning.module) &&
+          "resource" in warning.module
+            ? asText(warning.module.resource)
             : "";
+        const combined = `${message}\n${details}\n${stack}\n${moduleName}\n${moduleResource}`;
         return (
           message.includes("Critical dependency: require function is used in a way") &&
-          (moduleName.includes("@vladmandic/face-api") || message.includes("@vladmandic/face-api"))
+          combined.includes("@vladmandic/face-api")
         );
       },
     ];

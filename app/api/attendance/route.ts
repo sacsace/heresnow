@@ -35,6 +35,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { acquireAttendanceEmployeeLock } from "@/lib/attendanceLock";
 import { mapSiteRow, resolvePunchSiteContext } from "@/lib/attendanceSiteContext";
+import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
 import {
   checkGeofencePolicy,
   geofenceErrorMessage,
@@ -96,6 +97,8 @@ export async function POST(req: Request) {
   const session = await auth();
   const seatDenied = await seatLoginForbiddenResponse(session);
   if (seatDenied) return seatDenied;
+  const subscriptionDenied = await subscriptionPunchForbiddenResponse(session?.user?.companyId);
+  if (subscriptionDenied) return subscriptionDenied;
   if (!session?.user?.id || !session.user.employeeId) {
     return NextResponse.json({ error: "직원 프로필이 필요합니다." }, { status: 403 });
   }

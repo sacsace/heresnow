@@ -16,12 +16,15 @@ import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { isCheckOutEarly } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { prisma } from "@/lib/prisma";
+import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   const session = await auth();
   const seatDenied = await seatLoginForbiddenResponse(session);
   if (seatDenied) return seatDenied;
+  const subscriptionDenied = await subscriptionPunchForbiddenResponse(session?.user?.companyId);
+  if (subscriptionDenied) return subscriptionDenied;
   if (!session?.user?.employeeId || !session.user.companyId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

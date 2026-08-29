@@ -2,56 +2,71 @@
 
 import { AppHeaderActions } from "@/components/AppHeaderActions";
 import { AppLogo } from "@/components/AppLogo";
+import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import { useI18n } from "@/components/LanguageProvider";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, type MouseEvent, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type WheelEvent } from "react";
 
 type Props = {
   children: React.ReactNode;
   bodyClassName?: string;
+  subscriptionExpired?: boolean;
 };
 
-export function AdminChrome({ children, bodyClassName = "" }: Props) {
+export function AdminChrome({
+  children,
+  bodyClassName = "",
+  subscriptionExpired = false,
+}: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
+  const [subscriptionAlertOpen, setSubscriptionAlertOpen] = useState(false);
   const navScrollRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRafRef = useRef<number | null>(null);
   const autoScrollDirRef = useRef<-1 | 0 | 1>(0);
 
-  const menuGroups = useMemo(
-    () => [
+  const menuGroups = useMemo(() => {
+    const expiryAllowed = new Set(["/admin", "/admin/billing", "/admin/settings", "/admin/account"]);
+    const withExpiryGate = (
+      items: Array<{ href: string; label: string; exact?: boolean }>
+    ) =>
+      items.map((item) => ({
+        ...item,
+        disabled: subscriptionExpired && !expiryAllowed.has(item.href),
+      }));
+
+    return [
       {
         id: "core",
         label: "Core",
-        items: [
+        items: withExpiryGate([
           { href: "/admin", label: t("admin.navDashboard"), exact: true },
           { href: "/admin/punch", label: t("admin.navMyPunch") },
           { href: "/admin/attendance", label: t("admin.navAttendance") },
-        ],
+        ]),
       },
       {
         id: "people",
         label: "People",
-        items: [
+        items: withExpiryGate([
           { href: "/admin/employees", label: t("admin.navEmployees") },
           { href: "/admin/exceptions", label: t("admin.navExceptions") },
-        ],
+        ]),
       },
       {
         id: "ops",
         label: "Operations",
-        items: [
+        items: withExpiryGate([
           { href: "/admin/billing", label: t("admin.navBilling") },
           { href: "/admin/settings", label: t("admin.navSettings") },
           { href: "/admin/account", label: t("common.myAccount") },
-        ],
+        ]),
       },
-    ],
-    [t]
-  );
+    ];
+  }, [subscriptionExpired, t]);
 
   const links = useMemo(() => menuGroups.flatMap((g) => g.items), [menuGroups]);
 
@@ -121,6 +136,14 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
     return () => stopAutoScroll();
   }, []);
 
+  useEffect(() => {
+    if (subscriptionExpired) {
+      setSubscriptionAlertOpen(true);
+    } else {
+      setSubscriptionAlertOpen(false);
+    }
+  }, [subscriptionExpired]);
+
   const activeItem =
     links.find((l) => isActive(l.href, "exact" in l ? l.exact : false)) ?? null;
   const legalActiveItem = pathname.startsWith("/admin/terms")
@@ -174,17 +197,28 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
                 {links.map((link) => {
                   const active = isActive(link.href, "exact" in link ? link.exact : false);
                   return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={`relative inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-[0.55rem] px-3 text-[0.75rem] font-semibold transition-colors xl:px-3.5 xl:text-[0.8125rem] ${
-                        active
-                          ? "bg-[var(--fill-tertiary)] text-[var(--foreground)]"
-                          : "text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary)] hover:text-[var(--foreground)]"
-                      }`}
-                    >
-                      {link.label}
-                    </Link>
+                    link.disabled ? (
+                      <span
+                        key={link.href}
+                        aria-disabled="true"
+                        title={t("employee.subscriptionExpiredLead")}
+                        className="relative inline-flex h-9 shrink-0 cursor-not-allowed items-center justify-center whitespace-nowrap rounded-[0.55rem] px-3 text-[0.75rem] font-semibold text-[var(--apple-label-tertiary)] opacity-70 xl:px-3.5 xl:text-[0.8125rem]"
+                      >
+                        {link.label}
+                      </span>
+                    ) : (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className={`relative inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-[0.55rem] px-3 text-[0.75rem] font-semibold transition-colors xl:px-3.5 xl:text-[0.8125rem] ${
+                          active
+                            ? "bg-[var(--fill-tertiary)] text-[var(--foreground)]"
+                            : "text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary)] hover:text-[var(--foreground)]"
+                        }`}
+                      >
+                        {link.label}
+                      </Link>
+                    )
                   );
                 })}
               </div>
@@ -223,7 +257,15 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
           </section>
         </div>
       </div>
-
+      <AppleConfirmDialog
+        open={subscriptionAlertOpen}
+        title={t("employee.subscriptionExpiredTitle")}
+        message={t("employee.subscriptionExpiredLead")}
+        confirmLabel={t("common.confirm")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => setSubscriptionAlertOpen(false)}
+        onCancel={() => setSubscriptionAlertOpen(false)}
+      />
     </div>
   );
 }
