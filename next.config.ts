@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 
 function buildContentSecurityPolicy(): string {
   const isProd = process.env.NODE_ENV === "production";
-  const allowUnsafeInline = !isProd || process.env.CSP_ALLOW_UNSAFE_INLINE === "true";
+  // Hotfix: Next.js runtime uses inline chunks on production pages.
+  // Keep inline enabled by default until nonce-based CSP is fully wired.
+  const allowUnsafeInline = !isProd || process.env.CSP_ALLOW_UNSAFE_INLINE !== "false";
   const scriptSrc = [
     "'self'",
     ...(allowUnsafeInline ? ["'unsafe-inline'"] : []),
