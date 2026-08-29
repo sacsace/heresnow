@@ -11,6 +11,7 @@ import {
   formatLateCheckOutBasisLabel,
   isCheckOutPastWindow,
   resolveLateCheckOutTimestamp,
+  THIRTY_H_MS,
   type LateCheckOutTimeBasis,
 } from "@/lib/attendancePunchRules";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
@@ -18,6 +19,7 @@ import {
   evaluateAttendanceWorkFlags,
   evaluateCheckOutWorkFlags,
   evaluateFreePunchCheckOutWorkFlags,
+  scheduledShiftEndAt,
 } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { formatInTimeZone } from "date-fns-tz";
@@ -31,6 +33,7 @@ import {
   faceVerifiedForAttendance,
 } from "@/lib/integrations/enqueueMvsAttendance";
 import { prisma } from "@/lib/prisma";
+import { acquireAttendanceEmployeeLock } from "@/lib/attendanceLock";
 import { mapSiteRow, resolvePunchSiteContext } from "@/lib/attendanceSiteContext";
 import {
   checkGeofencePolicy,
@@ -73,6 +76,18 @@ const bodySchema = z
       }
     }
   });
+
+function checkInBlockCode(block: ReturnType<typeof evaluatePunchEligibility>["checkInBlock"]): string {
+  if (block === "ALREADY_CHECKED_IN") return "ALREADY_CHECKED_IN";
+  if (block === "COOLDOWN") return "COOLDOWN";
+  return "CHECK_IN_BLOCKED";
+}
+
+function checkOutBlockCode(block: ReturnType<typeof evaluatePunchEligibility>["checkOutBlock"]): string {
+  if (block === "NOT_CHECKED_IN") return "NOT_CHECKED_IN";
+  if (block === "MIN_INTERVAL") return "MIN_INTERVAL";
+  return "CHECK_OUT_BLOCKED";
+}
 
 /**
  * 출근/퇴근: 회사 geofenceMode에 따라 반경 밖 경고·차단. 출장 출근은 반경 검사 생략.
@@ -231,12 +246,26 @@ export async function POST(req: Request) {
   if (type === "CHECK_IN") {
     if (!eligibility.canCheckIn) {
       const msg = checkInErrorMessage(eligibility.checkInBlock) ?? "출근할 수 없습니다.";
-      return NextResponse.json({ error: msg }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: msg,
+          code: checkInBlockCode(eligibility.checkInBlock),
+          nextCheckInAt: eligibility.nextCheckInAt,
+        },
+        { status: 409 }
+      );
     }
   } else {
     if (!eligibility.canCheckOut) {
       const msg = checkOutErrorMessage(eligibility.checkOutBlock) ?? "퇴근할 수 없습니다.";
-      return NextResponse.json({ error: msg }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: msg,
+          code: checkOutBlockCode(eligibility.checkOutBlock),
+          nextCheckOutAt: eligibility.nextCheckOutAt,
+        },
+        { status: 409 }
+      );
     }
   }
 
@@ -301,15 +330,30 @@ export async function POST(req: Request) {
 
   let lateCheckOutResolved: ReturnType<typeof resolveLateCheckOutTimestamp> | null =
     null;
+  const staleCheckOutNoOvertime =
+    type === "CHECK_OUT" &&
+    checkInAt != null &&
+    now.getTime() - checkInAt.getTime() >= THIRTY_H_MS;
   if (checkOutPastWindow && checkInAt) {
     lateCheckOutResolved = resolveLateCheckOutTimestamp(checkInAt, tz);
   }
 
   let recordTimestamp = now;
   let checkOutWorkCapped = false;
+  let staleCheckOutAutoScheduled = false;
   if (type === "CHECK_OUT" && checkInAt) {
     if (lateCheckOutResolved) {
       recordTimestamp = lateCheckOutResolved.timestamp;
+    } else if (staleCheckOutNoOvertime) {
+      const scheduledEnd = scheduledShiftEndAt(checkInAt, tz, effectiveSchedule);
+      if (scheduledEnd) {
+        recordTimestamp = new Date(Math.max(checkInAt.getTime(), scheduledEnd.getTime()));
+        staleCheckOutAutoScheduled = true;
+      } else {
+        const capped = capCheckOutTimestamp(checkInAt, now);
+        recordTimestamp = capped.timestamp;
+        checkOutWorkCapped = capped.capped;
+      }
     } else {
       const capped = capCheckOutTimestamp(checkInAt, now);
       recordTimestamp = capped.timestamp;
@@ -332,7 +376,9 @@ export async function POST(req: Request) {
   const normalizedWorkFlags =
     freePunchEnabled && type === "CHECK_IN"
       ? { ...workFlags, isLate: false, lateMinutes: 0 }
-      : workFlags;
+      : staleCheckOutNoOvertime && type === "CHECK_OUT"
+        ? { ...workFlags, isOvertime: false, overtimeMinutes: 0 }
+        : workFlags;
 
   const siteId = siteCtx.siteId;
   const distanceFromSite = siteCtx.distanceFromSite;
@@ -379,7 +425,10 @@ export async function POST(req: Request) {
     const recordedAt = formatInTimeZone(recordTimestamp, tz, "yyyy-MM-dd HH:mm");
     if (checkOutPastWindow && lateCheckOutResolved) {
       const basisLabel = formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko");
-      const systemNote = `[지연 퇴근 보정] 실제 처리 ${actualAt} → 기록 ${recordedAt} (${basisLabel})`;
+      const systemNote = `[SYSTEM_CORRECTION] reason=STALE_CHECK_IN actualRequestedAt=${actualAt} correctedRecordedAt=${recordedAt} basis=${basisLabel}`;
+      recordMemo = userMemo ? `${userMemo}\n${systemNote}` : systemNote;
+    } else if (staleCheckOutAutoScheduled) {
+      const systemNote = `[SYSTEM_CORRECTION] reason=STALE_CHECK_IN_30H_NO_OT actualRequestedAt=${actualAt} correctedRecordedAt=${recordedAt} basis=scheduled_shift_end`;
       recordMemo = userMemo ? `${userMemo}\n${systemNote}` : systemNote;
     } else if (checkOutWorkCapped) {
       const systemNote = `[근무시간 상한] 실제 처리 ${actualAt} → 기록 ${recordedAt} (최대 21시간)`;
@@ -411,6 +460,7 @@ export async function POST(req: Request) {
   };
   try {
     result = await prisma.$transaction(async (tx) => {
+      await acquireAttendanceEmployeeLock(tx, session.user.companyId!, employee.id);
       const latest = await tx.attendanceRecord.findFirst({
         where: { employeeId: employee.id, companyId: session.user.companyId! },
         orderBy: { timestamp: "desc" },

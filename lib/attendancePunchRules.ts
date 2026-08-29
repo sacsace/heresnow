@@ -9,6 +9,8 @@ export const MIN_PUNCH_GAP_MS = 3 * 60 * 1000;
 export const SIX_H_MS = 6 * 60 * 60 * 1000;
 /** 출근 후 최대 퇴근 가능 시간 (철야·익일 퇴근 포함) */
 export const FORTY_EIGHT_H_MS = 48 * 60 * 60 * 1000;
+/** 30시간 초과 미퇴근 시 OT 미적용 보정 기준 */
+export const THIRTY_H_MS = 30 * 60 * 60 * 1000;
 /** 출근~퇴근 1회당 최대 근무 시간 (총 21시간) */
 export const MAX_SHIFT_WORK_MS = 21 * 60 * 60 * 1000;
 /** @deprecated MAX_SHIFT_WORK_MS 사용 */

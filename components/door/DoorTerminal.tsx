@@ -94,6 +94,9 @@ export function DoorTerminal() {
       if (code === "CHECK_OUT_TOO_EARLY" || fallback === "checkout_too_early") {
         return t("door.checkoutTooEarly");
       }
+      if (code === "CHECK_IN_TOO_EARLY" || fallback === "checkin_too_early") {
+        return t("door.checkInTooEarly");
+      }
       if (code === "CHECK_IN_COOLDOWN" || fallback === "checkin_cooldown") {
         return t("door.checkInCooldown");
       }

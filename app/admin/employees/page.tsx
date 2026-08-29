@@ -87,6 +87,7 @@ export default function AdminEmployeesPage() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [departmentId, setDepartmentId] = useState<string>("");
   const [newRole, setNewRole] = useState<Role>("EMPLOYEE");
   const [error, setError] = useState<string | null>(null);
@@ -259,6 +260,7 @@ export default function AdminEmployeesPage() {
     setEmail("");
     setName("");
     setPassword("");
+    setShowCreatePassword(false);
     setDepartmentId("");
     setNewRole("EMPLOYEE");
     await loadAll();
@@ -666,6 +668,13 @@ export default function AdminEmployeesPage() {
 
   const noDepartments = departments.length === 0;
   const canEditRoles = assignableRoles.length > 0;
+  const passwordVisibilityLabel = showCreatePassword
+    ? locale === "en"
+      ? "Hide password"
+      : "비밀번호 숨기기"
+    : locale === "en"
+      ? "Show password"
+      : "비밀번호 보기";
 
   return (
     <div className={`${pageStack} w-full min-w-0`}>
@@ -731,14 +740,46 @@ export default function AdminEmployeesPage() {
                   {t("admin.employeesPasswordLabel")}{" "}
                   <span aria-hidden className="text-[var(--apple-red)]">*</span>
                 </label>
-                <input
-                  required
-                  type="password"
-                  className={`${input} mt-1.5`}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t("admin.employeesPasswordHint")}
-                />
+                <div className="relative mt-1.5">
+                  <input
+                    required
+                    type={showCreatePassword ? "text" : "password"}
+                    className={`${input} pr-10`}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t("admin.employeesPasswordHint")}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-1.5 inline-flex h-7 w-7 items-center justify-center self-center rounded-md border-0 bg-transparent p-0 text-[var(--apple-label-secondary)] outline-none transition-colors hover:bg-[var(--fill-tertiary)] hover:text-[var(--foreground)]"
+                    onClick={() => setShowCreatePassword((prev) => !prev)}
+                    aria-label={passwordVisibilityLabel}
+                    title={passwordVisibilityLabel}
+                  >
+                    {showCreatePassword ? (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
+                        <path
+                          d="M3 3l18 18M10.73 10.73A3 3 0 0013.27 13.27M9.88 5.09A10.94 10.94 0 0112 5c5.05 0 9.27 3.11 10.5 7.5a11.79 11.79 0 01-4.21 5.95M6.61 6.61A11.8 11.8 0 001.5 12.5 11.77 11.77 0 005.84 18.62"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
+                        <path
+                          d="M1.5 12.5C2.73 8.11 6.95 5 12 5s9.27 3.11 10.5 7.5C21.27 16.89 17.05 20 12 20S2.73 16.89 1.5 12.5z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <circle cx="12" cy="12.5" r="3" stroke="currentColor" strokeWidth="1.6" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
               <div className={canEditRoles ? undefined : "sm:col-span-2"}>
                 <label className={label}>{t("admin.employeesDepartmentLabel")}</label>
@@ -939,7 +980,7 @@ export default function AdminEmployeesPage() {
           )}
 
           {filteredEmployees.length > 0 && listViewMode === "paged" && (
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+            <div className="mt-3 pb-3 flex flex-wrap items-center justify-center gap-1.5">
               <button
                 type="button"
                 className={btnSecondary}

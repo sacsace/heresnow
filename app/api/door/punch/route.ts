@@ -4,14 +4,16 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import {
   createDoorAttendanceRecord,
+  DOOR_PUNCHABLE_ROLES,
   getDoorPunchEligibility,
   matchFaceDoorEmployee,
   parseDoorFaceDescriptor,
   FACE_DESCRIPTOR_LENGTH,
 } from "@/lib/doorAttendance";
-import { resolveDoorTerminalMode } from "@/lib/doorTerminalMode";
+import { resolveDoorPunchTimeWindow, resolveDoorTerminalMode } from "@/lib/doorTerminalMode";
 import { doorApiForbidden } from "@/lib/requireDoorRole";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
+import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { prisma } from "@/lib/prisma";
 import { AttendanceType } from "@prisma/client";
 import { NextResponse } from "next/server";
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_face" }, { status: 400 });
   }
 
-  const [company, employee] = await Promise.all([
+  const [company, matchedEmployee] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
       select: {
@@ -54,6 +56,7 @@ export async function POST(req: Request) {
         workEndTime: true,
         workDays: true,
         workScheduleByDay: true,
+        shiftPresets: true,
       },
     }),
     matchFaceDoorEmployee(probe, companyId),
@@ -62,14 +65,61 @@ export async function POST(req: Request) {
   if (!company) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (!employee) {
+  if (!matchedEmployee) {
     return NextResponse.json({ error: "face_not_matched", code: "FACE_NOT_MATCHED" }, { status: 404 });
   }
 
   const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const now = new Date();
-  const { mode } = resolveDoorTerminalMode(now, tz, company);
+  const employee = await prisma.employee.findFirst({
+    where: {
+      id: matchedEmployee.id,
+      companyId,
+      faceEnrolledAt: { not: null },
+      user: { role: { in: DOOR_PUNCHABLE_ROLES } },
+    },
+    select: {
+      id: true,
+      name: true,
+      workScheduleType: true,
+      shiftCode: true,
+      workStartTime: true,
+      workEndTime: true,
+      workScheduleByDay: true,
+    },
+  });
+  if (!employee) {
+    return NextResponse.json({ error: "face_not_matched", code: "FACE_NOT_MATCHED" }, { status: 404 });
+  }
+  const effectiveSchedule = resolveEmployeeWorkSchedule(employee, company);
+  const { mode } = resolveDoorTerminalMode(now, tz, effectiveSchedule);
   const type: AttendanceType = mode;
+  const timeWindow = resolveDoorPunchTimeWindow(now, tz, effectiveSchedule);
+
+  if (type === "CHECK_IN" && now.getTime() < new Date(timeWindow.checkInOpenAt).getTime()) {
+    return NextResponse.json(
+      {
+        error: "checkin_too_early",
+        code: "CHECK_IN_TOO_EARLY",
+        employee: { id: employee.id, name: employee.name },
+        mode: type,
+        nextCheckInAt: timeWindow.checkInOpenAt,
+      },
+      { status: 409 }
+    );
+  }
+  if (type === "CHECK_OUT" && now.getTime() < new Date(timeWindow.checkOutOpenAt).getTime()) {
+    return NextResponse.json(
+      {
+        error: "checkout_too_early",
+        code: "CHECK_OUT_TOO_EARLY",
+        employee: { id: employee.id, name: employee.name },
+        mode: type,
+        nextCheckOutAt: timeWindow.checkOutOpenAt,
+      },
+      { status: 409 }
+    );
+  }
 
   const eligibility = await getDoorPunchEligibility(companyId, employee.id);
 
@@ -80,7 +130,7 @@ export async function POST(req: Request) {
           {
             error: "already_checked_in",
             code: "ALREADY_CHECKED_IN",
-            employee,
+            employee: { id: employee.id, name: employee.name },
             mode: type,
           },
           { status: 409 }
@@ -90,7 +140,7 @@ export async function POST(req: Request) {
         {
           error: "checkin_cooldown",
           code: "CHECK_IN_COOLDOWN",
-          employee,
+          employee: { id: employee.id, name: employee.name },
           mode: type,
           nextCheckInAt: eligibility.nextCheckInAt,
         },
@@ -103,7 +153,7 @@ export async function POST(req: Request) {
         {
           error: "checkout_cooldown",
           code: "CHECK_OUT_COOLDOWN",
-          employee,
+          employee: { id: employee.id, name: employee.name },
           mode: type,
           nextCheckOutAt: eligibility.nextCheckOutAt,
         },
@@ -115,7 +165,7 @@ export async function POST(req: Request) {
         {
           error: "already_checked_out",
           code: "ALREADY_CHECKED_OUT",
-          employee,
+          employee: { id: employee.id, name: employee.name },
           mode: type,
         },
         { status: 409 }
@@ -125,7 +175,7 @@ export async function POST(req: Request) {
       {
         error: "not_checked_in",
         code: "NOT_CHECKED_IN",
-        employee,
+        employee: { id: employee.id, name: employee.name },
         mode: type,
       },
       { status: 409 }
@@ -138,6 +188,7 @@ export async function POST(req: Request) {
       companyId,
       employeeId: employee.id,
       type,
+      timestamp: now,
       expectedLastType: eligibility.lastType,
       expectedLastTimestamp: eligibility.lastTimestamp,
     });
@@ -158,8 +209,9 @@ export async function POST(req: Request) {
           {
             error: "checkin_cooldown",
             code: "CHECK_IN_COOLDOWN",
-            employee,
+            employee: { id: employee.id, name: employee.name },
             mode: type,
+            nextCheckInAt: eligibility.nextCheckInAt,
           },
           { status: 409 }
         );
@@ -169,8 +221,9 @@ export async function POST(req: Request) {
           {
             error: "checkout_cooldown",
             code: "CHECK_OUT_COOLDOWN",
-            employee,
+            employee: { id: employee.id, name: employee.name },
             mode: type,
+            nextCheckOutAt: eligibility.nextCheckOutAt,
           },
           { status: 409 }
         );
@@ -184,7 +237,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     mode: type,
-    employee,
+    employee: { id: employee.id, name: employee.name },
     record: {
       id: record.id,
       type: record.type,

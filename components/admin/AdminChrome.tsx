@@ -211,7 +211,7 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
             <main className="flex-1">
               <div className={`w-full min-w-0 ${bodyClassName}`.trim()}>{children}</div>
             </main>
-            <div className="border-t border-[var(--separator)] bg-white px-3 py-3 sm:px-5">
+            <div className="bg-white px-3 py-3 sm:px-5">
               <div className="flex w-full flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                 <LegalFooterLinks
                   layout="inline"

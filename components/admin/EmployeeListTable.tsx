@@ -4,7 +4,7 @@ import type { Department } from "@/components/admin/DepartmentManagerModal";
 import { useI18n } from "@/components/LanguageProvider";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
-import { emptyStateCompact, tableHead, tableWrap, trDivider } from "@/lib/uiStyles";
+import { emptyStateCompact, tableHead, trDivider } from "@/lib/uiStyles";
 import type { Role } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -314,7 +314,7 @@ export function EmployeeListTable({
     showSelect && employees.length > 0 && employees.every((e) => selectedIds!.has(e.id));
 
   return (
-    <div className={tableWrap}>
+    <div className="overflow-x-auto">
       <table
         className={empTable}
         style={{ tableLayout: "fixed", width: "100%", minWidth: tableMinWidth }}
@@ -379,7 +379,7 @@ export function EmployeeListTable({
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="border-b border-[var(--separator)]">
           {sortedEmployees.map((e, rowIndex) => {
             const isSelf = callerUserId != null && e.user.id === callerUserId;
             const canEditThisRole =

@@ -11,6 +11,8 @@ import type { AttendanceType } from "@prisma/client";
 
 /** 정규 퇴근 N분 전부터 출입문 단말을 퇴근 모드로 전환 */
 export const DOOR_CHECKOUT_LEAD_MS = 30 * 60 * 1000;
+/** 정규 출근 N분 전부터 얼굴인식 출근 허용 */
+export const DOOR_CHECKIN_LEAD_MS = 90 * 60 * 1000;
 
 export type DoorTerminalMode = AttendanceType;
 
@@ -33,6 +35,13 @@ function resolveWorkEndStrForWeekday(weekday: number, schedule: CompanyWorkSched
   // 출입문 단말은 회사 기본 퇴근시간을 우선 사용한다.
   // (요일별 값은 기본값이 비어 있을 때만 폴백)
   return schedule.workEndTime ?? dayWindow?.workEndTime ?? DEFAULT_WORK_END;
+}
+
+function resolveWorkStartStrForWeekday(weekday: number, schedule: CompanyWorkSchedule): string {
+  const byDay = normalizeWorkScheduleByDay(schedule.workScheduleByDay);
+  const dayWindow = byDay[weekday];
+  // 출입문 단말은 회사/직원의 기본 출근시간을 우선 사용.
+  return schedule.workStartTime ?? dayWindow?.workStartTime ?? "09:00";
 }
 
 /** 회사 타임존·오늘 요일 기준 정규 퇴근 시각 */
@@ -63,6 +72,55 @@ export function resolveTodayWorkEndAt(
   } catch {
     return fromZonedTime(`${endDay} ${endStr}:00`, "UTC");
   }
+}
+
+/** 회사 타임존·오늘 요일 기준 정규 출근 시각 */
+export function resolveTodayWorkStartAt(
+  now: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule
+): Date {
+  const tz = timeZone.trim() || "UTC";
+  const weekday = localWeekday(now, tz);
+  const startStr = resolveWorkStartStrForWeekday(weekday, schedule);
+  const today = calendarDayInTz(now, tz);
+  try {
+    return fromZonedTime(`${today} ${startStr}:00`, tz);
+  } catch {
+    return fromZonedTime(`${today} ${startStr}:00`, "UTC");
+  }
+}
+
+export type DoorPunchTimeWindow = {
+  checkInOpenAt: string;
+  checkOutOpenAt: string;
+  endOfDayAt: string;
+  timezone: string;
+};
+
+/** 얼굴인식 단말의 시간대 제한 (체크인 시작/체크아웃 시작) */
+export function resolveDoorPunchTimeWindow(
+  now: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule
+): DoorPunchTimeWindow {
+  const tz = timeZone.trim() || "UTC";
+  const workStartAt = resolveTodayWorkStartAt(now, tz, schedule);
+  const workEndAt = resolveTodayWorkEndAt(now, tz, schedule);
+  const checkInOpenAt = new Date(workStartAt.getTime() - DOOR_CHECKIN_LEAD_MS);
+  const today = calendarDayInTz(now, tz);
+  let endOfDayAt: Date;
+  try {
+    endOfDayAt = fromZonedTime(`${today} 23:59:59.999`, tz);
+  } catch {
+    endOfDayAt = fromZonedTime(`${today} 23:59:59.999`, "UTC");
+  }
+  return {
+    checkInOpenAt: checkInOpenAt.toISOString(),
+    checkOutOpenAt: workEndAt.toISOString(),
+    endOfDayAt: endOfDayAt.toISOString(),
+    timezone: tz,
+  };
 }
 
 /**

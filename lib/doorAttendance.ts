@@ -1,6 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
-import { evaluatePunchEligibility } from "@/lib/attendancePunchRules";
+import {
+  capCheckOutTimestamp,
+  evaluatePunchEligibility,
+  formatLateCheckOutBasisLabel,
+  isCheckOutPastWindow,
+  resolveLateCheckOutTimestamp,
+} from "@/lib/attendancePunchRules";
+import { acquireAttendanceEmployeeLock } from "@/lib/attendanceLock";
 import {
   FACE_DESCRIPTOR_LENGTH,
   FACE_IDENTIFY_MIN_GAP_DOOR,
@@ -134,6 +141,7 @@ export async function createDoorAttendanceRecord(input: {
     : null;
 
   const record = await prisma.$transaction(async (tx) => {
+    await acquireAttendanceEmployeeLock(tx, input.companyId, input.employeeId);
     const latest = await tx.attendanceRecord.findFirst({
       where: { companyId: input.companyId, employeeId: input.employeeId },
       orderBy: { timestamp: "desc" },
@@ -158,12 +166,28 @@ export async function createDoorAttendanceRecord(input: {
       throw { code: "CHECK_OUT_BLOCKED" } as const;
     }
 
+    let recordTimestamp = timestamp;
+    let memo: string | null = null;
+    if (input.type === "CHECK_OUT" && latest?.type === "CHECK_IN") {
+      if (isCheckOutPastWindow(latest.timestamp, timestamp)) {
+        const resolved = resolveLateCheckOutTimestamp(latest.timestamp, tz);
+        recordTimestamp = resolved.timestamp;
+        memo = `[SYSTEM_CORRECTION] reason=STALE_CHECK_IN actualRequestedAt=${timestamp.toISOString()} correctedRecordedAt=${recordTimestamp.toISOString()} basis=${formatLateCheckOutBasisLabel(resolved.basis, "en")}`;
+      } else {
+        const capped = capCheckOutTimestamp(latest.timestamp, timestamp);
+        recordTimestamp = capped.timestamp;
+        if (capped.capped) {
+          memo = `[SYSTEM_CORRECTION] reason=MAX_SHIFT_WORK_21H actualRequestedAt=${timestamp.toISOString()} correctedRecordedAt=${recordTimestamp.toISOString()}`;
+        }
+      }
+    }
+
     return tx.attendanceRecord.create({
       data: {
         companyId: input.companyId,
         employeeId: input.employeeId,
         type: input.type,
-        timestamp,
+        timestamp: recordTimestamp,
         recordTimezone: tz,
         latitude: 0,
         longitude: 0,
@@ -171,7 +195,7 @@ export async function createDoorAttendanceRecord(input: {
         distanceFromSite: 0,
         outsideGeofence: false,
         status: "APPROVED",
-        memo: null,
+        memo,
         deviceInfo: "DOOR_TERMINAL",
         isLate: false,
         isEarlyLeave: false,

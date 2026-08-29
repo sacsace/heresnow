@@ -77,11 +77,30 @@ const nextConfig: NextConfig = {
         path: false,
         crypto: false,
       };
-      // @vladmandic/face-api 가 Node 전용 모듈을 동적 require 하면서 발생하는
-      // "Critical dependency: require function..." 경고를 무시한다 (브라우저에서 미사용).
+      // @vladmandic/face-api 의 내부 동적 require 경고는 라이브러리 고유 동작이며
+      // 브라우저 경로에서만 사용되므로 노이즈 로그를 필터링한다.
       config.module = config.module ?? {};
       config.module.exprContextCritical = false;
     }
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      (warning) => {
+        const message =
+          typeof warning === "string"
+            ? warning
+            : warning && typeof warning === "object" && "message" in warning
+              ? String((warning as { message?: unknown }).message ?? "")
+              : "";
+        const moduleName =
+          warning && typeof warning === "object" && "module" in warning
+            ? String((warning as { module?: unknown }).module ?? "")
+            : "";
+        return (
+          message.includes("Critical dependency: require function is used in a way") &&
+          (moduleName.includes("@vladmandic/face-api") || message.includes("@vladmandic/face-api"))
+        );
+      },
+    ];
     return config;
   },
   async headers() {
