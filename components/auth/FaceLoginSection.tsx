@@ -23,6 +23,7 @@ export function FaceLoginSection({
 }: Props) {
   const { t } = useI18n();
   const signInStartedRef = useRef(false);
+  const retryBlockedUntilRef = useRef(0);
   const [companyName, setCompanyName] = useState("");
   const trimmedCompany = companyName.trim();
   const faceReady = trimmedCompany.length > 0;
@@ -30,10 +31,9 @@ export function FaceLoginSection({
   const handleVerified = useCallback(
     async (descriptor: number[]) => {
       if (signInStartedRef.current || disabled || !trimmedCompany) return false;
+      if (Date.now() < retryBlockedUntilRef.current) return false;
 
       signInStartedRef.current = true;
-      onError(null);
-      onLoadingChange(true);
 
       try {
         const matchRes = await fetch("/api/public/face-login", {
@@ -52,6 +52,8 @@ export function FaceLoginSection({
         if (!matchRes.ok) {
           signInStartedRef.current = false;
           if (matchRes.status === 429) {
+            // 과도한 자동 재시도로 인한 깜빡임/요청폭주 방지
+            retryBlockedUntilRef.current = Date.now() + 10_000;
             onError(t("login.errorFaceRateLimit"));
           } else if (matchBody.error === "missing_name") {
             onError(t("login.faceCompanyRequired"));
@@ -72,6 +74,8 @@ export function FaceLoginSection({
           return false;
         }
 
+        onError(null);
+        onLoadingChange(true);
         const res = await signIn("face-login", {
           loginToken,
           redirect: false,
@@ -103,6 +107,7 @@ export function FaceLoginSection({
           onChange={(e) => {
             setCompanyName(e.target.value);
             signInStartedRef.current = false;
+            retryBlockedUntilRef.current = 0;
             onError(null);
           }}
           required

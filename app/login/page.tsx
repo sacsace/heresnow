@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLogo } from "@/components/AppLogo";
+import { FaceLoginSection } from "@/components/auth/FaceLoginSection";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import {
@@ -24,20 +25,9 @@ import { prefetchFaceRecognition } from "@/lib/faceRecognitionClient";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { signIn } from "next-auth/react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState, Suspense, useEffect, useMemo, useRef, useCallback } from "react";
-
-const FaceLoginSection = dynamic(
-  () => import("@/components/auth/FaceLoginSection").then((m) => m.FaceLoginSection),
-  {
-    ssr: false,
-    loading: () => (
-      <p className="text-center text-[0.8125rem] text-[var(--apple-label-secondary)]">…</p>
-    ),
-  }
-);
 
 type LoginMode = "password" | "face";
 
@@ -261,7 +251,6 @@ function LoginForm() {
     if (next === mode) return;
     if (next === "face") {
       prefetchFaceRecognition(true);
-      void import("@/components/auth/FaceLoginSection");
     }
     setMode(next);
     setError(null);
@@ -269,7 +258,6 @@ function LoginForm() {
 
   function warmFaceLogin() {
     prefetchFaceRecognition(true);
-    void import("@/components/auth/FaceLoginSection");
   }
 
   const shellWidth = mode === "face" ? "!w-[26rem] sm:!w-[28rem]" : "!w-[26rem] sm:!w-[27rem]";

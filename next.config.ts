@@ -84,7 +84,7 @@ const nextConfig: NextConfig = {
     }
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),
-      (warning) => {
+      (warning: unknown) => {
         const message =
           typeof warning === "string"
             ? warning

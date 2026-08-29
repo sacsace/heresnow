@@ -29,8 +29,6 @@ export function FaceModelPreloader() {
     }
 
     prefetchFaceRecognition(true);
-    void import("@/components/auth/FaceLoginSection");
-    void import("@/components/employee/FaceCapture");
   }, []);
 
   return null;
