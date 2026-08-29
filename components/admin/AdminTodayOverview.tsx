@@ -24,7 +24,7 @@ type Props = {
 };
 
 export function AdminTodayOverview({ companyId, hideViewAllLink }: Props = {}) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [stats, setStats] = useState<TodayStats | null>(null);
 
   const load = useCallback(async () => {
@@ -40,6 +40,16 @@ export function AdminTodayOverview({ companyId, hideViewAllLink }: Props = {}) {
 
   if (!stats) return null;
 
+  const parsedDate = new Date(`${stats.date}T00:00:00`);
+  const todayLabel =
+    locale === "en" && !Number.isNaN(parsedDate.getTime())
+      ? parsedDate.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : stats.date;
+
   const tiles = [
     { label: t("admin.todayCheckedIn"), value: stats.checkedIn, sub: `/ ${stats.employeeCount}` },
     { label: t("admin.todayComplete"), value: stats.completePairs, sub: "" },
@@ -53,7 +63,7 @@ export function AdminTodayOverview({ companyId, hideViewAllLink }: Props = {}) {
         <div>
           <p className={sectionLabel}>{t("admin.todayTitle")}</p>
           <p className={pageSubtitle}>
-            {stats.date} · {t("admin.todayLead")}
+            {todayLabel} · {t("admin.todayLead")}
           </p>
         </div>
         {!hideViewAllLink && (

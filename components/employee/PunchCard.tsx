@@ -1108,7 +1108,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                           {isLate && (
                             <span className="font-medium text-amber-800">
                               {lateMin > 0
-                                ? `${t("employee.flagLate")} ${formatDurationMinutes(lateMin, t)}`
+                                ? t("employee.flagLateBy").replace(
+                                    "{d}",
+                                    formatDurationMinutes(lateMin, t)
+                                  )
                                 : t("employee.flagLate")}
                             </span>
                           )}
@@ -1120,7 +1123,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                           {isOvertime && (
                             <span className="font-medium text-[var(--apple-blue)]">
                               {overtimeMin > 0
-                                ? `${t("employee.flagOvertime")} ${formatDurationMinutes(overtimeMin, t)}`
+                                ? t("employee.flagOvertimeBy").replace(
+                                    "{d}",
+                                    formatDurationMinutes(overtimeMin, t)
+                                  )
                                 : t("employee.flagOvertime")}
                             </span>
                           )}

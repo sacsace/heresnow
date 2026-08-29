@@ -7,7 +7,7 @@ import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useRef, type WheelEvent } from "react";
 
 type Props = {
   children: React.ReactNode;
@@ -17,6 +17,7 @@ type Props = {
 export function AdminChrome({ children, bodyClassName = "" }: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
+  const navScrollRef = useRef<HTMLDivElement | null>(null);
 
   const menuGroups = useMemo(
     () => [
@@ -57,12 +58,46 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
+  function onMenuWheel(e: WheelEvent<HTMLDivElement>) {
+    const el = navScrollRef.current;
+    if (!el) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (delta === 0) return;
+    e.preventDefault();
+    el.scrollLeft += delta;
+  }
+
   const activeItem =
     links.find((l) => isActive(l.href, "exact" in l ? l.exact : false)) ?? null;
+  const legalActiveItem = pathname.startsWith("/admin/terms")
+    ? { label: t("legal.terms") }
+    : pathname.startsWith("/admin/privacy")
+      ? { label: t("legal.privacy") }
+      : pathname.startsWith("/admin/cancellation-policy")
+        ? { label: t("legal.cancellationPolicy") }
+        : pathname.startsWith("/admin/refund-policy")
+          ? { label: t("legal.refundPolicy") }
+          : pathname.startsWith("/admin/support")
+            ? { label: t("legal.support") }
+            : null;
   const activeGroup = menuGroups.find((group) =>
     group.items.some((item) => activeItem?.href === item.href)
   );
-  const activeLabel = activeItem?.label ?? t("admin.navDashboard");
+  const activeLabel = legalActiveItem?.label ?? activeItem?.label ?? t("admin.navDashboard");
+  const activeLead =
+    legalActiveItem
+      ? t("legal.navLabel")
+      : activeItem?.href === "/admin/punch"
+      ? t("admin.navMyPunchLead")
+      : activeItem?.href === "/admin/employees"
+        ? t("admin.navEmployeesLead")
+        : activeItem?.href === "/admin/exceptions"
+          ? t("admin.navExceptionsLead")
+          : activeItem?.href === "/admin/billing"
+            ? t("admin.navBillingLead")
+            : activeItem?.href === "/admin/settings"
+              ? t("admin.navSettingsLead")
+        : t("admin.homeLead");
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)]">
@@ -72,23 +107,27 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
             <MobileNavDrawer items={links} />
             <AppLogo href="/admin" title={t("login.title")} className="min-w-0" />
             <nav
-              className="hidden min-w-0 flex-1 rounded-lg border border-[var(--separator)] bg-white px-2 py-1.5 lg:flex"
+              className="hidden min-w-0 flex-1 overflow-hidden rounded-lg border border-[var(--separator)] bg-white px-2 py-1.5 lg:flex"
               aria-label={t("admin.navDashboard")}
             >
-              <div className="grid w-full min-w-0 grid-cols-8 items-center gap-1">
+              <div
+                ref={navScrollRef}
+                onWheel={onMenuWheel}
+                className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
                 {links.map((link) => {
                   const active = isActive(link.href, "exact" in link ? link.exact : false);
                   return (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`relative inline-flex h-9 min-w-0 items-center justify-center rounded-[0.55rem] px-2 text-[0.75rem] font-semibold transition-colors xl:px-3 xl:text-[0.8125rem] ${
+                      className={`relative inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-[0.55rem] px-3 text-[0.75rem] font-semibold transition-colors xl:px-3.5 xl:text-[0.8125rem] ${
                         active
                           ? "bg-[var(--fill-tertiary)] text-[var(--foreground)]"
                           : "text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary)] hover:text-[var(--foreground)]"
                       }`}
                     >
-                      <span className="truncate">{link.label}</span>
+                      {link.label}
                     </Link>
                   );
                 })}
@@ -105,11 +144,11 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
             <div className="flex items-center justify-between border-b border-[var(--separator)] bg-[var(--fill-tertiary)]/40 px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <p className="truncate text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--apple-label-tertiary)]">
-                  {activeGroup?.label ?? "Core"}
+                  {legalActiveItem ? t("legal.navLabel") : (activeGroup?.label ?? "Core")}
                 </p>
                 <p className="truncate text-[0.875rem] font-semibold text-[var(--foreground)]">{activeLabel}</p>
                 <p className="mt-0.5 truncate text-[0.75rem] text-[var(--apple-label-secondary)]">
-                  {t("admin.homeLead")}
+                  {activeLead}
                 </p>
               </div>
             </div>

@@ -16,14 +16,18 @@ import {
   contentDispositionAttachment,
 } from "@/lib/attendanceExportFilename";
 import { getAttendanceExportLabels, parseExportLocale } from "@/lib/attendanceExportI18n";
-import { buildAttendancePresenceMatrix, resolveExportDateRange } from "@/lib/attendanceExportMatrix";
+import {
+  buildAttendancePresenceMatrix,
+  enumerateDateRange,
+  resolveExportDateRange,
+} from "@/lib/attendanceExportMatrix";
 import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
-import { lateMinutesFor, overtimeMinutesFor } from "@/lib/companyWorkSchedule";
+import { lateMinutesFor, overtimeMinutesFor, parseWorkDays } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { STORAGE_KEY } from "@/lib/i18n/dictionaries";
 import { prisma } from "@/lib/prisma";
 import ExcelJS from "exceljs";
-import { fromZonedTime } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -43,6 +47,26 @@ function visualWidth(value: unknown): number {
 }
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function dateWeekday(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y!, (m ?? 1) - 1, d ?? 1)).getUTCDay();
+}
+
+function formatLateDuration(minutes: number, locale: "ko" | "en"): string {
+  const safe = Math.max(0, Math.round(minutes));
+  if (safe <= 0) return "-";
+  if (locale === "en") {
+    if (safe < 60) return `${safe}m`;
+    const h = Math.floor(safe / 60);
+    const m = safe % 60;
+    return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  }
+  if (safe < 60) return `${safe}분`;
+  const h = Math.floor(safe / 60);
+  const m = safe % 60;
+  return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
+}
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -69,8 +93,12 @@ export async function GET(req: Request) {
   }
 
   const cookieStore = await cookies();
+  const localeHint =
+    url.searchParams.get("lang") ??
+    cookieStore.get(STORAGE_KEY)?.value ??
+    req.headers.get("accept-language");
   const locale = parseExportLocale(
-    url.searchParams.get("lang") ?? cookieStore.get(STORAGE_KEY)?.value
+    localeHint
   );
   const labels = getAttendanceExportLabels(locale);
 
@@ -185,35 +213,173 @@ export async function GET(req: Request) {
   );
 
   const { from, to } = resolveExportDateRange(fromParam, toParam, days, tz);
-  const matrix = buildAttendancePresenceMatrix(days, employees, from, to, {
-    workDays: company.workDays,
-    timeZone: tz,
-  });
-
-  const dataHeaders = [labels.nameCol, ...matrix.dateHeaders, ...labels.summaryHeaders];
-  const legendMergeCols = Math.min(Math.max(dataHeaders.length, 4), 12);
-
   const wb = new ExcelJS.Workbook();
   wb.creator = "HeresNow";
   wb.created = new Date();
-  const ws = wb.addWorksheet(labels.sheetName);
+  const personalMode = Boolean(q);
 
-  writeAttendanceLegend(ws, labels, legendMergeCols);
+  if (personalMode) {
+    const ws = wb.addWorksheet(labels.personalSheetName);
+    const includeNameCol = employees.length > 1;
+    const headers = includeNameCol
+      ? [labels.nameCol, ...labels.personalHeaders]
+      : [...labels.personalHeaders];
+    ws.addRow(headers);
 
-  const dataHeaderRow = dataHeaderRowIndex(labels);
-  ws.addRow(dataHeaders);
-  for (const row of matrix.rows) {
-    ws.addRow([
-      row.name,
-      ...row.cells,
-      row.otTotal,
-      row.absentDays,
-      row.workDays,
-      row.holidayWorkDays,
-    ]);
+    const workDaySet = parseWorkDays(company.workDays);
+    const todayYmd = formatInTimeZone(new Date(), tz, "yyyy-MM-dd");
+    const dates = enumerateDateRange(from, to);
+
+    type PersonalAgg = {
+      checkInTime: string | null;
+      checkInSite: string | null;
+      checkOutTime: string | null;
+      firstCheckInTs: string | null;
+      lastCheckOutTs: string | null;
+      isLate: boolean;
+      lateMinutes: number;
+    };
+    const aggByEmployeeDate = new Map<string, Map<string, PersonalAgg>>();
+
+    for (const row of days) {
+      let byDate = aggByEmployeeDate.get(row.employeeId);
+      if (!byDate) {
+        byDate = new Map();
+        aggByEmployeeDate.set(row.employeeId, byDate);
+      }
+      const current =
+        byDate.get(row.date) ??
+        ({
+          checkInTime: null,
+          checkInSite: null,
+          checkOutTime: null,
+          firstCheckInTs: null,
+          lastCheckOutTs: null,
+          isLate: false,
+          lateMinutes: 0,
+        } satisfies PersonalAgg);
+
+      if (
+        row.checkIn?.timestamp &&
+        (!current.firstCheckInTs || row.checkIn.timestamp < current.firstCheckInTs)
+      ) {
+        current.firstCheckInTs = row.checkIn.timestamp;
+        current.checkInTime = row.checkIn.time;
+        current.checkInSite = row.checkIn.site?.name ?? null;
+      }
+      if (
+        row.checkOut?.timestamp &&
+        (!current.lastCheckOutTs || row.checkOut.timestamp > current.lastCheckOutTs)
+      ) {
+        current.lastCheckOutTs = row.checkOut.timestamp;
+        current.checkOutTime = row.checkOut.time;
+      }
+      if (row.isLate) {
+        current.isLate = true;
+        current.lateMinutes = Math.max(current.lateMinutes, row.lateMinutes ?? 0);
+      }
+
+      byDate.set(row.date, current);
+    }
+
+    for (const employee of employees) {
+      const byDate = aggByEmployeeDate.get(employee.id) ?? new Map<string, PersonalAgg>();
+      for (const date of dates) {
+        const agg = byDate.get(date);
+        const hasAttendance = Boolean(agg?.checkInTime || agg?.checkOutTime);
+        const isWorkday = workDaySet.has(dateWeekday(date));
+        const isPastOrToday = date <= todayYmd;
+        const absent = !hasAttendance && isWorkday && isPastOrToday;
+        const late = Boolean(agg?.isLate);
+        const lateDuration = formatLateDuration(agg?.lateMinutes ?? 0, labels.locale);
+        const row = includeNameCol
+          ? [
+              employee.name,
+              date,
+              agg?.checkInTime ?? "-",
+              agg?.checkOutTime ?? "-",
+              agg?.checkInSite ?? "-",
+              late ? labels.yesLabel : labels.noLabel,
+              lateDuration,
+              absent ? labels.yesLabel : labels.noLabel,
+            ]
+          : [
+              date,
+              agg?.checkInTime ?? "-",
+              agg?.checkOutTime ?? "-",
+              agg?.checkInSite ?? "-",
+              late ? labels.yesLabel : labels.noLabel,
+              lateDuration,
+              absent ? labels.yesLabel : labels.noLabel,
+            ];
+        ws.addRow(row);
+      }
+    }
+
+    const headerRow = ws.getRow(1);
+    headerRow.height = 20;
+    headerRow.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { name: labels.fontName, size: 9, bold: true, color: { argb: "FFFFFFFF" } };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF263238" } };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFB0BEC5" } },
+        left: { style: "thin", color: { argb: "FFB0BEC5" } },
+        bottom: { style: "thin", color: { argb: "FFB0BEC5" } },
+        right: { style: "thin", color: { argb: "FFB0BEC5" } },
+      };
+    });
+
+    for (let r = 2; r <= ws.rowCount; r += 1) {
+      const row = ws.getRow(r);
+      row.height = 18;
+      row.eachCell({ includeEmpty: true }, (cell, c) => {
+        const leftAligned = includeNameCol ? c <= 2 : c <= 1;
+        cell.font = { name: labels.fontName, size: 9 };
+        cell.alignment = { vertical: "middle", horizontal: leftAligned ? "left" : "center" };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFCFD8DC" } },
+          left: { style: "thin", color: { argb: "FFCFD8DC" } },
+          bottom: { style: "thin", color: { argb: "FFCFD8DC" } },
+          right: { style: "thin", color: { argb: "FFCFD8DC" } },
+        };
+      });
+    }
+
+    for (let c = 1; c <= headers.length; c += 1) {
+      let max = visualWidth(headers[c - 1] ?? "");
+      for (let r = 2; r <= ws.rowCount; r += 1) {
+        max = Math.max(max, visualWidth(ws.getRow(r).getCell(c).value ?? ""));
+      }
+      ws.getColumn(c).width = Math.min(28, Math.max(8, max + 2));
+    }
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+  } else {
+    const matrix = buildAttendancePresenceMatrix(days, employees, from, to, {
+      workDays: company.workDays,
+      timeZone: tz,
+    });
+    const dataHeaders = [labels.nameCol, ...matrix.dateHeaders, ...labels.summaryHeaders];
+    const legendMergeCols = Math.min(Math.max(dataHeaders.length, 4), 12);
+    const ws = wb.addWorksheet(labels.sheetName);
+
+    writeAttendanceLegend(ws, labels, legendMergeCols);
+
+    const dataHeaderRow = dataHeaderRowIndex(labels);
+    ws.addRow(dataHeaders);
+    for (const row of matrix.rows) {
+      ws.addRow([
+        row.name,
+        ...row.cells,
+        row.otTotal,
+        row.absentDays,
+        row.workDays,
+        row.holidayWorkDays,
+      ]);
+    }
+
+    styleAttendanceDataSheet(ws, matrix, labels, dataHeaderRow, visualWidth);
   }
-
-  styleAttendanceDataSheet(ws, matrix, labels, dataHeaderRow, visualWidth);
 
   const arrayBuffer = await wb.xlsx.writeBuffer();
   const buf = Buffer.from(arrayBuffer);

@@ -54,6 +54,32 @@ const MONTH_PRESETS = MONTH_PRESET_VALUES.map((m) => ({
   discount: getSubscriptionDurationDiscountPercent(m),
 }));
 
+function formatBillingDate(iso: string, locale: "ko" | "en"): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  if (locale === "en") {
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+  return date.toLocaleDateString("ko-KR");
+}
+
+function formatRupee(amount: number, locale: "ko" | "en"): string {
+  if (!Number.isFinite(amount)) return "—";
+  if (locale === "en") {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  }
+  return `Rs.${amount}`;
+}
+
 export default function AdminBillingPage() {
   const { t, locale } = useI18n();
   const { data: session } = useSession();
@@ -66,8 +92,6 @@ export default function AdminBillingPage() {
   const [monthsInput, setMonthsInput] = useState("1");
   const [historyKey, setHistoryKey] = useState(0);
   const [billingProfile, setBillingProfile] = useState<BillingProfileState | null>(null);
-
-  const dateLocale = locale === "en" ? "en-US" : "ko-KR";
 
   const load = useCallback(async () => {
     const r = await fetch("/api/admin/billing");
@@ -170,7 +194,7 @@ export default function AdminBillingPage() {
                 <dt className={label}>{t("admin.billingExpires")}</dt>
                 <dd className="mt-1 text-[1.0625rem] font-semibold">
                   {company.subscriptionEndsAt
-                    ? new Date(company.subscriptionEndsAt).toLocaleDateString(dateLocale)
+                    ? formatBillingDate(company.subscriptionEndsAt, locale)
                     : "—"}
                 </dd>
               </div>
@@ -179,8 +203,9 @@ export default function AdminBillingPage() {
                 <dd className="mt-1 text-[1.0625rem] font-semibold">
                   {pricePerUser > 0 ? (
                     <>
-                      Rs.{pricePerUser}
-                      {locale === "en" ? "/user/mo" : "/인·월"}
+                      {locale === "en"
+                        ? `${formatRupee(pricePerUser, locale)} per user/month`
+                        : `Rs.${pricePerUser}/인·월`}
                     </>
                   ) : (
                     "—"
@@ -305,7 +330,7 @@ export default function AdminBillingPage() {
                     {gst && gst.gstTotal > 0 && (
                       <div className="mt-3 space-y-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
                         <p>
-                          {t("admin.billingTaxableAmount")}: Rs.{gst.taxableAmount}
+                          {t("admin.billingTaxableAmount")}: {formatRupee(gst.taxableAmount, locale)}
                         </p>
                         {formatGstSummaryLines(gst, locale).map((line) => (
                           <p key={line}>{line}</p>
@@ -318,13 +343,15 @@ export default function AdminBillingPage() {
                       </div>
                     )}
                     <p className="mt-3 text-[1.375rem] font-bold tracking-tight">
-                      {t("admin.billingTotalDue")}: Rs.{gst?.grandTotal ?? bill.total}
+                      {t("admin.billingTotalDue")}: {formatRupee(gst?.grandTotal ?? bill.total, locale)}
                     </p>
                     {bill.months > 1 && (
                       <p className="mt-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
                         {t("admin.billingMonthlyEquivalent").replace(
                           "{amount}",
-                          String(bill.monthlySubtotal)
+                          locale === "en"
+                            ? formatRupee(bill.monthlySubtotal, locale)
+                            : String(bill.monthlySubtotal)
                         )}
                       </p>
                     )}

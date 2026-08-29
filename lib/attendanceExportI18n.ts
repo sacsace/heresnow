@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n/dictionaries";
+import { normalizeLocale } from "@/lib/i18n/locale";
 import {
   ATTENDANCE_EXPORT_HALF_DAY,
   ATTENDANCE_EXPORT_LATE,
@@ -6,7 +7,7 @@ import {
 } from "@/lib/attendanceExportMatrix";
 
 export function parseExportLocale(v: string | null | undefined): Locale {
-  return v === "en" ? "en" : "ko";
+  return normalizeLocale(v) ?? "ko";
 }
 
 export type LegendRow = {
@@ -21,9 +22,13 @@ export type AttendanceExportLabels = {
   locale: Locale;
   fontName: string;
   sheetName: string;
+  personalSheetName: string;
   fileListLabel: string;
   nameCol: string;
+  personalHeaders: [string, string, string, string, string, string, string];
   summaryHeaders: [string, string, string, string];
+  yesLabel: string;
+  noLabel: string;
   legendTitle: string;
   legendColSymbol: string;
   legendColMeaning: string;
@@ -57,9 +62,21 @@ export function getAttendanceExportLabels(locale: Locale): AttendanceExportLabel
       locale: "en",
       fontName: "Calibri",
       sheetName: "Attendance",
+      personalSheetName: "Personal Attendance",
       fileListLabel: "Attendance List",
       nameCol: "Name",
+      personalHeaders: [
+        "Date",
+        "Check-in time",
+        "Check-out time",
+        "Check-in site",
+        "Late",
+        "Late duration",
+        "Absent",
+      ],
       summaryHeaders: ["OT", "Absent days", "Work days", "Holiday work days"],
+      yesLabel: "Y",
+      noLabel: "N",
       legendTitle: "Calendar cell legend",
       legendColSymbol: "Symbol",
       legendColMeaning: "Meaning",
@@ -99,9 +116,13 @@ export function getAttendanceExportLabels(locale: Locale): AttendanceExportLabel
     locale: "ko",
     fontName: "맑은 고딕",
     sheetName: "근태",
+    personalSheetName: "개인별 출퇴근",
     fileListLabel: "근태 목록",
     nameCol: "이름",
+    personalHeaders: ["날짜", "출근 시간", "퇴근 시간", "출근 장소", "지각 유무", "지각 시간", "결근 유무"],
     summaryHeaders: ["OT", "결근일수", "근무일수", "휴일 근무일수"],
+    yesLabel: "Y",
+    noLabel: "N",
     legendTitle: "달력 셀 표기",
     legendColSymbol: "표기",
     legendColMeaning: "의미",

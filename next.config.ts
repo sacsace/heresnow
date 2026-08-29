@@ -1,9 +1,36 @@
 import type { NextConfig } from "next";
 
+function buildContentSecurityPolicy(): string {
+  const directives = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+    "script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://www.googletagmanager.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "connect-src 'self' https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://vitals.vercel-insights.com",
+    "worker-src 'self' blob:",
+    "media-src 'self' blob:",
+    "frame-src 'self' https://www.google.com https://maps.google.com https://www.google.com/maps",
+  ];
+  if (process.env.NODE_ENV === "production") {
+    directives.push("upgrade-insecure-requests");
+  }
+  return directives.join("; ");
+}
+
 const securityHeaders = [
+  { key: "Content-Security-Policy", value: buildContentSecurityPolicy() },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-site" },
+  { key: "X-DNS-Prefetch-Control", value: "off" },
+  { key: "Origin-Agent-Cluster", value: "?1" },
   {
     key: "Permissions-Policy",
     value: "camera=(self), microphone=(), geolocation=(self), interest-cohort=()",
@@ -47,7 +74,7 @@ const nextConfig: NextConfig = {
         ? ([
             {
               key: "Strict-Transport-Security",
-              value: "max-age=31536000; includeSubDomains",
+              value: "max-age=63072000; includeSubDomains; preload",
             },
           ] as const)
         : []),

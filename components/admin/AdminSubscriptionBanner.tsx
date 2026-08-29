@@ -84,7 +84,9 @@ export function AdminSubscriptionBanner({ companyId }: Props = {}) {
       <div className={`${cardBody} flex flex-wrap items-center justify-between gap-3 py-4 sm:py-5`}>
         <div className="min-w-0">
           <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-[var(--apple-label-secondary)]">
-            {t("admin.dashboardSubscriptionLabel")}
+            {expired
+              ? t("admin.dashboardSubscriptionLabelExpired")
+              : t("admin.dashboardSubscriptionLabelActive")}
           </p>
           <p className={`mt-1 text-[1.125rem] font-semibold tracking-tight ${valueClass}`}>
             {endsLabel}

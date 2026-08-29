@@ -30,7 +30,6 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type AttendanceTab =
-  | "daily"
   | "byEmployee"
   | "holiday"
   | "calendar"
@@ -61,6 +60,16 @@ function monthRangeFor(year: number, month: number): { from: string; to: string 
 function currentMonthRange(): { from: string; to: string } {
   const now = new Date();
   return monthRangeFor(now.getFullYear(), now.getMonth());
+}
+
+function previousMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  return monthRangeFor(now.getFullYear(), now.getMonth() - 1);
+}
+
+function endOfMonthYmd(ymd: string): string {
+  const d = parseYmd(ymd);
+  return monthRangeFor(d.getFullYear(), d.getMonth()).to;
 }
 
 function todayYmd(): string {
@@ -95,7 +104,7 @@ function shiftCalendarMonth(anchorYmd: string, delta: number): string {
 }
 
 function defaultFilters(): SearchFilters {
-  const { from, to } = todayRange();
+  const { from, to } = previousMonthRange();
   return { q: "", from, to, status: "", departmentId: "" };
 }
 
@@ -114,7 +123,7 @@ export default function AdminAttendancePage() {
   const { t, locale } = useI18n();
   const [rows, setRows] = useState<AdminAttendanceDayRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<AttendanceTab>("daily");
+  const [tab, setTab] = useState<AttendanceTab>("byEmployee");
   const [draft, setDraft] = useState<SearchFilters>(() => defaultFilters());
   const [filters, setFilters] = useState<SearchFilters>(() => defaultFilters());
   /** 월 달력 탭 전용 — 검색 기간(filters)과 분리 */
@@ -155,7 +164,6 @@ export default function AdminAttendancePage() {
   }, []);
 
   const tabs: { id: AttendanceTab; label: string }[] = [
-    { id: "daily", label: t("admin.attendanceTabDaily") },
     { id: "byEmployee", label: t("admin.attendanceTabByEmployee") },
     { id: "holiday", label: t("admin.attendanceTabHoliday") },
     { id: "calendar", label: t("admin.attendanceTabCalendar") },
@@ -166,7 +174,6 @@ export default function AdminAttendancePage() {
   ];
 
   const subtitleByTab: Record<AttendanceTab, string> = {
-    daily: t("admin.attendanceTabDailyLead"),
     byEmployee: t("admin.attendanceTabByEmployeeLead"),
     holiday: t("admin.attendanceTabHolidayLead"),
     calendar: t("admin.attendanceTabCalendarLead"),
@@ -191,7 +198,8 @@ export default function AdminAttendancePage() {
     if (filters.status) q.set("status", filters.status);
     if (filters.from) q.set("from", filters.from);
     if (filters.to) q.set("to", filters.to);
-    if (filters.q) q.set("q", filters.q);
+    const keyword = filters.q.trim();
+    if (keyword) q.set("q", keyword);
     if (filters.departmentId) q.set("departmentId", filters.departmentId);
     return `/api/admin/export?${q.toString()}`;
   }, [filters, locale]);
@@ -202,7 +210,8 @@ export default function AdminAttendancePage() {
     if (fetchFilters.status) q.set("status", fetchFilters.status);
     if (fetchFilters.from) q.set("from", fetchFilters.from);
     if (fetchFilters.to) q.set("to", fetchFilters.to);
-    if (fetchFilters.q) q.set("q", fetchFilters.q);
+    const keyword = fetchFilters.q.trim();
+    if (keyword) q.set("q", keyword);
     if (fetchFilters.departmentId) q.set("departmentId", fetchFilters.departmentId);
     const r = await fetch(`/api/admin/attendance?${q.toString()}`);
     const j = await r.json();
@@ -220,7 +229,7 @@ export default function AdminAttendancePage() {
 
   function applySearch(e: React.FormEvent) {
     e.preventDefault();
-    setFilters({ ...draft });
+    setFilters({ ...draft, q: draft.q.trim() });
   }
 
   function resetSearch() {
@@ -229,16 +238,7 @@ export default function AdminAttendancePage() {
     setFilters(next);
   }
 
-  function applyTodaySearch() {
-    const next = todayRange();
-    setDraft((d) => ({ ...d, from: next.from, to: next.to }));
-    setFilters((f) => ({ ...f, from: next.from, to: next.to }));
-  }
-
   function selectTab(id: AttendanceTab) {
-    if (id === "daily") {
-      applyTodaySearch();
-    }
     setTab(id);
   }
 
@@ -404,7 +404,13 @@ export default function AdminAttendancePage() {
                   lang={dateLocale}
                   className={inputCompact}
                   value={draft.from}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, from: e.target.value }))}
+                  onChange={(e) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      from: e.target.value,
+                      to: e.target.value ? endOfMonthYmd(e.target.value) : prev.to,
+                    }))
+                  }
                 />
               </div>
               <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[8.75rem]`}>
@@ -440,27 +446,15 @@ export default function AdminAttendancePage() {
                   ))}
                 </select>
               </div>
-              <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[9.5rem]`}>
-                <label className={label} htmlFor="attendance-status">
-                  {t("admin.attendanceFilterStatus")}
-                </label>
-                <select
-                  id="attendance-status"
-                  className={`${selectSm} !w-full !min-w-0`}
-                  value={draft.status}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, status: e.target.value }))}
-                >
-                  <option value="">{t("admin.attendanceFilterAll")}</option>
-                  <option value="APPROVED">APPROVED</option>
-                  <option value="PENDING">PENDING</option>
-                  <option value="REJECTED">REJECTED</option>
-                </select>
-              </div>
-              <div className={searchActions}>
+              <div className={`${searchActions} !flex-nowrap whitespace-nowrap`}>
                 <button type="submit" className={`${btnPrimary} h-9 px-4`}>
                   {t("admin.attendanceSearchApply")}
                 </button>
-                <button type="button" onClick={applyTodaySearch} className={`${btnSecondary} h-9`}>
+                <button
+                  type="button"
+                  className={`${btnSecondary} h-9`}
+                  onClick={() => setDraft((prev) => ({ ...prev, to: todayYmd() }))}
+                >
                   {t("admin.attendanceMapToday")}
                 </button>
                 {hasActiveFilters && (

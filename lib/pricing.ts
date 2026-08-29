@@ -248,14 +248,17 @@ export function formatUsageBillingLine(
   const monthlySuffix = locale === "en" ? "/mo" : "/월";
   const months = breakdown.months ?? 1;
   const monthlySubtotal = breakdown.monthlySubtotal ?? breakdown.subtotal;
+  const unitPriceLabel = locale === "en" ? `₹${breakdown.pricePerUser}` : `Rs.${breakdown.pricePerUser}`;
+  const subtotalLabel = locale === "en" ? `₹${monthlySubtotal}` : `Rs.${monthlySubtotal}`;
+  const totalBaseLabel = locale === "en" ? `₹${breakdown.subtotal}` : `Rs.${breakdown.subtotal}`;
 
   const base =
     months <= 1
       ? locale === "en"
-        ? `${breakdown.employeeCount} × Rs.${breakdown.pricePerUser} = Rs.${monthlySubtotal}${monthlySuffix}`
+        ? `${breakdown.employeeCount} users × ${unitPriceLabel}${monthlySuffix} = ${subtotalLabel}`
         : `${breakdown.employeeCount}명 × Rs.${breakdown.pricePerUser} = Rs.${monthlySubtotal}${monthlySuffix}`
       : locale === "en"
-        ? `${breakdown.employeeCount} × Rs.${breakdown.pricePerUser} × ${months} mo = Rs.${breakdown.subtotal}`
+        ? `${breakdown.employeeCount} users × ${unitPriceLabel} × ${months} months = ${totalBaseLabel}`
         : `${breakdown.employeeCount}명 × Rs.${breakdown.pricePerUser} × ${months}개월 = Rs.${breakdown.subtotal}`;
 
   if (breakdown.discountTotal <= 0) {
@@ -273,14 +276,14 @@ export function formatUsageBillingLine(
   if (breakdown.companyDiscountPercent > 0) {
     parts.push(
       locale === "en"
-        ? `${breakdown.companyDiscountPercent}% company discount`
+        ? `${breakdown.companyDiscountPercent}% promotional discount`
         : `회사 할인 ${breakdown.companyDiscountPercent}%`
     );
   }
   if (breakdown.discountAmount > 0) {
     parts.push(
       locale === "en"
-        ? `Rs.${breakdown.discountAmount} off`
+        ? `₹${breakdown.discountAmount} off`
         : `Rs.${breakdown.discountAmount} 할인`
     );
   }
@@ -292,6 +295,6 @@ export function formatUsageBillingLine(
       : "";
 
   return locale === "en"
-    ? `${base} − Rs.${breakdown.discountTotal}${discountLabel} → Rs.${breakdown.total}`
+    ? `${base} − ₹${breakdown.discountTotal}${discountLabel} → ₹${breakdown.total}`
     : `${base} − Rs.${breakdown.discountTotal}${discountLabel} → Rs.${breakdown.total}`;
 }

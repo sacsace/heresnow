@@ -181,18 +181,18 @@ export function formatGstSummaryLines(
   if (gst.isIntraState) {
     lines.push(
       locale === "en"
-        ? `CGST @ ${gst.halfRatePercent}%: Rs.${gst.cgstAmount}`
+        ? `CGST @ ${gst.halfRatePercent}%: ₹${gst.cgstAmount}`
         : `CGST ${gst.halfRatePercent}%: Rs.${gst.cgstAmount}`
     );
     lines.push(
       locale === "en"
-        ? `SGST @ ${gst.halfRatePercent}%: Rs.${gst.sgstAmount}`
+        ? `SGST @ ${gst.halfRatePercent}%: ₹${gst.sgstAmount}`
         : `SGST ${gst.halfRatePercent}%: Rs.${gst.sgstAmount}`
     );
   } else {
     lines.push(
       locale === "en"
-        ? `IGST @ ${gst.gstRatePercent}%: Rs.${gst.igstAmount}`
+        ? `IGST @ ${gst.gstRatePercent}%: ₹${gst.igstAmount}`
         : `IGST ${gst.gstRatePercent}%: Rs.${gst.igstAmount}`
     );
   }

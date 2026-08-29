@@ -24,7 +24,7 @@ export type ShiftLocale = "ko" | "en";
 /** 기본 교대명 (한·영) */
 export const BUILTIN_SHIFT_LABELS: Record<ShiftLocale, Record<ShiftCode, string>> = {
   ko: { A: "1교대", B: "2교대", C: "3교대" },
-  en: { A: "1st Shift", B: "2nd Shift", C: "3rd Shift" },
+  en: { A: "First Shift", B: "Second Shift", C: "Third Shift" },
 };
 
 const ALL_BUILTIN_SHIFT_LABELS = new Set(

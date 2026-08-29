@@ -1,6 +1,10 @@
 import { auth } from "@/auth.edge";
 import { NextResponse } from "next/server";
 
+const AUTH_RATE_WINDOW_MS = 10 * 60 * 1000;
+const AUTH_RATE_LIMIT = 20;
+const authRateState = new Map<string, { count: number; resetAt: number }>();
+
 const CANONICAL_SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.AUTH_URL ||
@@ -43,11 +47,61 @@ function canonicalProtocolFromEnv(): "http" | "https" | null {
   }
 }
 
+function firstHeaderValue(raw: string | null | undefined): string {
+  return (raw ?? "").split(",")[0]?.trim() ?? "";
+}
+
+function hostFromUrlLike(raw: string | null | undefined): string {
+  const value = firstHeaderValue(raw);
+  if (!value) return "";
+  try {
+    return normalizeHost(new URL(value).host);
+  } catch {
+    return "";
+  }
+}
+
+function getClientIp(req: Parameters<typeof auth>[0] extends never ? never : any): string {
+  const forwarded = firstHeaderValue(req.headers.get("x-forwarded-for"));
+  if (forwarded) return forwarded;
+  const realIp = firstHeaderValue(req.headers.get("x-real-ip"));
+  if (realIp) return realIp;
+  return "unknown";
+}
+
+function shouldRateLimitAuth(pathname: string, method: string): boolean {
+  if (method !== "POST") return false;
+  return (
+    pathname === "/api/auth/callback/credentials" ||
+    pathname === "/api/public/face-login" ||
+    pathname === "/api/public/passkey-login/verify"
+  );
+}
+
+function consumeRateLimit(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  if (authRateState.size > 5000) {
+    for (const [k, v] of authRateState) {
+      if (v.resetAt <= now) authRateState.delete(k);
+    }
+  }
+  const current = authRateState.get(key);
+  if (!current || current.resetAt <= now) {
+    authRateState.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (current.count >= limit) return false;
+  current.count += 1;
+  authRateState.set(key, current);
+  return true;
+}
+
 const CANONICAL_HOST = canonicalHostFromEnv();
 const CANONICAL_PROTOCOL = canonicalProtocolFromEnv();
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+  const method = req.method.toUpperCase();
   const loggedIn = !!req.auth;
   const role = req.auth?.user?.role;
   const hostHeader = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
@@ -55,6 +109,22 @@ export default auth((req) => {
     req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol
   );
   const reqHost = normalizeHost(hostHeader);
+
+  if (shouldRateLimitAuth(pathname, method)) {
+    const ip = getClientIp(req);
+    const bucketKey = `${ip}:${pathname}`;
+    if (!consumeRateLimit(bucketKey, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW_MS)) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": "600",
+          },
+        }
+      );
+    }
+  }
 
   const isAuthPage = pathname.startsWith("/login");
   const isDevHealth =
@@ -90,6 +160,26 @@ export default auth((req) => {
   }
 
   if (isPublicApi) return NextResponse.next();
+
+  if (
+    method !== "GET" &&
+    method !== "HEAD" &&
+    method !== "OPTIONS" &&
+    loggedIn &&
+    pathname.startsWith("/api/") &&
+    !pathname.startsWith("/api/auth") &&
+    !pathname.startsWith("/api/integrations/")
+  ) {
+    const originHost = hostFromUrlLike(req.headers.get("origin"));
+    const refererHost = hostFromUrlLike(req.headers.get("referer"));
+    const requestHost = reqHost || CANONICAL_HOST || "";
+    if (originHost && requestHost && originHost !== requestHost) {
+      return NextResponse.json({ error: "Forbidden origin" }, { status: 403 });
+    }
+    if (!originHost && refererHost && requestHost && refererHost !== requestHost) {
+      return NextResponse.json({ error: "Forbidden referer" }, { status: 403 });
+    }
+  }
 
   if (pathname.startsWith("/api/") && !loggedIn) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
