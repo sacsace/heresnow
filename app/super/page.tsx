@@ -10,7 +10,6 @@ import {
   btnDanger,
   btnGhost,
   btnPrimary,
-  btnSecondary,
   caption,
   cardActionBar,
   cardBody,
@@ -44,6 +43,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 type Company = {
   id: string;
   name: string;
+  isActive: boolean;
   createdAt: string;
   seatLimit: number;
   timezone: string;
@@ -67,6 +67,8 @@ type RowDraft = {
   discountPercent: string;
   discountAmount: string;
 };
+
+const actionIconClass = "h-[1.6rem] w-[1.6rem]";
 
 function draftFromCompany(c: Company, prev?: Partial<RowDraft>): RowDraft {
   return {
@@ -108,6 +110,7 @@ export default function SuperPage() {
     previousPercent: string;
     nextPercent: string;
   } | null>(null);
+  const [deleteConfirmCompany, setDeleteConfirmCompany] = useState<Company | null>(null);
   const [logs, setLogs] = useState<
     { id: string; action: string; timestamp: string; company: { name: string }; approver: { email: string } }[]
   >([]);
@@ -260,6 +263,31 @@ export default function SuperPage() {
     await load();
   }
 
+  function hasCompanyDraftChanges(c: Company): boolean {
+    const d = draft[c.id] ?? draftFromCompany(c);
+    const nextSeatLimit = Number.parseInt(d.seatLimit, 10);
+    const nextSubscription = d.subscriptionInput.trim();
+    const nextDiscountPercent = Number.parseInt(d.discountPercent, 10);
+    const nextDiscountAmount = Number.parseInt(d.discountAmount, 10);
+
+    const currentSubscription = subscriptionEndsAtToDateInput(c.subscriptionEndsAt, c.timezone).trim();
+    const currentDiscountPercent = c.billingDiscountPercent ?? 0;
+    const currentDiscountAmount = c.billingDiscountAmount ?? 0;
+
+    return (
+      nextSeatLimit !== c.seatLimit ||
+      nextSubscription !== currentSubscription ||
+      nextDiscountPercent !== currentDiscountPercent ||
+      nextDiscountAmount !== currentDiscountAmount
+    );
+  }
+
+  async function autoSaveCompanyIfNeeded(c: Company) {
+    if (savingId === c.id) return;
+    if (!hasCompanyDraftChanges(c)) return;
+    await saveCompany(c.id);
+  }
+
   function startEditName(c: Company) {
     setDraft((prev) => ({
       ...prev,
@@ -313,14 +341,39 @@ export default function SuperPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm(t("super.confirmDelete"))) return;
-    await fetch(`/api/super/companies/${id}`, { method: "DELETE" });
+    const r = await fetch(`/api/super/companies/${id}`, { method: "DELETE" });
+    const body = (await r.json().catch(() => ({}))) as { error?: string; mode?: string };
+    if (!r.ok) {
+      setBanner(typeof body.error === "string" ? body.error : t("super.saveCompanyFail"));
+      return;
+    }
+    if (body.mode === "deactivated") {
+      setBanner(t("super.deactivatedOk"));
+    } else if (body.mode === "hard_deleted") {
+      setBanner(t("super.hardDeletedOk"));
+    }
     await load();
+  }
+
+  function requestRemove(c: Company) {
+    setDeleteConfirmCompany(c);
+  }
+
+  async function confirmRemoveCompany() {
+    const target = deleteConfirmCompany;
+    if (!target) return;
+    setDeleteConfirmCompany(null);
+    await remove(target.id);
+  }
+
+  function cancelRemoveCompany() {
+    setDeleteConfirmCompany(null);
   }
 
   const filteredCompanies = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return companies.filter((c) => {
+      if (!c.isActive && activeOnly) return false;
       if (activeOnly && !companyInUse(c)) return false;
       if (!q) return true;
       return c.name.toLowerCase().includes(q);
@@ -335,7 +388,7 @@ export default function SuperPage() {
       {banner && <p className={bannerInfo}>{banner}</p>}
 
       <section className={bodySection}>
-        <p className={sectionLabel}>{t("super.create")}</p>
+        <p className={sectionLabel}>{locale === "en" ? "Company registration" : "회사 등록"}</p>
         <div className={groupedCard}>
           <div className={`${cardBody} !py-4`}>
             <form onSubmit={create} className={formInlineRow}>
@@ -362,17 +415,23 @@ export default function SuperPage() {
       </section>
 
       <section className={bodySection}>
-        <p className={sectionLabel}>{t("super.thName")}</p>
+        <p className={sectionLabel}>{locale === "en" ? "Company list" : "회사 목록"}</p>
         {companies.length === 0 ? (
           <div className={groupedCard}>
             <p className={emptyStateCompact}>—</p>
           </div>
         ) : (
           <div className={tableWrap}>
-            <div className={tableToolbar}>
+            <div className="flex items-start justify-between px-5 pt-2 sm:px-6">
+              <p className={`${label} !mt-0`}>{t("super.searchCompanies")}</p>
+              <p className="text-right text-[0.75rem] text-[var(--apple-red)]">
+                ※ 입력 후 커서가 영역 밖으로 이동하면 자동 저장됩니다.
+              </p>
+            </div>
+            <div className={`${tableToolbar} pt-1 sm:pt-1`}>
               <div className={searchToolbar}>
                 <div className={searchFieldWrap}>
-                  <label className={label} htmlFor="company-search">
+                  <label className="sr-only" htmlFor="company-search">
                     {t("super.searchCompanies")}
                   </label>
                   <input
@@ -384,26 +443,28 @@ export default function SuperPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <label className={filterCheckboxLabel}>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-[var(--separator)] accent-[var(--apple-blue)]"
-                    checked={activeOnly}
-                    onChange={(e) => setActiveOnly(e.target.checked)}
-                  />
-                  {t("super.filterActiveOnly")}
-                </label>
+                <div className="ml-auto flex items-center gap-3 self-end">
+                  <label className={filterCheckboxLabel}>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-[var(--separator)] accent-[var(--apple-blue)]"
+                      checked={activeOnly}
+                      onChange={(e) => setActiveOnly(e.target.checked)}
+                    />
+                    {t("super.filterActiveOnly")}
+                  </label>
+                </div>
               </div>
             </div>
             <table className={table}>
               <thead className={tableHead}>
                 <tr>
-                  <th className={`${th} w-[4.5rem]`}>#</th>
-                  <th className={th}>{t("super.thName")}</th>
-                  <th className={`${th} w-[7rem] min-w-[7rem]`}>{t("super.thSeatCap")}</th>
-                  <th className={`${th} w-[10.5rem]`}>{t("super.thSubscriptionEnd")}</th>
-                  <th className={`${th} w-[15rem] min-w-[15rem] whitespace-nowrap`}>{t("super.thDiscount")}</th>
-                  <th className={`${th} text-right`}>{t("super.thActions")}</th>
+                  <th className={`${th} w-[4.5rem] text-center`}>#</th>
+                  <th className={`${th} text-center`}>{t("super.thName")}</th>
+                  <th className={`${th} w-[7rem] min-w-[7rem] text-center`}>{t("super.thSeatCap")}</th>
+                  <th className={`${th} w-[10.5rem] text-center`}>{t("super.thSubscriptionEnd")}</th>
+                  <th className={`${th} w-[15rem] min-w-[15rem] whitespace-nowrap text-center`}>{t("super.thDiscount")}</th>
+                  <th className={`${th} text-center`}>{t("super.thActions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -415,7 +476,13 @@ export default function SuperPage() {
                   </tr>
                 ) : (
                   filteredCompanies.map((c, idx) => (
-                    <tr key={c.id} className={tableRow}>
+                    <tr
+                      key={c.id}
+                      className={tableRow}
+                      onMouseLeave={() => {
+                        void autoSaveCompanyIfNeeded(c);
+                      }}
+                    >
                       <td className={`${td} w-[4.5rem] text-[var(--apple-label-secondary)] tabular-nums`}>
                         {idx + 1}
                       </td>
@@ -516,6 +583,9 @@ export default function SuperPage() {
                               }),
                             }))
                           }
+                          onBlur={() => {
+                            void autoSaveCompanyIfNeeded(c);
+                          }}
                         />
                       </td>
                       <td className={td}>
@@ -538,6 +608,9 @@ export default function SuperPage() {
                               }),
                             }))
                           }
+                          onBlur={() => {
+                            void autoSaveCompanyIfNeeded(c);
+                          }}
                         />
                       </td>
                       <td className={`${td} whitespace-nowrap`}>
@@ -572,6 +645,9 @@ export default function SuperPage() {
                                 } else if (clamped !== e.target.value) {
                                   updateDraftDiscountPercent(c.id, c, clamped);
                                 }
+                                window.setTimeout(() => {
+                                  void autoSaveCompanyIfNeeded(c);
+                                }, 0);
                               }}
                             />
                             <span className="shrink-0 text-[0.8125rem] font-bold text-[var(--apple-blue)]">
@@ -601,28 +677,65 @@ export default function SuperPage() {
                                   }),
                                 }))
                               }
+                              onBlur={() => {
+                                void autoSaveCompanyIfNeeded(c);
+                              }}
                             />
                           </label>
                         </div>
                       </td>
                       <td className={td}>
-                        <div className={`${cardActionBar} justify-end`}>
+                        <div className={`${cardActionBar} justify-end flex-nowrap whitespace-nowrap gap-2`}>
+                          {savingId === c.id ? (
+                            <span className="text-xs font-medium text-[var(--apple-label-secondary)]">
+                              {t("common.processing")}
+                            </span>
+                          ) : null}
+                          <a
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-105"
+                            href={`/api/admin/export?companyId=${encodeURIComponent(c.id)}`}
+                            aria-label={t("super.excel")}
+                            title={t("super.excel")}
+                          >
+                            <svg
+                              viewBox="0 0 24 24"
+                              className={actionIconClass}
+                              fill="none"
+                              aria-hidden
+                            >
+                              <circle cx="12" cy="12" r="10" fill="#22c55e" />
+                              <path
+                                d="M12 7.6v6.3m0 0l-2.2-2.2M12 13.9l2.2-2.2M9.2 16.6h5.6"
+                                stroke="#ffffff"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            <span className="sr-only">{t("super.excel")}</span>
+                          </a>
                           <button
                             type="button"
-                            disabled={savingId === c.id}
-                            className={btnSecondary}
-                            onClick={() => void saveCompany(c.id)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-105"
+                            onClick={() => requestRemove(c)}
+                            aria-label={t("super.delete")}
+                            title={t("super.delete")}
                           >
-                            {savingId === c.id ? "…" : t("super.saveCompany")}
-                          </button>
-                          <a
-                            className={btnGhost}
-                            href={`/api/admin/export?companyId=${encodeURIComponent(c.id)}`}
-                          >
-                            {t("super.excel")}
-                          </a>
-                          <button type="button" className={btnDanger} onClick={() => void remove(c.id)}>
-                            {t("super.delete")}
+                            <svg
+                              viewBox="0 0 24 24"
+                              className={actionIconClass}
+                              fill="none"
+                              aria-hidden
+                            >
+                              <circle cx="12" cy="12" r="10" fill="#ff3b47" />
+                              <path
+                                d="M8 8l8 8M16 8l-8 8"
+                                stroke="#111111"
+                                strokeWidth="2.4"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <span className="sr-only">{t("super.delete")}</span>
                           </button>
                         </div>
                       </td>
@@ -657,12 +770,12 @@ export default function SuperPage() {
               ) : (
                 logs.map((l) => (
                   <tr key={l.id} className={tableRow}>
-                    <td className={`${td} whitespace-nowrap text-[var(--apple-label-secondary)]`}>
+                    <td className={`${td} whitespace-nowrap text-[0.8125rem] text-[var(--apple-label-secondary)]`}>
                       {new Date(l.timestamp).toLocaleString(locale === "en" ? "en-IN" : "ko-KR")}
                     </td>
-                    <td className={td}>{l.company.name}</td>
-                    <td className={`${td} text-[var(--apple-label-secondary)]`}>{l.approver.email}</td>
-                    <td className={`${td} font-semibold text-[var(--apple-blue)]`}>{l.action}</td>
+                    <td className={`${td} text-[0.8125rem]`}>{l.company.name}</td>
+                    <td className={`${td} text-[0.8125rem] text-[var(--apple-label-secondary)]`}>{l.approver.email}</td>
+                    <td className={`${td} text-[0.8125rem] font-semibold text-[var(--apple-blue)]`}>{l.action}</td>
                   </tr>
                 ))
               )}
@@ -682,6 +795,19 @@ export default function SuperPage() {
         cancelLabel={t("common.cancel")}
         onConfirm={confirmHighDiscount}
         onCancel={cancelHighDiscount}
+      />
+      <AppleConfirmDialog
+        open={deleteConfirmCompany !== null}
+        title={deleteConfirmCompany?.isActive ? (locale === "en" ? "Deactivate company" : "회사 비활성화") : (locale === "en" ? "Delete permanently" : "완전 삭제")}
+        message={
+          deleteConfirmCompany?.isActive
+            ? t("super.confirmDeactivate")
+            : t("super.confirmHardDelete")
+        }
+        confirmLabel={t("common.confirm")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => void confirmRemoveCompany()}
+        onCancel={cancelRemoveCompany}
       />
     </div>
   );

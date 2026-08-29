@@ -841,6 +841,12 @@ export const ko = {
     discountHighWarningConfirm: "적용",
     loadCompaniesFail: "회사 목록을 불러오지 못했습니다. 개발 서버를 재시작하거나 prisma generate 후 새로고침하세요.",
     confirmDelete: "회사와 연결 데이터를 삭제합니다. 계속할까요?",
+    confirmDeactivate:
+      "회사를 비활성화합니다. 비활성화 상태에서 다시 삭제하면 회사 데이터가 완전히 삭제됩니다. 계속할까요?",
+    confirmHardDelete:
+      "비활성화된 회사를 완전히 삭제합니다. 이 작업은 되돌릴 수 없습니다. 계속할까요?",
+    deactivatedOk: "회사가 비활성화되었습니다. 다시 삭제하면 완전히 삭제됩니다.",
+    hardDeletedOk: "회사가 완전히 삭제되었습니다.",
     auditTitle: "전체 승인 로그",
     auditColTime: "일시",
     auditColCompany: "회사",
@@ -1911,6 +1917,13 @@ export const en = {
     discountHighWarningConfirm: "Apply",
     loadCompaniesFail: "Could not load companies. Restart the dev server or run prisma generate, then refresh.",
     confirmDelete: "This will delete the company and related data. Continue?",
+    confirmDeactivate:
+      "This will deactivate the company. Deleting it again while inactive will permanently remove company data. Continue?",
+    confirmHardDelete:
+      "This will permanently delete the inactive company. This action cannot be undone. Continue?",
+    deactivatedOk:
+      "Company deactivated. Delete once more to remove it permanently.",
+    hardDeletedOk: "Company permanently deleted.",
     auditTitle: "Approval log (all)",
     auditColTime: "Time",
     auditColCompany: "Company",

@@ -171,6 +171,8 @@ model InvoiceNumberSequence {
 model Company {
   id        String   @id @default(cuid())
   name      String
+  /// 1회 삭제 시 비활성화(soft delete), 재삭제 시 실제 삭제
+  isActive  Boolean  @default(true)
   /// IANA 타임존 (지각/조퇴 판별)
   timezone  String   @default("Asia/Kolkata")
   /// false면 출근 시 안면 등록·인식 없이 GPS만으로 출근

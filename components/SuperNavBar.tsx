@@ -14,7 +14,6 @@ export function SuperNavBar() {
   const nav = [
     { href: "/super", label: t("super.navCompanies"), exact: true },
     { href: "/super/pricing", label: t("super.navPricing") },
-    { href: "/super/billing", label: t("super.navBilling") },
   ];
 
   function isActive(href: string, exact?: boolean) {

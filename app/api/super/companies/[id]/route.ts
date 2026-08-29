@@ -123,6 +123,23 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   }
 
   const { id } = await ctx.params;
-  await prisma.company.delete({ where: { id } }).catch(() => null);
-  return NextResponse.json({ ok: true });
+  const company = await prisma.company.findUnique({
+    where: { id },
+    select: { id: true, isActive: true },
+  });
+  if (!company) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // 1회 삭제: 비활성화, 2회 삭제: 완전 삭제
+  if (company.isActive) {
+    await prisma.company.update({
+      where: { id },
+      data: { isActive: false },
+    });
+    return NextResponse.json({ ok: true, mode: "deactivated" as const });
+  }
+
+  await prisma.company.delete({ where: { id } });
+  return NextResponse.json({ ok: true, mode: "hard_deleted" as const });
 }
