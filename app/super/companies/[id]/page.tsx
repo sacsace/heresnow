@@ -6,7 +6,7 @@ import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceO
 import { SuperCompanyAttendanceStats } from "@/components/super/SuperCompanyAttendanceStats";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
-import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
 import {
   btnDestructive,
   btnPrimaryLg,
@@ -135,6 +135,10 @@ export default function SuperCompanyUsersPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!isStrongPassword(password.trim())) {
+      setError(t("super.addPassword"));
+      return;
+    }
     setLoading(true);
     const r = await fetch(`/api/super/companies/${id}/users`, {
       method: "POST",

@@ -20,7 +20,7 @@ import {
   type ShiftPresetsMap,
 } from "@/lib/shiftPresets";
 import { useI18n } from "@/components/LanguageProvider";
-import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   bannerWarning,
@@ -230,6 +230,10 @@ export default function AdminEmployeesPage() {
     e.preventDefault();
     setError(null);
     setAddSuccess(null);
+    if (!isStrongPassword(password.trim())) {
+      setError(t("admin.employeesPasswordHint"));
+      return;
+    }
     if (!departmentId) {
       setError(t("admin.employeesDepartmentRequired"));
       return;
@@ -446,7 +450,7 @@ export default function AdminEmployeesPage() {
 
   async function savePassword(empId: string): Promise<boolean> {
     const pwd = passwordDraft.trim();
-    if (pwd.length < MIN_PASSWORD_LENGTH) {
+    if (!isStrongPassword(pwd)) {
       setRowError(t("admin.employeesPasswordHint"));
       return false;
     }
@@ -466,7 +470,7 @@ export default function AdminEmployeesPage() {
       setPasswordDraft("");
       return;
     }
-    if (pwd.length < MIN_PASSWORD_LENGTH) {
+    if (!isStrongPassword(pwd)) {
       setRowError(t("admin.employeesPasswordHint"));
       return;
     }

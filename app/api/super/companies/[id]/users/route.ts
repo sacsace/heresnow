@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
-import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { isStrongPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -11,7 +11,13 @@ import { z } from "zod";
 const postSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase().trim()),
   name: z.string().min(1).max(120),
-  password: z.string().min(MIN_PASSWORD_LENGTH).max(200),
+  password: z
+    .string()
+    .min(MIN_PASSWORD_LENGTH)
+    .max(MAX_PASSWORD_LENGTH)
+    .refine(isStrongPassword, {
+      message: "Password must include uppercase, lowercase, number, and special character.",
+    }),
   role: z.enum(["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE", "DOOR"]),
 });
 

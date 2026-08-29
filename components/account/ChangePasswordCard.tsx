@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
-import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
 import {
   bannerSuccess,
   btnPrimary,
@@ -43,7 +43,7 @@ export function ChangePasswordCard() {
       setError(t("account.errNewRequired"));
       return;
     }
-    if (next.length < MIN_PASSWORD_LENGTH) {
+    if (!isStrongPassword(next)) {
       setError(t("account.errMinLength"));
       return;
     }

@@ -23,6 +23,13 @@ const DEFAULT_DESCRIPTION: Record<Locale, string> = {
   en: "HeresNow is a multi-tenant attendance proof SaaS that stores GPS only when check-in/out is tapped, with face verification, business-trip/night-shift support, company timezone work rules, and admin analytics.",
 };
 
+function toSafeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
   const siteName = SITE_NAME[locale];
@@ -165,14 +172,8 @@ export default async function RootLayout({
     <html lang={locale}>
       <body className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased">
         <Providers initialLocale={locale}>{children}</Providers>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareLd) }}
-        />
+        <script type="application/ld+json">{toSafeJsonLd(organizationLd)}</script>
+        <script type="application/ld+json">{toSafeJsonLd(softwareLd)}</script>
       </body>
     </html>
   );
