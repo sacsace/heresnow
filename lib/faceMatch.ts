@@ -1,5 +1,5 @@
 /** face-api.js 유클리드 거리 기준 (낮을수록 동일인) */
-export const FACE_MATCH_THRESHOLD = 0.55;
+export const FACE_MATCH_THRESHOLD = 0.58;
 
 /** 출입문 단말 — 고정 카메라·다중 프레임 평균과 함께 사용 */
 export const FACE_MATCH_THRESHOLD_DOOR = 0.5;
