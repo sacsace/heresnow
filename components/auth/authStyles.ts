@@ -87,7 +87,7 @@ export const authLangSlot = "fixed right-4 top-4 z-50 sm:right-6 sm:top-5";
 export const consentShellWidth =
   "!w-full !max-w-[min(100%,36rem)] sm:!max-w-[38rem] md:!max-w-[44rem] lg:!max-w-[48rem] xl:!max-w-[52rem]";
 export const consentCard =
-  "w-full overflow-hidden rounded-2xl bg-[var(--grouped-bg)] px-5 py-7 shadow-sm ring-1 ring-black/[0.04] sm:px-8 sm:py-9 md:px-10 md:py-10";
+  "w-full overflow-hidden rounded-2xl border border-[var(--separator)] bg-[var(--grouped-bg)] px-5 py-7 sm:px-8 sm:py-9 md:px-10 md:py-10";
 export const consentTitle =
   "text-[1.375rem] font-semibold leading-tight tracking-tight text-[var(--foreground)] sm:text-[1.5rem]";
 export const consentIntro =

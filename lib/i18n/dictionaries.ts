@@ -509,9 +509,17 @@ export const ko = {
     attendanceDownloadHint:
       "위 검색 조건(기간·부서·승인 상태·이름)이 적용된 출퇴근 데이터를 Excel(.xlsx)로 받을 수 있습니다.",
     attendanceDownloadApplyNote: "조건을 바꾼 뒤에는 먼저 「검색」을 눌러 적용해 주세요.",
+    attendanceDownloadFormatLabel: "다운로드 형식",
+    attendanceDownloadFormatSummary: "현재 구성(요약 달력형)",
+    attendanceDownloadFormatDetail: "세부 사항(리스트형)",
+    attendanceDownloadOptionTitle: "다운로드 옵션",
+    attendanceDownloadOptionDescription:
+      "엑셀 형식을 선택해 주세요. 세부 사항은 직원별 시트로 리스트 형태로 내려받습니다.",
     attendanceDownloadThisMonth: "이번 달 기간으로 설정",
     attendanceDownloadFormat:
       "Excel 상단에는 달력 표기 범례만 색상과 함께 포함됩니다. 산정 기준은 이 화면에서 확인하세요.",
+    attendanceDownloadDetailFormat:
+      "세부 사항 형식은 직원·날짜별 출근/퇴근 시간과 근태 상태를 리스트 행으로 내보냅니다.",
     attendanceDownloadRulesTitle: "산정 기준",
     attendanceDownloadCalendarTitle: "달력 셀 표기",
     attendanceDownloadCalendarO: "정상 출근",
@@ -576,6 +584,7 @@ export const ko = {
     attendanceFilterDepartmentAll: "전체 부서",
     attendanceSearchName: "직원 이름",
     attendanceSearchNamePlaceholder: "이름으로 검색",
+    attendanceSearchNameHelper: "직원 이름을 입력하지 않으면 전체 직원이 조회됩니다.",
     attendanceDateFrom: "시작일",
     attendanceDateTo: "종료일",
     attendanceSearchApply: "검색",
@@ -1565,9 +1574,17 @@ export const en = {
     attendanceDownloadHint:
       "Export check-in/out data matching the filters above (date range, department, status, name) as .xlsx.",
     attendanceDownloadApplyNote: "After changing filters, click Search to apply them before downloading.",
+    attendanceDownloadFormatLabel: "Download format",
+    attendanceDownloadFormatSummary: "Current layout (summary calendar)",
+    attendanceDownloadFormatDetail: "Detailed rows (list view)",
+    attendanceDownloadOptionTitle: "Download options",
+    attendanceDownloadOptionDescription:
+      "Choose an Excel export format. The detailed format exports records as a list, with a separate sheet for each employee.",
     attendanceDownloadThisMonth: "Set to this month",
     attendanceDownloadFormat:
       "The Excel file includes only the color-coded calendar legend at the top. See calculation rules on this screen.",
+    attendanceDownloadDetailFormat:
+      "Detailed format exports employee/day attendance as list rows with check-in, check-out, and status fields.",
     attendanceDownloadRulesTitle: "Calculation rules",
     attendanceDownloadCalendarTitle: "Calendar cells",
     attendanceDownloadCalendarO: "On time",
@@ -1632,6 +1649,7 @@ export const en = {
     attendanceFilterDepartmentAll: "All Departments",
     attendanceSearchName: "Employee name",
     attendanceSearchNamePlaceholder: "Search by name",
+    attendanceSearchNameHelper: "If no employee name is entered, all employees are shown.",
     attendanceDateFrom: "From",
     attendanceDateTo: "To",
     attendanceSearchApply: "Search",

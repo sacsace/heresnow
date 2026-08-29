@@ -78,6 +78,15 @@ function shouldRateLimitAuth(pathname: string, method: string): boolean {
   );
 }
 
+function shouldValidateAuthOrigin(pathname: string, method: string): boolean {
+  if (method !== "POST") return false;
+  return (
+    pathname === "/api/auth/callback/credentials" ||
+    pathname === "/api/public/face-login" ||
+    pathname === "/api/public/passkey-login/verify"
+  );
+}
+
 function consumeRateLimit(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now();
   if (authRateState.size > 5000) {
@@ -124,6 +133,25 @@ export default auth((req) => {
         }
       );
     }
+  }
+
+  if (shouldValidateAuthOrigin(pathname, method)) {
+    const originHost = hostFromUrlLike(req.headers.get("origin"));
+    const refererHost = hostFromUrlLike(req.headers.get("referer"));
+    const requestHost = reqHost || CANONICAL_HOST || "";
+    // same-origin POST만 허용 (로그인/인증 엔드포인트)
+    if (originHost && requestHost && originHost !== requestHost) {
+      return NextResponse.json({ error: "Forbidden origin" }, { status: 403 });
+    }
+    if (!originHost && refererHost && requestHost && refererHost !== requestHost) {
+      return NextResponse.json({ error: "Forbidden referer" }, { status: 403 });
+    }
+  }
+
+  if (pathname === "/api/auth/signout" && method === "POST") {
+    const res = NextResponse.next();
+    res.headers.set("Clear-Site-Data", "\"cache\", \"cookies\", \"storage\"");
+    return res;
   }
 
   const isAuthPage = pathname.startsWith("/login");

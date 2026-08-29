@@ -24,7 +24,6 @@ import {
   searchFiltersRow,
   segmentedBtn,
   segmentedWrap,
-  selectSm,
   tableToolbar,
 } from "@/lib/uiStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -45,6 +44,8 @@ type SearchFilters = {
   status: string;
   departmentId: string;
 };
+
+type ExportFormat = "summary" | "detail";
 
 type DepartmentLite = { id: string; name: string };
 
@@ -120,6 +121,8 @@ export default function AdminAttendancePage() {
   const [tab, setTab] = useState<AttendanceTab>("byEmployee");
   const [draft, setDraft] = useState<SearchFilters>(() => defaultFilters());
   const [filters, setFilters] = useState<SearchFilters>(() => defaultFilters());
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("summary");
+  const [exportPickerOpen, setExportPickerOpen] = useState(false);
   /** 월 달력 탭 전용 — 검색 기간(filters)과 분리 */
   const [calendarMonth, setCalendarMonth] = useState(() => todayYmd());
   const [mapMode, setMapMode] = useState<"single" | "range">("single");
@@ -186,17 +189,62 @@ export default function AdminAttendancePage() {
     return filters;
   }, [tab, filters, calendarMonth]);
 
-  const exportHref = useMemo(() => {
-    const q = new URLSearchParams();
-    q.set("lang", locale);
-    if (filters.status) q.set("status", filters.status);
-    if (filters.from) q.set("from", filters.from);
-    if (filters.to) q.set("to", filters.to);
-    const keyword = filters.q.trim();
-    if (keyword) q.set("q", keyword);
-    if (filters.departmentId) q.set("departmentId", filters.departmentId);
-    return `/api/admin/export?${q.toString()}`;
-  }, [filters, locale]);
+  const buildExportHref = useCallback(
+    (format: ExportFormat) => {
+      const q = new URLSearchParams();
+      q.set("lang", locale);
+      if (filters.status) q.set("status", filters.status);
+      if (filters.from) q.set("from", filters.from);
+      if (filters.to) q.set("to", filters.to);
+      const keyword = filters.q.trim();
+      if (keyword) q.set("q", keyword);
+      if (filters.departmentId) q.set("departmentId", filters.departmentId);
+      q.set("format", format);
+      return `/api/admin/export?${q.toString()}`;
+    },
+    [filters, locale]
+  );
+
+  function startDownloadWithFormat(format: ExportFormat) {
+    setExportFormat(format);
+    setExportPickerOpen(false);
+    window.location.href = buildExportHref(format);
+  }
+
+  const exportLabelSummary = t("admin.attendanceDownloadFormatSummary");
+  const exportLabelDetail = t("admin.attendanceDownloadFormatDetail");
+
+  const exportPickerHint = t("admin.attendanceDownloadOptionDescription");
+  const exportPickerTitle = t("admin.attendanceDownloadOptionTitle");
+
+  const showExportPicker = () => {
+    setExportPickerOpen(true);
+  };
+
+  const closeExportPicker = () => {
+    setExportPickerOpen(false);
+  };
+
+  const onExportPickerBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      closeExportPicker();
+    }
+  };
+
+  const onExportPickerKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") setExportPickerOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!exportPickerOpen) return;
+    window.addEventListener("keydown", onExportPickerKeyDown);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onExportPickerKeyDown);
+      document.body.style.overflow = prev;
+    };
+  }, [exportPickerOpen, onExportPickerKeyDown]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -376,7 +424,7 @@ export default function AdminAttendancePage() {
           <form onSubmit={applySearch} className={tableToolbar}>
             <div className={searchFiltersRow}>
               <div className={`${searchFieldCol} w-full sm:w-auto sm:flex-1 sm:min-w-[14rem] sm:max-w-[18rem]`}>
-                <label className={label} htmlFor="attendance-search-name">
+                <label className="sr-only" htmlFor="attendance-search-name">
                   {t("admin.attendanceSearchName")}
                 </label>
                 <input
@@ -384,12 +432,14 @@ export default function AdminAttendancePage() {
                   type="search"
                   className={inputCompact}
                   placeholder={t("admin.attendanceSearchNamePlaceholder")}
+                  title={t("admin.attendanceSearchNameHelper")}
+                  aria-label={`${t("admin.attendanceSearchName")} - ${t("admin.attendanceSearchNameHelper")}`}
                   value={draft.q}
                   onChange={(e) => setDraft((prev) => ({ ...prev, q: e.target.value }))}
                 />
               </div>
               <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[8.75rem]`}>
-                <label className={label} htmlFor="attendance-from">
+                <label className="sr-only" htmlFor="attendance-from">
                   {t("admin.attendanceDateFrom")}
                 </label>
                 <input
@@ -408,7 +458,7 @@ export default function AdminAttendancePage() {
                 />
               </div>
               <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[8.75rem]`}>
-                <label className={label} htmlFor="attendance-to">
+                <label className="sr-only" htmlFor="attendance-to">
                   {t("admin.attendanceDateTo")}
                 </label>
                 <input
@@ -421,12 +471,12 @@ export default function AdminAttendancePage() {
                 />
               </div>
               <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[9.5rem]`}>
-                <label className={label} htmlFor="attendance-department">
+                <label className="sr-only" htmlFor="attendance-department">
                   {t("admin.attendanceFilterDepartment")}
                 </label>
                 <select
                   id="attendance-department"
-                  className={`${selectSm} !w-full !min-w-0`}
+                  className="auth-select-field w-full min-h-[2.25rem] rounded-[0.625rem] border border-transparent bg-[var(--fill-secondary)] px-3.5 py-1.5 pr-10 text-[0.875rem] text-[var(--foreground)] outline-none transition-[box-shadow,background-color,border-color] focus:bg-white focus:border-[var(--separator-opaque)] focus:ring-2 focus:ring-[var(--apple-blue)]/18"
                   value={draft.departmentId}
                   onChange={(e) =>
                     setDraft((prev) => ({ ...prev, departmentId: e.target.value }))
@@ -457,12 +507,19 @@ export default function AdminAttendancePage() {
                   </button>
                 )}
                 {tab !== "download" && (
-                  <a href={exportHref} className={`${btnSecondary} h-9`}>
+                  <button
+                    type="button"
+                    className={`${btnSecondary} h-9`}
+                    onClick={showExportPicker}
+                  >
                     Excel
-                  </a>
+                  </button>
                 )}
               </div>
             </div>
+            <p className="mt-2 text-[0.75rem] leading-relaxed text-[var(--apple-label-tertiary)]">
+              {t("admin.attendanceSearchNameHelper")}
+            </p>
           </form>
         </div>
       )}
@@ -505,7 +562,9 @@ export default function AdminAttendancePage() {
         />
       ) : tab === "download" ? (
         <AttendanceDownloadView
-          exportHref={exportHref}
+          exportFormat={exportFormat}
+          onChangeExportFormat={setExportFormat}
+          onRequestDownload={showExportPicker}
           filters={filters}
           departments={departments}
           onApplyMonthRange={applyMonthRangeForDownload}
@@ -525,6 +584,42 @@ export default function AdminAttendancePage() {
         rows={rows}
         dateLocale={dateLocale}
       />
+
+      {exportPickerOpen ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 p-4"
+          onClick={onExportPickerBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label={exportPickerTitle}
+        >
+          <div className="w-full max-w-[23rem] overflow-hidden rounded-[1.5rem] border border-[var(--separator-opaque)] bg-white p-5 shadow-[0_14px_30px_rgba(15,23,42,0.10)]">
+            <h3 className="text-[1rem] font-semibold text-[var(--foreground)]">{exportPickerTitle}</h3>
+            <p className="mt-2 text-[0.875rem] text-[var(--apple-label-secondary)]">{exportPickerHint}</p>
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                className={`${btnPrimary} w-full justify-center`}
+                onClick={() => startDownloadWithFormat("summary")}
+              >
+                {exportLabelSummary}
+              </button>
+              <button
+                type="button"
+                className={`${btnSecondary} w-full justify-center`}
+                onClick={() => startDownloadWithFormat("detail")}
+              >
+                {exportLabelDetail}
+              </button>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button type="button" className={btnSecondary} onClick={closeExportPicker}>
+                {t("common.cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

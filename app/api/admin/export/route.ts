@@ -47,6 +47,7 @@ function visualWidth(value: unknown): number {
 }
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+type ExportFormat = "summary" | "detail";
 
 function dateWeekday(dateStr: string): number {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -66,6 +67,33 @@ function formatLateDuration(minutes: number, locale: "ko" | "en"): string {
   const h = Math.floor(safe / 60);
   const m = safe % 60;
   return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
+}
+
+function sanitizeSheetName(raw: string, fallback: string): string {
+  const base = (raw || fallback).trim() || fallback;
+  const cleaned = base.replace(/[\\/*?:[\]]/g, " ").replace(/\s+/g, " ").trim();
+  return (cleaned || fallback).slice(0, 31);
+}
+
+function makeUniqueSheetName(base: string, used: Set<string>): string {
+  if (!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+  let index = 2;
+  while (index < 9999) {
+    const suffix = ` (${index})`;
+    const trimmed = base.slice(0, Math.max(1, 31 - suffix.length));
+    const candidate = `${trimmed}${suffix}`;
+    if (!used.has(candidate)) {
+      used.add(candidate);
+      return candidate;
+    }
+    index += 1;
+  }
+  const fallback = `${base.slice(0, 27)} (x)`;
+  used.add(fallback);
+  return fallback;
 }
 
 export async function GET(req: Request) {
@@ -138,6 +166,8 @@ export async function GET(req: Request) {
   const toParam = url.searchParams.get("to") ?? undefined;
   const q = url.searchParams.get("q")?.trim() ?? undefined;
   const departmentId = url.searchParams.get("departmentId") ?? undefined;
+  const formatParam = url.searchParams.get("format");
+  const exportFormat: ExportFormat = formatParam === "detail" ? "detail" : "summary";
 
   let timestampFilter: { gte: Date; lte: Date } | undefined;
   if (fromParam && toParam && DATE_ONLY.test(fromParam) && DATE_ONLY.test(toParam)) {
@@ -355,6 +385,123 @@ export async function GET(req: Request) {
     }
     ws.views = [{ state: "frozen", ySplit: 1 }];
   } else {
+    if (exportFormat === "detail") {
+      const headers =
+        labels.locale === "en"
+          ? ["Date", "Check-in", "Check-out", "Check-in site", "Check-out site", "Status", "Flags"]
+          : ["날짜", "출근", "퇴근", "출근 장소", "퇴근 장소", "상태", "근태"];
+      const usedSheetNames = new Set<string>();
+
+      const statusLabel = (statusValue: string) => {
+        if (labels.locale === "en") return statusValue;
+        if (statusValue === "APPROVED") return "승인";
+        if (statusValue === "PENDING") return "대기";
+        if (statusValue === "REJECTED") return "반려";
+        if (statusValue === "MIXED") return "혼합";
+        return statusValue;
+      };
+      const flagLabels = {
+        late: labels.locale === "en" ? "Late" : "지각",
+        early: labels.locale === "en" ? "Early leave" : "조퇴",
+        overtime: labels.locale === "en" ? "Overtime" : "초과근무",
+        holiday: labels.locale === "en" ? "Holiday work" : "휴일근무",
+        incomplete: labels.locale === "en" ? "Incomplete" : "미완료",
+      };
+
+      const rows = days
+        .filter((row) => row.checkIn || row.checkOut)
+        .slice()
+        .sort((a, b) => {
+          if (a.employeeName !== b.employeeName) {
+            return a.employeeName.localeCompare(
+              b.employeeName,
+              labels.locale === "en" ? "en" : "ko"
+            );
+          }
+          if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+          const aIn = a.checkIn?.timestamp ?? "";
+          const bIn = b.checkIn?.timestamp ?? "";
+          return aIn.localeCompare(bIn);
+        });
+
+      const rowsByEmployee = new Map<string, typeof rows>();
+      for (const row of rows) {
+        const list = rowsByEmployee.get(row.employeeId) ?? [];
+        list.push(row);
+        rowsByEmployee.set(row.employeeId, list);
+      }
+
+      const writeDetailSheet = (
+        ws: ExcelJS.Worksheet,
+        sheetRows: typeof rows
+      ) => {
+        ws.addRow(headers);
+        for (const row of sheetRows) {
+          const flags: string[] = [];
+          if (row.isLate) flags.push(flagLabels.late);
+          if (row.isEarlyLeave) flags.push(flagLabels.early);
+          if (row.isOvertime) flags.push(flagLabels.overtime);
+          if (row.isHolidayWork) flags.push(flagLabels.holiday);
+          if (row.incomplete) flags.push(flagLabels.incomplete);
+          ws.addRow([
+            row.date,
+            row.checkIn?.time ?? "-",
+            row.checkOut?.time ?? "-",
+            row.checkIn?.site?.name ?? "-",
+            row.checkOut?.site?.name ?? "-",
+            statusLabel(row.status),
+            flags.join(", ") || "-",
+          ]);
+        }
+
+        const headerRow = ws.getRow(1);
+        headerRow.height = 20;
+        headerRow.eachCell({ includeEmpty: true }, (cell) => {
+          cell.font = { name: labels.fontName, size: 9, bold: true, color: { argb: "FFFFFFFF" } };
+          cell.alignment = { vertical: "middle", horizontal: "center" };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF263238" } };
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFB0BEC5" } },
+            left: { style: "thin", color: { argb: "FFB0BEC5" } },
+            bottom: { style: "thin", color: { argb: "FFB0BEC5" } },
+            right: { style: "thin", color: { argb: "FFB0BEC5" } },
+          };
+        });
+        for (let r = 2; r <= ws.rowCount; r += 1) {
+          const row = ws.getRow(r);
+          row.height = 18;
+          row.eachCell({ includeEmpty: true }, (cell, c) => {
+            const leftAligned = c <= 5 || c === 7;
+            cell.font = { name: labels.fontName, size: 9 };
+            cell.alignment = { vertical: "middle", horizontal: leftAligned ? "left" : "center" };
+            cell.border = {
+              top: { style: "thin", color: { argb: "FFCFD8DC" } },
+              left: { style: "thin", color: { argb: "FFCFD8DC" } },
+              bottom: { style: "thin", color: { argb: "FFCFD8DC" } },
+              right: { style: "thin", color: { argb: "FFCFD8DC" } },
+            };
+          });
+        }
+        for (let c = 1; c <= headers.length; c += 1) {
+          let max = visualWidth(headers[c - 1] ?? "");
+          for (let r = 2; r <= ws.rowCount; r += 1) {
+            max = Math.max(max, visualWidth(ws.getRow(r).getCell(c).value ?? ""));
+          }
+          ws.getColumn(c).width = Math.min(32, Math.max(10, max + 2));
+        }
+        ws.views = [{ state: "frozen", ySplit: 1 }];
+      };
+
+      for (const employee of employees) {
+        const baseSheetName = sanitizeSheetName(
+          employee.name,
+          labels.locale === "en" ? "Employee" : "직원"
+        );
+        const sheetName = makeUniqueSheetName(baseSheetName, usedSheetNames);
+        const ws = wb.addWorksheet(sheetName);
+        writeDetailSheet(ws, rowsByEmployee.get(employee.id) ?? []);
+      }
+    } else {
     const matrix = buildAttendancePresenceMatrix(days, employees, from, to, {
       workDays: company.workDays,
       timeZone: tz,
@@ -379,6 +526,7 @@ export async function GET(req: Request) {
     }
 
     styleAttendanceDataSheet(ws, matrix, labels, dataHeaderRow, visualWidth);
+    }
   }
 
   const arrayBuffer = await wb.xlsx.writeBuffer();

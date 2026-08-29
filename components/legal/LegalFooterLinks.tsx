@@ -13,14 +13,6 @@ type Props = {
   wrap?: boolean;
 };
 
-function FooterDot() {
-  return (
-    <span className="text-[var(--apple-label-tertiary)]" aria-hidden>
-      ·
-    </span>
-  );
-}
-
 export function LegalFooterLinks({ className = "", layout = "inline", wrap = true }: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
@@ -32,6 +24,12 @@ export function LegalFooterLinks({ className = "", layout = "inline", wrap = tru
   const cancellationHref = inAdmin ? "/admin/cancellation-policy" : "/cancellation-policy";
   const refundHref = inAdmin ? "/admin/refund-policy" : "/refund-policy";
   const supportHref = inAdmin ? "/admin/support" : null;
+  const items = [
+    { key: "terms", href: termsHref, label: t("legal.terms") },
+    { key: "privacy", href: privacyHref, label: t("legal.privacy") },
+    { key: "cancellation", href: cancellationHref, label: t("legal.cancellationPolicy") },
+    { key: "refund", href: refundHref, label: t("legal.refundPolicy") },
+  ] as const;
 
   return (
     <>
@@ -43,22 +41,20 @@ export function LegalFooterLinks({ className = "", layout = "inline", wrap = tru
         }
         aria-label={t("legal.navLabel")}
       >
-        <Link href={termsHref} className={authLink}>
-          {t("legal.terms")}
-        </Link>
-        {!isStack && <FooterDot />}
-        <Link href={privacyHref} className={authLink}>
-          {t("legal.privacy")}
-        </Link>
-        {!isStack && <FooterDot />}
-        <Link href={cancellationHref} className={authLink}>
-          {t("legal.cancellationPolicy")}
-        </Link>
-        {!isStack && <FooterDot />}
-        <Link href={refundHref} className={authLink}>
-          {t("legal.refundPolicy")}
-        </Link>
-        {!isStack && <FooterDot />}
+        {items.map((item, idx) => (
+          <span
+            key={item.key}
+            className={
+              isStack || idx === items.length - 1
+                ? "inline-flex items-center"
+                : "inline-flex items-center after:ml-2 after:text-[var(--apple-label-tertiary)] after:content-['·']"
+            }
+          >
+            <Link href={item.href} className={authLink}>
+              {item.label}
+            </Link>
+          </span>
+        ))}
         {supportHref ? (
           <Link href={supportHref} className={authLink}>
             {t("legal.support")}

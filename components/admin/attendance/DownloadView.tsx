@@ -18,8 +18,12 @@ type Filters = {
   departmentId: string;
 };
 
+type ExportFormat = "summary" | "detail";
+
 type Props = {
-  exportHref: string;
+  exportFormat: ExportFormat;
+  onChangeExportFormat: (next: ExportFormat) => void;
+  onRequestDownload: () => void;
   filters: Filters;
   departments: { id: string; name: string }[];
   onApplyMonthRange: () => void;
@@ -53,7 +57,9 @@ function RuleBlock({ title, body }: { title: string; body: string }) {
 }
 
 export function AttendanceDownloadView({
-  exportHref,
+  exportFormat,
+  onChangeExportFormat,
+  onRequestDownload,
   filters,
   departments,
   onApplyMonthRange,
@@ -109,6 +115,17 @@ export function AttendanceDownloadView({
         <p className={`mt-4 ${hint}`}>{t("admin.attendanceDownloadApplyNote")}</p>
 
         <div className="mt-5 flex flex-wrap gap-2">
+          <label className="inline-flex min-w-[16rem] flex-col gap-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
+            <span>{t("admin.attendanceDownloadFormatLabel")}</span>
+            <select
+              className="min-h-9 rounded-lg border border-[var(--separator)] bg-white px-2.5 text-[0.875rem] text-[var(--foreground)] outline-none"
+              value={exportFormat}
+              onChange={(e) => onChangeExportFormat(e.target.value as ExportFormat)}
+            >
+              <option value="summary">{t("admin.attendanceDownloadFormatSummary")}</option>
+              <option value="detail">{t("admin.attendanceDownloadFormatDetail")}</option>
+            </select>
+          </label>
           <button type="button" className={btnSecondary} onClick={onApplyMonthRange}>
             {t("admin.attendanceDownloadThisMonth")}
           </button>
@@ -116,7 +133,9 @@ export function AttendanceDownloadView({
 
         <div className={`mt-5 space-y-4 ${bannerInfo}`}>
           <p className="!bg-transparent !p-0 text-[0.8125rem] text-[var(--apple-label-secondary)]">
-            {t("admin.attendanceDownloadFormat")}
+            {exportFormat === "summary"
+              ? t("admin.attendanceDownloadFormat")
+              : t("admin.attendanceDownloadDetailFormat")}
           </p>
 
           <div>
@@ -171,12 +190,13 @@ export function AttendanceDownloadView({
           </div>
         </div>
 
-        <a
-          href={exportHref}
+        <button
+          type="button"
+          onClick={onRequestDownload}
           className={`${btnPrimary} mt-5 inline-flex min-h-[2.75rem] items-center justify-center px-6`}
         >
           {t("admin.attendanceDownloadButton")}
-        </a>
+        </button>
       </div>
     </div>
   );

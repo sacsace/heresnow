@@ -7,7 +7,7 @@ import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useRef, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, type MouseEvent, type WheelEvent } from "react";
 
 type Props = {
   children: React.ReactNode;
@@ -18,6 +18,8 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
   const navScrollRef = useRef<HTMLDivElement | null>(null);
+  const autoScrollRafRef = useRef<number | null>(null);
+  const autoScrollDirRef = useRef<-1 | 0 | 1>(0);
 
   const menuGroups = useMemo(
     () => [
@@ -67,6 +69,58 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
     el.scrollLeft += delta;
   }
 
+  function stopAutoScroll() {
+    autoScrollDirRef.current = 0;
+    if (autoScrollRafRef.current != null) {
+      cancelAnimationFrame(autoScrollRafRef.current);
+      autoScrollRafRef.current = null;
+    }
+  }
+
+  function runAutoScroll() {
+    const el = navScrollRef.current;
+    if (!el) {
+      stopAutoScroll();
+      return;
+    }
+    const dir = autoScrollDirRef.current;
+    if (dir === 0) {
+      stopAutoScroll();
+      return;
+    }
+    el.scrollLeft += dir * 8;
+    autoScrollRafRef.current = requestAnimationFrame(runAutoScroll);
+  }
+
+  function startAutoScroll(dir: -1 | 1) {
+    if (autoScrollDirRef.current === dir && autoScrollRafRef.current != null) return;
+    autoScrollDirRef.current = dir;
+    if (autoScrollRafRef.current == null) {
+      autoScrollRafRef.current = requestAnimationFrame(runAutoScroll);
+    }
+  }
+
+  function onMenuMouseMove(e: MouseEvent<HTMLDivElement>) {
+    const el = navScrollRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const threshold = Math.min(72, rect.width * 0.22);
+    const x = e.clientX - rect.left;
+    if (x <= threshold) {
+      startAutoScroll(-1);
+      return;
+    }
+    if (x >= rect.width - threshold) {
+      startAutoScroll(1);
+      return;
+    }
+    stopAutoScroll();
+  }
+
+  useEffect(() => {
+    return () => stopAutoScroll();
+  }, []);
+
   const activeItem =
     links.find((l) => isActive(l.href, "exact" in l ? l.exact : false)) ?? null;
   const legalActiveItem = pathname.startsWith("/admin/terms")
@@ -102,7 +156,7 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)]">
       <header className="z-40 shrink-0 border-b border-[var(--separator)] bg-[var(--bar-bg)] pt-[env(safe-area-inset-top,0px)] backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-[1366px] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[1503px] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <MobileNavDrawer items={links} />
             <AppLogo href="/admin" title={t("login.title")} className="min-w-0" />
@@ -113,7 +167,9 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
               <div
                 ref={navScrollRef}
                 onWheel={onMenuWheel}
-                className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                onMouseMove={onMenuMouseMove}
+                onMouseLeave={stopAutoScroll}
+                className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden pr-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {links.map((link) => {
                   const active = isActive(link.href, "exact" in link ? link.exact : false);
@@ -139,8 +195,8 @@ export function AdminChrome({ children, bodyClassName = "" }: Props) {
       </header>
 
       <div className="flex-1">
-        <div className="mx-auto flex w-full max-w-[1366px] min-w-0 px-3 pb-3 pt-4 sm:px-4 lg:px-5">
-          <section className="flex min-w-0 flex-1 flex-col rounded-2xl border border-[var(--separator)] bg-white">
+        <div className="mx-auto flex w-full max-w-[1503px] min-w-0 px-3 pb-3 pt-4 sm:px-4 lg:px-5">
+          <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--separator-opaque)] bg-white">
             <div className="flex items-center justify-between border-b border-[var(--separator)] bg-[var(--fill-tertiary)]/40 px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <p className="truncate text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--apple-label-tertiary)]">
