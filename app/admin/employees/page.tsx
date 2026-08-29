@@ -230,10 +230,6 @@ export default function AdminEmployeesPage() {
     e.preventDefault();
     setError(null);
     setAddSuccess(null);
-    if (!departmentId) {
-      setError(t("admin.employeesDepartmentRequired"));
-      return;
-    }
     if (!isStrongPassword(password)) {
       setError(t("admin.employeesPasswordHint"));
       return;
@@ -745,19 +741,14 @@ export default function AdminEmployeesPage() {
                 />
               </div>
               <div className={canEditRoles ? undefined : "sm:col-span-2"}>
-                <label className={label}>
-                  {t("admin.employeesDepartmentLabel")}{" "}
-                  <span aria-hidden className="text-[var(--apple-red)]">*</span>
-                </label>
+                <label className={label}>{t("admin.employeesDepartmentLabel")}</label>
                 <select
-                  required
                   className={`${select} mt-1.5`}
                   value={departmentId}
                   onChange={(e) => setDepartmentId(e.target.value)}
-                  disabled={noDepartments}
                 >
-                  <option value="" disabled>
-                    {t("admin.employeesDepartmentSelect")}
+                  <option value="">
+                    {t("admin.employeesDepartmentUnassigned")}
                   </option>
                   {departments.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -789,7 +780,6 @@ export default function AdminEmployeesPage() {
                 <button
                   type="submit"
                   className={`${btnPrimary} mt-1.5 w-full`}
-                  disabled={noDepartments}
                 >
                   {t("admin.employeesAddButton")}
                 </button>

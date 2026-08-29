@@ -253,7 +253,7 @@ export const ko = {
     employeesDepartmentRequired: "부서를 선택해 주세요.",
     employeesDepartmentManage: "부서 관리",
     employeesNoDepartmentsYet:
-      "등록된 부서가 없습니다. 우측 상단의 '부서 관리'에서 먼저 부서를 추가해 주세요.",
+      "등록된 부서가 없어도 직원 추가는 가능합니다. 필요하면 우측 상단의 '부서 관리'에서 부서를 추가하세요.",
     employeesAddButton: "추가",
     employeesBulkTitle: "엑셀 일괄 등록",
     employeesBulkLead:
@@ -1311,7 +1311,7 @@ export const en = {
     employeesDepartmentRequired: "Please select a department.",
     employeesDepartmentManage: "Manage Departments",
     employeesNoDepartmentsYet:
-      "No departments yet. Click 'Manage departments' on the top right to add one first.",
+      "You can add employees even without departments. If needed, click 'Manage departments' on the top right.",
     employeesAddButton: "Add Employee",
     employeesBulkTitle: "Bulk Import from Excel",
     employeesBulkLead:

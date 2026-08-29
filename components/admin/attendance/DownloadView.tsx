@@ -126,7 +126,7 @@ export function AttendanceDownloadView({
               <option value="detail">{t("admin.attendanceDownloadFormatDetail")}</option>
             </select>
           </label>
-          <button type="button" className={btnSecondary} onClick={onApplyMonthRange}>
+          <button type="button" className={`${btnSecondary} self-end`} onClick={onApplyMonthRange}>
             {t("admin.attendanceDownloadThisMonth")}
           </button>
         </div>
