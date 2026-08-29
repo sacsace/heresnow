@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { isStrongPassword } from "@/lib/passwordPolicy";
 import { canAssignRole } from "@/lib/roleHierarchy";
+import { isStrongPassword } from "@/lib/passwordPolicy";
 import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -37,16 +37,16 @@ export async function createCompanyEmployee(
   if (dup) {
     return { ok: false, code: "EMAIL_TAKEN", message: "이미 등록된 이메일입니다." };
   }
-
-  if (role !== "EMPLOYEE" && !canAssignRole(opts.callerRole, "EMPLOYEE", role)) {
-    return { ok: false, code: "ROLE_NOT_ALLOWED", message: "허용되지 않는 역할입니다." };
-  }
   if (!isStrongPassword(password)) {
     return {
       ok: false,
       code: "WEAK_PASSWORD",
-      message: "비밀번호는 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.",
+      message: "비밀번호는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.",
     };
+  }
+
+  if (role !== "EMPLOYEE" && !canAssignRole(opts.callerRole, "EMPLOYEE", role)) {
+    return { ok: false, code: "ROLE_NOT_ALLOWED", message: "허용되지 않는 역할입니다." };
   }
 
   const passwordHash = await bcrypt.hash(password, 10);

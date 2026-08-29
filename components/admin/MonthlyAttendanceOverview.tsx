@@ -49,16 +49,27 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const cidQs = companyId ? `&companyId=${encodeURIComponent(companyId)}` : "";
-    const r = await fetch(`/api/admin/dashboard/monthly?year=${year}&month=${month}${cidQs}`);
-    const j = await r.json().catch(() => ({}));
-    setLoading(false);
-    if (!r.ok) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const cidQs = companyId ? `&companyId=${encodeURIComponent(companyId)}` : "";
+      const r = await fetch(`/api/admin/dashboard/monthly?year=${year}&month=${month}${cidQs}`, {
+        signal: controller.signal,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setData(null);
+        setError(typeof j.error === "string" ? j.error : t("admin.monthlyLoadFail"));
+        return;
+      }
+      setData(j as ApiPayload);
+    } catch {
       setData(null);
-      setError(typeof j.error === "string" ? j.error : t("admin.monthlyLoadFail"));
-      return;
+      setError(t("admin.monthlyLoadFail"));
+    } finally {
+      window.clearTimeout(timeoutId);
+      setLoading(false);
     }
-    setData(j as ApiPayload);
   }, [year, month, t, companyId]);
 
   useEffect(() => {

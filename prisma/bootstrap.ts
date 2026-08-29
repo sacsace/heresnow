@@ -10,7 +10,7 @@
  */
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { isStrongPassword, MIN_PASSWORD_LENGTH } from "../lib/passwordPolicy";
+import { MIN_PASSWORD_LENGTH, isStrongPassword } from "../lib/passwordPolicy";
 
 const prisma = new PrismaClient();
 
@@ -40,9 +40,9 @@ async function main() {
       "SEED_SUPER_ADMIN_EMAIL 와 SEED_SUPER_ADMIN_PASSWORD 는 함께 설정해야 합니다."
     );
   }
-  if (!isStrongPassword(password)) {
+  if (password.length < MIN_PASSWORD_LENGTH) {
     throw new Error(
-      `SEED_SUPER_ADMIN_PASSWORD 는 최소 ${MIN_PASSWORD_LENGTH}자 이상이며 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.`
+      `SEED_SUPER_ADMIN_PASSWORD 는 최소 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`
     );
   }
   const email = rawEmail.toLowerCase();
@@ -53,6 +53,11 @@ async function main() {
   const existing = await prisma.user.findUnique({ where: { email } });
 
   if (!existing) {
+    if (!isStrongPassword(password)) {
+      throw new Error(
+        "SEED_SUPER_ADMIN_PASSWORD 는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다."
+      );
+    }
     const passwordHash = await bcrypt.hash(password, 10);
     await prisma.user.create({
       data: {
@@ -77,6 +82,11 @@ async function main() {
     updates.companyId = null;
   }
   if (rotate) {
+    if (!isStrongPassword(password)) {
+      throw new Error(
+        "SEED_SUPER_ADMIN_PASSWORD 는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다."
+      );
+    }
     updates.passwordHash = await bcrypt.hash(password, 10);
   }
   if (!existing.consentGivenAt) {

@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { isStrongPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -11,13 +11,7 @@ export const dynamic = "force-dynamic";
 
 const Body = z.object({
   currentPassword: z.string().min(1).max(200),
-  newPassword: z
-    .string()
-    .min(MIN_PASSWORD_LENGTH)
-    .max(MAX_PASSWORD_LENGTH)
-    .refine(isStrongPassword, {
-      message: "비밀번호는 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.",
-    }),
+  newPassword: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
 });
 
 export async function PATCH(req: Request) {
@@ -40,6 +34,9 @@ export async function PATCH(req: Request) {
     );
   }
   const { currentPassword, newPassword } = parsed.data;
+  if (!isStrongPassword(newPassword)) {
+    return NextResponse.json({ error: "WEAK_PASSWORD" }, { status: 400 });
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },

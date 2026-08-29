@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import { createCompanyEmployee } from "@/lib/employeeCreate";
 import { parseEmployeeBulkWorkbook, parseEmployeeRole } from "@/lib/employeeBulkExcel";
-import { isStrongPassword, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
 import { NextResponse } from "next/server";
@@ -86,11 +86,19 @@ export async function POST(req: Request) {
       failures.push({ row: row.rowNumber, email, error: "이메일 형식이 올바르지 않습니다." });
       continue;
     }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      failures.push({
+        row: row.rowNumber,
+        email,
+        error: `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`,
+      });
+      continue;
+    }
     if (!isStrongPassword(password)) {
       failures.push({
         row: row.rowNumber,
         email,
-        error: `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이며 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.`,
+        error: "비밀번호는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.",
       });
       continue;
     }

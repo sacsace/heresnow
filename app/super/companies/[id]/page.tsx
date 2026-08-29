@@ -6,7 +6,7 @@ import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceO
 import { SuperCompanyAttendanceStats } from "@/components/super/SuperCompanyAttendanceStats";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
-import { MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
+import { isStrongPassword } from "@/lib/passwordPolicy";
 import {
   btnDestructive,
   btnPrimaryLg,
@@ -135,8 +135,8 @@ export default function SuperCompanyUsersPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!isStrongPassword(password.trim())) {
-      setError(t("super.addPassword"));
+    if (!isStrongPassword(password)) {
+      setError(t("account.errMinLength"));
       return;
     }
     setLoading(true);
@@ -148,7 +148,13 @@ export default function SuperCompanyUsersPage() {
     const j = await r.json().catch(() => ({}));
     setLoading(false);
     if (!r.ok) {
-      setError(typeof j.error === "string" ? j.error : t("super.addUserFail"));
+      setError(
+        typeof j.message === "string"
+          ? j.message
+          : typeof j.error === "string"
+            ? j.error
+            : t("super.addUserFail")
+      );
       return;
     }
     setEmail("");
@@ -371,7 +377,6 @@ export default function SuperCompanyUsersPage() {
                 <input
                   type="password"
                   required
-                  minLength={MIN_PASSWORD_LENGTH}
                   autoComplete="new-password"
                   className={`${inputLg} mt-1.5`}
                   value={password}

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
 import { annotateEmployeesWithLoginAccess, EMPLOYEE_SEAT_ORDER } from "@/lib/seatAccess";
-import { isStrongPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import { normalizeShiftPresets } from "@/lib/shiftPresets";
 import { canAssignRole } from "@/lib/roleHierarchy";
@@ -112,13 +112,7 @@ export async function GET(req: Request) {
 const postSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase().trim()),
   name: z.string().min(1).max(120),
-  password: z
-    .string()
-    .min(MIN_PASSWORD_LENGTH)
-    .max(MAX_PASSWORD_LENGTH)
-    .refine(isStrongPassword, {
-      message: "비밀번호는 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.",
-    }),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
   departmentId: z.string().min(1).max(40).optional().nullable(),
   role: z.enum(COMPANY_ROLES).optional(),
 });
@@ -151,6 +145,12 @@ export async function POST(req: Request) {
   }
 
   const { email, name, password, departmentId } = parsed.data;
+  if (!isStrongPassword(password)) {
+    return NextResponse.json(
+      { error: "WEAK_PASSWORD", message: "비밀번호는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다." },
+      { status: 400 }
+    );
+  }
   // 새 직원 역할 — 미지정 시 EMPLOYEE. 호출자보다 *엄격히 낮은* 등급만 허용.
   const requestedRole = (parsed.data.role ?? "EMPLOYEE") as Role;
   if (

@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import { employeeScheduleSummary } from "@/lib/employeeWorkSchedule";
 import { normalizeWorkScheduleByDay } from "@/lib/companyWorkSchedule";
-import { isStrongPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import { isShiftCode } from "@/lib/employeeWorkSchedule";
 import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
@@ -36,14 +36,7 @@ const patchSchema = z.object({
   departmentId: z.string().min(1).max(40).nullable().optional(),
   name: z.string().trim().min(1).max(120).optional(),
   email: z.string().email().transform((e) => e.toLowerCase().trim()).optional(),
-  password: z
-    .string()
-    .min(MIN_PASSWORD_LENGTH)
-    .max(MAX_PASSWORD_LENGTH)
-    .refine(isStrongPassword, {
-      message: "비밀번호는 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.",
-    })
-    .optional(),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH).optional(),
   role: z.enum(COMPANY_ROLES).optional(),
   workScheduleType: z.enum(["COMPANY", "SHIFT", "CUSTOM", "FREE"]).optional(),
   shiftCode: z.enum(["A", "B", "C"]).nullable().optional(),
@@ -155,6 +148,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const wantsPasswordChange = parsed.data.password !== undefined;
+  if (wantsPasswordChange && !isStrongPassword(parsed.data.password!)) {
+    return NextResponse.json(
+      { error: "WEAK_PASSWORD", message: "비밀번호는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다." },
+      { status: 400 }
+    );
+  }
   if (parsed.data.workScheduleType === "FREE") {
     const company = await prisma.company.findUnique({
       where: { id: resolved.companyId },

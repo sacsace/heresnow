@@ -20,7 +20,7 @@ import {
 } from "@/components/auth/authStyles";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { useI18n } from "@/components/LanguageProvider";
-import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { isStrongPassword } from "@/lib/passwordPolicy";
 import type { BillingPeriod } from "@prisma/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -72,6 +72,10 @@ export default function SignupPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!isStrongPassword(adminPassword)) {
+      setError(t("account.errMinLength"));
+      return;
+    }
     setLoading(true);
     const r = await fetch("/api/public/register-company", {
       method: "POST",
@@ -89,8 +93,10 @@ export default function SignupPage() {
     setLoading(false);
     if (!r.ok) {
       setError(
-        typeof j.error === "string"
-          ? j.error
+        typeof j.message === "string"
+          ? j.message
+          : typeof j.error === "string"
+            ? j.error
           : j.error?.fieldErrors
             ? t("signup.errorInput")
             : t("signup.errorSignup")
@@ -169,7 +175,6 @@ export default function SignupPage() {
               value={adminPassword}
               onChange={(e) => setAdminPassword(e.target.value)}
               required
-              minLength={MIN_PASSWORD_LENGTH}
             />
             <p className={authHint}>{t("signup.adminIsCompanyAdmin")}</p>
           </div>

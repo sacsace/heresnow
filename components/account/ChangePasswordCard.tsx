@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
-import { MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
+import { isStrongPassword } from "@/lib/passwordPolicy";
 import {
   bannerSuccess,
   btnPrimary,
@@ -75,6 +75,9 @@ export function ChangePasswordCard() {
           case "SAME_AS_CURRENT":
             setError(t("account.errSameAsCurrent"));
             break;
+          case "WEAK_PASSWORD":
+            setError(t("account.errMinLength"));
+            break;
           case "INVALID_INPUT":
             setError(t("account.errMinLength"));
             break;
@@ -123,7 +126,6 @@ export function ChangePasswordCard() {
             id="new-password"
             type="password"
             autoComplete="new-password"
-            minLength={MIN_PASSWORD_LENGTH}
             className={`${input} mt-1.5`}
             value={next}
             onChange={(e) => setNext(e.target.value)}
@@ -140,7 +142,6 @@ export function ChangePasswordCard() {
             id="confirm-password"
             type="password"
             autoComplete="new-password"
-            minLength={MIN_PASSWORD_LENGTH}
             className={`${input} mt-1.5`}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}

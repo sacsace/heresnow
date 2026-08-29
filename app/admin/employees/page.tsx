@@ -20,7 +20,7 @@ import {
   type ShiftPresetsMap,
 } from "@/lib/shiftPresets";
 import { useI18n } from "@/components/LanguageProvider";
-import { MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
+import { isStrongPassword } from "@/lib/passwordPolicy";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   bannerWarning,
@@ -230,12 +230,12 @@ export default function AdminEmployeesPage() {
     e.preventDefault();
     setError(null);
     setAddSuccess(null);
-    if (!isStrongPassword(password.trim())) {
-      setError(t("admin.employeesPasswordHint"));
-      return;
-    }
     if (!departmentId) {
       setError(t("admin.employeesDepartmentRequired"));
+      return;
+    }
+    if (!isStrongPassword(password)) {
+      setError(t("admin.employeesPasswordHint"));
       return;
     }
     const r = await fetch("/api/admin/employees", {
@@ -251,7 +251,13 @@ export default function AdminEmployeesPage() {
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
-      setError(typeof j.error === "string" ? j.error : t("admin.employeesAddFail"));
+      setError(
+        typeof j.message === "string"
+          ? j.message
+          : typeof j.error === "string"
+            ? j.error
+            : t("admin.employeesAddFail")
+      );
       return;
     }
     setEmail("");
@@ -732,7 +738,6 @@ export default function AdminEmployeesPage() {
                 <input
                   required
                   type="password"
-                  minLength={MIN_PASSWORD_LENGTH}
                   className={`${input} mt-1.5`}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

@@ -62,27 +62,39 @@ export function AdminDayAttendanceMap({ date, from, to, companyId, className }: 
       setLoading(false);
       return;
     }
-    const r = await fetch(`/api/admin/dashboard/day-map?${queryString}`);
-    const j = await r.json().catch(() => ({}));
-    setLoading(false);
-    if (!r.ok) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const r = await fetch(`/api/admin/dashboard/day-map?${queryString}`, {
+        signal: controller.signal,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setMarkers([]);
+        setTimezone(null);
+        const err = j.error;
+        const msg = j.message;
+        setError(
+          typeof msg === "string"
+            ? msg
+            : typeof err === "string"
+              ? err
+              : typeof err === "object" && err !== null && "message" in err
+                ? String((err as { message: unknown }).message)
+                : t("admin.monthlyMapLoadFail")
+        );
+        return;
+      }
+      setMarkers((j as { markers?: DayMapMarker[] }).markers ?? []);
+      setTimezone((j as { timezone?: string }).timezone ?? null);
+    } catch {
       setMarkers([]);
       setTimezone(null);
-      const err = j.error;
-      const msg = j.message;
-      setError(
-        typeof msg === "string"
-          ? msg
-          : typeof err === "string"
-            ? err
-            : typeof err === "object" && err !== null && "message" in err
-              ? String((err as { message: unknown }).message)
-              : t("admin.monthlyMapLoadFail")
-      );
-      return;
+      setError(t("admin.monthlyMapLoadFail"));
+    } finally {
+      window.clearTimeout(timeoutId);
+      setLoading(false);
     }
-    setMarkers((j as { markers?: DayMapMarker[] }).markers ?? []);
-    setTimezone((j as { timezone?: string }).timezone ?? null);
   }, [queryString, t]);
 
   useEffect(() => {

@@ -1,18 +1,15 @@
 import type { NextConfig } from "next";
 
 function buildContentSecurityPolicy(): string {
-  const allowUnsafeInline = process.env.CSP_ALLOW_UNSAFE_INLINE === "true";
+  const isProd = process.env.NODE_ENV === "production";
   const scriptSrc = [
     "'self'",
+    "'unsafe-inline'",
+    ...(!isProd ? ["'unsafe-eval'"] : []),
     "https://maps.googleapis.com",
     "https://www.googletagmanager.com",
-    ...(allowUnsafeInline ? ["'unsafe-inline'"] : []),
   ].join(" ");
-  const styleSrc = [
-    "'self'",
-    "https://fonts.googleapis.com",
-    ...(allowUnsafeInline ? ["'unsafe-inline'"] : []),
-  ].join(" ");
+
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -20,7 +17,7 @@ function buildContentSecurityPolicy(): string {
     "frame-ancestors 'self'",
     "object-src 'none'",
     `script-src ${scriptSrc}`,
-    `style-src ${styleSrc}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     "connect-src 'self' https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://vitals.vercel-insights.com",

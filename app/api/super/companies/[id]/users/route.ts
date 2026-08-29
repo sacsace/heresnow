@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
-import { isStrongPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -11,13 +11,7 @@ import { z } from "zod";
 const postSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase().trim()),
   name: z.string().min(1).max(120),
-  password: z
-    .string()
-    .min(MIN_PASSWORD_LENGTH)
-    .max(MAX_PASSWORD_LENGTH)
-    .refine(isStrongPassword, {
-      message: "Password must include uppercase, lowercase, number, and special character.",
-    }),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
   role: z.enum(["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE", "DOOR"]),
 });
 
@@ -69,6 +63,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const { email, name, password, role } = parsed.data;
+  if (!isStrongPassword(password)) {
+    return NextResponse.json(
+      { error: "WEAK_PASSWORD", message: "비밀번호는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다." },
+      { status: 400 }
+    );
+  }
 
   const company = await prisma.company.findUnique({ where: { id: companyId } });
   if (!company) {
