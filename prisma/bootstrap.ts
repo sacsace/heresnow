@@ -54,8 +54,8 @@ async function main() {
 
   if (!existing) {
     if (!isStrongPassword(password)) {
-      throw new Error(
-        "SEED_SUPER_ADMIN_PASSWORD 는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다."
+      console.warn(
+        "[bootstrap] 경고: SEED_SUPER_ADMIN_PASSWORD 가 강한 비밀번호 정책(8자+, 영문 대/소문자/숫자/특수문자)을 충족하지 않습니다. 기존 운영 호환을 위해 생성은 진행합니다."
       );
     }
     const passwordHash = await bcrypt.hash(password, 10);
@@ -83,11 +83,12 @@ async function main() {
   }
   if (rotate) {
     if (!isStrongPassword(password)) {
-      throw new Error(
-        "SEED_SUPER_ADMIN_PASSWORD 는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다."
+      console.warn(
+        "[bootstrap] 경고: SEED_SUPER_ADMIN_ROTATE_PASSWORD=1 이지만 비밀번호가 강한 정책을 충족하지 않아 비밀번호 갱신을 건너뜁니다."
       );
+    } else {
+      updates.passwordHash = await bcrypt.hash(password, 10);
     }
-    updates.passwordHash = await bcrypt.hash(password, 10);
   }
   if (!existing.consentGivenAt) {
     updates.consentGivenAt = new Date();
