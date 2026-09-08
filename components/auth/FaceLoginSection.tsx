@@ -24,9 +24,25 @@ export function FaceLoginSection({
   const { t } = useI18n();
   const signInStartedRef = useRef(false);
   const retryBlockedUntilRef = useRef(0);
+  const LOGIN_TIMEOUT_MS = 12_000;
   const [companyName, setCompanyName] = useState("");
   const trimmedCompany = companyName.trim();
   const faceReady = trimmedCompany.length > 0;
+
+  function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error("REQUEST_TIMEOUT")), timeoutMs);
+      promise
+        .then((value) => {
+          window.clearTimeout(timer);
+          resolve(value);
+        })
+        .catch((error: unknown) => {
+          window.clearTimeout(timer);
+          reject(error);
+        });
+    });
+  }
 
   const handleVerified = useCallback(
     async (descriptor: number[]) => {
@@ -36,14 +52,17 @@ export function FaceLoginSection({
       signInStartedRef.current = true;
 
       try {
-        const matchRes = await fetch("/api/public/face-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            descriptor,
-            companyName: trimmedCompany,
+        const matchRes = await withTimeout(
+          fetch("/api/public/face-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              descriptor,
+              companyName: trimmedCompany,
+            }),
           }),
-        });
+          LOGIN_TIMEOUT_MS
+        );
         const matchBody = (await matchRes.json().catch(() => ({}))) as {
           loginToken?: string;
           error?: string;
@@ -76,11 +95,14 @@ export function FaceLoginSection({
 
         onError(null);
         onLoadingChange(true);
-        const res = await signIn("face-login", {
-          loginToken,
-          redirect: false,
-          callbackUrl,
-        });
+        const res = await withTimeout(
+          signIn("face-login", {
+            loginToken,
+            redirect: false,
+            callbackUrl,
+          }),
+          LOGIN_TIMEOUT_MS
+        );
         if (res?.error) {
           signInStartedRef.current = false;
           onError(t("login.errorFaceCredentials"));
@@ -88,6 +110,14 @@ export function FaceLoginSection({
         }
         window.location.href = callbackUrl;
         return true;
+      } catch (err) {
+        signInStartedRef.current = false;
+        if (err instanceof Error && err.message === "REQUEST_TIMEOUT") {
+          onError(t("login.errorFaceCredentials"));
+          return false;
+        }
+        onError(t("login.errorFaceCredentials"));
+        return false;
       } finally {
         onLoadingChange(false);
       }

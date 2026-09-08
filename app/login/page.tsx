@@ -42,11 +42,13 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [dbHint, setDbHint] = useState<string | null>(null);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const enrollDecisionRef = useRef<((ok: boolean) => void) | null>(null);
-  const autoPasskeyAttemptedRef = useRef(false);
+  const passkeyInFlightRef = useRef(false);
+  const LOGIN_TIMEOUT_MS = 12_000;
   const isMobileOrTablet = useMemo(() => {
     if (typeof window === "undefined") return false;
     const ua = window.navigator.userAgent.toLowerCase();
@@ -140,25 +142,44 @@ function LoginForm() {
     }
   }
 
+  function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error("REQUEST_TIMEOUT")), timeoutMs);
+      promise
+        .then((value) => {
+          window.clearTimeout(timer);
+          resolve(value);
+        })
+        .catch((error: unknown) => {
+          window.clearTimeout(timer);
+          reject(error);
+        });
+    });
+  }
+
   const onPasskeyLogin = useCallback(async (options?: { silent?: boolean; autofill?: boolean }) => {
     const silent = options?.silent === true;
     const autofill = options?.autofill === true;
     if (!silent) setError(null);
-    if (loading) return;
+    if (formLoading || passkeyInFlightRef.current) return;
     if (!passkeySupported) {
       if (!silent) setError(t("login.passkeyNoSupport"));
       return;
     }
     const normalizedEmail = email.trim().toLowerCase();
 
-    setLoading(true);
+    passkeyInFlightRef.current = true;
+    if (!silent) setPasskeyLoading(true);
     try {
       const body = normalizedEmail ? { email: normalizedEmail } : {};
-      const optionsRes = await fetch("/api/public/passkey-login/options", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const optionsRes = await withTimeout(
+        fetch("/api/public/passkey-login/options", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        LOGIN_TIMEOUT_MS
+      );
       const optionsJson = (await optionsRes.json().catch(() => ({}))) as {
         error?: string;
       } & Record<string, unknown>;
@@ -177,11 +198,14 @@ function LoginForm() {
         optionsJson as unknown as Parameters<typeof startAuthentication>[0],
         autofill
       );
-      const verifyRes = await fetch("/api/public/passkey-login/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ response: authenticationResponse }),
-      });
+      const verifyRes = await withTimeout(
+        fetch("/api/public/passkey-login/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ response: authenticationResponse }),
+        }),
+        LOGIN_TIMEOUT_MS
+      );
       const verifyJson = (await verifyRes.json().catch(() => ({}))) as {
         loginToken?: string;
       };
@@ -190,11 +214,14 @@ function LoginForm() {
         return;
       }
 
-      const signInRes = await signIn("passkey-login", {
-        loginToken: verifyJson.loginToken,
-        redirect: false,
-        callbackUrl,
-      });
+      const signInRes = await withTimeout(
+        signIn("passkey-login", {
+          loginToken: verifyJson.loginToken,
+          redirect: false,
+          callbackUrl,
+        }),
+        LOGIN_TIMEOUT_MS
+      );
       if (signInRes?.error) {
         if (!silent) setError(t("login.errorCredentials"));
         return;
@@ -204,24 +231,19 @@ function LoginForm() {
       const errorName =
         err && typeof err === "object" && "name" in err ? String((err as { name?: unknown }).name) : "";
       const cancelled = errorName === "NotAllowedError" || errorName === "AbortError";
-      if (!silent || !cancelled) {
+      const timeouted = err instanceof Error && err.message === "REQUEST_TIMEOUT";
+      if (!silent && !cancelled) {
+        if (timeouted) {
+          setError(t("login.errorCredentials"));
+          return;
+        }
         setError(t("login.passkeyFailed"));
       }
     } finally {
-      setLoading(false);
+      passkeyInFlightRef.current = false;
+      if (!silent) setPasskeyLoading(false);
     }
-  }, [callbackUrl, email, loading, passkeySupported, t]);
-
-  useEffect(() => {
-    if (mode !== "password") return;
-    if (!isMobileOrTablet || !passkeySupported) return;
-    if (autoPasskeyAttemptedRef.current) return;
-    autoPasskeyAttemptedRef.current = true;
-    const timer = window.setTimeout(() => {
-      void onPasskeyLogin({ silent: true, autofill: true });
-    }, 220);
-    return () => window.clearTimeout(timer);
-  }, [mode, isMobileOrTablet, passkeySupported, onPasskeyLogin]);
+  }, [callbackUrl, email, formLoading, passkeySupported, t]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -230,15 +252,25 @@ function LoginForm() {
       setError(t("login.errorPasswordMinLength"));
       return;
     }
-    setLoading(true);
+    setFormLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
-    const res = await signIn("credentials", {
-      email: normalizedEmail,
-      password,
-      redirect: false,
-      callbackUrl,
-    });
-    setLoading(false);
+    let res: Awaited<ReturnType<typeof signIn>> | undefined;
+    try {
+      res = await withTimeout(
+        signIn("credentials", {
+          email: normalizedEmail,
+          password,
+          redirect: false,
+          callbackUrl,
+        }),
+        LOGIN_TIMEOUT_MS
+      );
+    } catch {
+      setFormLoading(false);
+      setError(t("login.errorCredentials"));
+      return;
+    }
+    setFormLoading(false);
     if (res?.error) {
       setError(t("login.errorCredentials"));
       return;
@@ -348,18 +380,18 @@ function LoginForm() {
               </p>
             </div>
             {error && <p className={authError}>{error}</p>}
-            <button type="submit" disabled={loading} className={authButtonPrimary}>
-              {loading ? t("login.submitting") : t("login.submit")}
+            <button type="submit" disabled={formLoading} className={authButtonPrimary}>
+              {formLoading ? t("login.submitting") : t("login.submit")}
             </button>
             {isMobileOrTablet ? (
               <>
                 <button
                   type="button"
-                  disabled={loading || !passkeySupported}
+                  disabled={formLoading || passkeyLoading || !passkeySupported}
                   className="w-full rounded-[0.625rem] border border-[var(--separator)] bg-[var(--fill-secondary)] py-2 text-[0.875rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] disabled:opacity-50 sm:text-[0.9375rem]"
                   onClick={() => void onPasskeyLogin()}
                 >
-                  {loading ? t("login.passkeyChecking") : t("login.passkeySubmit")}
+                  {passkeyLoading ? t("login.passkeyChecking") : t("login.passkeySubmit")}
                 </button>
                 {!passkeySupported ? (
                   <p className="text-center text-[0.75rem] text-[var(--apple-label-secondary)]">
@@ -373,9 +405,9 @@ function LoginForm() {
           <div className={authFormLogin}>
             <FaceLoginSection
               callbackUrl={callbackUrl}
-              disabled={loading}
+              disabled={formLoading}
               error={error}
-              onLoadingChange={setLoading}
+              onLoadingChange={setFormLoading}
               onError={setError}
             />
           </div>
