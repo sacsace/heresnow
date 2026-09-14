@@ -83,16 +83,17 @@ export function pickFaceLoginMatch(
   return { employeeId: best.employeeId };
 }
 
-/** 로그인 1:N — companyId가 있으면 해당 회사, null이면 전체 검색 */
+/** 로그인 1:N — 해당 회사 직원만 검색 */
 export async function matchFaceLoginUser(
   probe: number[],
-  companyId: string | null
+  companyId: string
 ): Promise<{ user: FaceLoginUser } | FaceLoginPickFailure> {
   const employees = await prisma.employee.findMany({
     where: {
+      companyId,
       faceEnrolledAt: { not: null },
-      ...(companyId ? { companyId } : {}),
       company: { faceRecognitionEnabled: true },
+      user: { role: { notIn: ["DOOR", "SUPER_ADMIN"] } },
     },
     select: {
       id: true,

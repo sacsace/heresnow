@@ -15,7 +15,7 @@ const FACE_LOGIN_WINDOW_MS = 60_000;
 
 const bodySchema = z.object({
   descriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH),
-  companyName: z.string().optional(),
+  companyName: z.string().min(1),
 });
 
 export async function POST(req: Request) {
@@ -51,7 +51,12 @@ export async function POST(req: Request) {
 
   const company = await resolveFaceLoginCompanyId(parsed.data.companyName);
   if (!company.ok) {
-    const status = company.reason === "ambiguous" ? 409 : 404;
+    const status =
+      company.reason === "missing_name"
+        ? 400
+        : company.reason === "ambiguous"
+          ? 409
+          : 404;
     return NextResponse.json({ error: company.reason }, { status });
   }
 
@@ -64,17 +69,15 @@ export async function POST(req: Request) {
           : result.reason === "no_enrolled"
             ? 404
             : 401;
-      return NextResponse.json(
-        {
-          error: result.reason,
-          bestDistance: result.bestDistance,
-          secondDistance: result.secondDistance,
-        },
-        { status }
-      );
+      const body: Record<string, unknown> = { error: result.reason };
+      if (process.env.NODE_ENV === "development") {
+        body.bestDistance = result.bestDistance;
+        body.secondDistance = result.secondDistance;
+      }
+      return NextResponse.json(body, { status });
     }
 
-    const loginToken = createFaceLoginToken(result.user.id);
+    const loginToken = await createFaceLoginToken(result.user.id);
     return NextResponse.json({ loginToken });
   } catch (e) {
     if (process.env.NODE_ENV === "development") {

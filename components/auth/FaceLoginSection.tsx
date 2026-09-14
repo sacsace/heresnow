@@ -28,6 +28,7 @@ export function FaceLoginSection({
   const FAILED_RETRY_COOLDOWN_MS = 5_000;
   const [companyName, setCompanyName] = useState("");
   const trimmedCompany = companyName.trim();
+  const faceReady = trimmedCompany.length > 0;
 
   function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
     return new Promise<T>((resolve, reject) => {
@@ -46,7 +47,7 @@ export function FaceLoginSection({
 
   const handleVerified = useCallback(
     async (descriptor: number[]) => {
-      if (signInStartedRef.current || disabled) return false;
+      if (signInStartedRef.current || disabled || !trimmedCompany) return false;
       if (Date.now() < retryBlockedUntilRef.current) return false;
 
       signInStartedRef.current = true;
@@ -58,7 +59,7 @@ export function FaceLoginSection({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               descriptor,
-              ...(trimmedCompany ? { companyName: trimmedCompany } : {}),
+              companyName: trimmedCompany,
             }),
           }),
           LOGIN_TIMEOUT_MS
@@ -75,6 +76,9 @@ export function FaceLoginSection({
             retryBlockedUntilRef.current =
               Date.now() + Math.max(matchBody.retryAfterMs ?? 0, 15_000);
             onError(t("login.errorFaceRateLimit"));
+          } else if (matchBody.error === "missing_name") {
+            retryBlockedUntilRef.current = Date.now() + FAILED_RETRY_COOLDOWN_MS;
+            onError(t("login.faceCompanyRequired"));
           } else if (matchBody.error === "not_found") {
             retryBlockedUntilRef.current = Date.now() + FAILED_RETRY_COOLDOWN_MS;
             onError(t("login.errorFaceCompanyNotFound"));
@@ -133,12 +137,7 @@ export function FaceLoginSection({
   return (
     <>
       <div className={authFieldGroup}>
-        <label className={authLabel}>
-          {t("login.faceCompanyName")}{" "}
-          <span className="font-normal text-[var(--apple-label-tertiary)]">
-            ({t("login.faceCompanyOptional")})
-          </span>
-        </label>
+        <label className={authLabel}>{t("login.faceCompanyName")}</label>
         <input
           type="text"
           autoComplete="organization"
@@ -154,21 +153,25 @@ export function FaceLoginSection({
         <p className={authHint}>{t("login.faceCompanyHint")}</p>
       </div>
       {error && <p className={authError}>{error}</p>}
-      <FaceCapture
-        key={trimmedCompany.toLowerCase() || "all"}
-        mode="verify"
-        autoVerify
-        verifyOnClientOnly
-        scanWhenFaceVisible
-        blockRetryUntilFaceAbsent={false}
-        profileKind="login"
-        disabled={disabled}
-        verifyTitle={t("login.faceVerifyTitle")}
-        verifyLead={t("login.faceVerifyLead")}
-        verifyRetryLabel={t("login.faceVerifyRetry")}
-        onVerified={handleVerified}
-        onError={(message) => onError(message)}
-      />
+      {faceReady ? (
+        <FaceCapture
+          key={trimmedCompany.toLowerCase()}
+          mode="verify"
+          autoVerify
+          verifyOnClientOnly
+          scanWhenFaceVisible
+          blockRetryUntilFaceAbsent={false}
+          profileKind="login"
+          disabled={disabled}
+          verifyTitle={t("login.faceVerifyTitle")}
+          verifyLead={t("login.faceVerifyLead")}
+          verifyRetryLabel={t("login.faceVerifyRetry")}
+          onVerified={handleVerified}
+          onError={(message) => onError(message)}
+        />
+      ) : (
+        <p className={authHint}>{t("login.faceEnterCompanyToStart")}</p>
+      )}
     </>
   );
 }

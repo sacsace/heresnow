@@ -289,6 +289,20 @@ model User {
   assignedWorkRequests    WorkRequest[]    @relation("WorkRequestAssignedApprover")
   passkeys      UserPasskeyCredential[]
   pushSubscriptions PushSubscription[]
+  faceLoginTokens FaceLoginToken[]
+}
+
+/// 안면 로그인 1회용 토큰 (jti)
+model FaceLoginToken {
+  jti       String    @id
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model UserPasskeyCredential {

@@ -1,5 +1,5 @@
 import type { Role } from "@prisma/client";
-import { verifyFaceLoginToken } from "@/lib/faceLoginToken";
+import { consumeFaceLoginToken } from "@/lib/faceLoginToken";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 
@@ -11,7 +11,7 @@ export async function authorizeFaceLogin(
 
   let userId: string | null;
   try {
-    userId = verifyFaceLoginToken(token);
+    userId = await consumeFaceLoginToken(token);
   } catch {
     return null;
   }

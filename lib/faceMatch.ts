@@ -1,8 +1,8 @@
 /** face-api.js 유클리드 거리 기준 (낮을수록 동일인) — 1:1 출퇴근 검증 */
 export const FACE_MATCH_THRESHOLD = 0.48;
 
-/** 로그인 1:N — 웹캠·조명 차이 허용 (출근 1:1보다 여유) */
-export const FACE_MATCH_THRESHOLD_LOGIN = 0.62;
+/** 로그인 1:N — 회사 범위 1:N + minGap (출근보다 약간 여유) */
+export const FACE_MATCH_THRESHOLD_LOGIN = 0.55;
 
 /** 로그인 — 매우 확실할 때 모호성 검사 생략 */
 export const FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT = 0.42;
@@ -45,7 +45,7 @@ export function isFaceMatch(stored: number[], probe: number[], threshold = FACE_
 export const FACE_IDENTIFY_MIN_GAP = 0.08;
 
 /** 로그인 1:N — 2명 이상 근접 매칭 시 최소 격차 */
-export const FACE_IDENTIFY_MIN_GAP_LOGIN = 0.02;
+export const FACE_IDENTIFY_MIN_GAP_LOGIN = 0.05;
 
 export const FACE_IDENTIFY_MIN_GAP_DOOR = 0.12;
 

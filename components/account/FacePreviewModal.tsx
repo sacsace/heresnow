@@ -90,6 +90,9 @@ export function FacePreviewModal({ open, onClose, hasPreview }: Props) {
         case "NOT_ENROLLED":
           setError(t("account.faceStatusNotEnrolled"));
           break;
+        case "RATE_LIMITED":
+          setError(t("account.facePreviewRateLimited"));
+          break;
         default:
           setError(t("account.facePreviewLoadFail"));
       }

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
 import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
+import { findConflictingFaceEmployee } from "@/lib/faceEnrollGuard";
 import { isValidFacePreviewUrl } from "@/lib/facePreviewValidation";
 import { FACE_DESCRIPTOR_LENGTH, isFaceMatch, parseFaceDescriptor } from "@/lib/faceMatch";
 import { prisma } from "@/lib/prisma";
@@ -89,12 +90,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "유효한 얼굴 미리보기가 필요합니다." }, { status: 400 });
   }
 
+  const conflict = await findConflictingFaceEmployee(
+    session.user.companyId,
+    session.user.employeeId,
+    descriptor
+  );
+  if (conflict) {
+    return NextResponse.json(
+      { error: "다른 직원에게 이미 등록된 얼굴과 유사합니다. 본인 얼굴로 다시 등록해 주세요." },
+      { status: 409 }
+    );
+  }
+
   await prisma.employee.update({
     where: { id: session.user.employeeId },
     data: {
       faceDescriptor: descriptor,
       faceEnrolledAt: new Date(),
-      facePreviewUrl: previewUrl ?? null,
+      ...(previewUrl != null ? { facePreviewUrl: previewUrl } : {}),
     },
   });
 
@@ -104,6 +117,8 @@ export async function POST(req: Request) {
 /** 출근 시 본인 확인 (descriptor만 검증, 저장하지 않음) */
 export async function PUT(req: Request) {
   const session = await auth();
+  const seatDenied = await seatLoginForbiddenResponse(session);
+  if (seatDenied) return seatDenied;
   if (!session?.user?.employeeId || !session.user.companyId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

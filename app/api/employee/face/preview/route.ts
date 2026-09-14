@@ -2,11 +2,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { getClientIp } from "@/lib/clientIp";
 import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import { prisma } from "@/lib/prisma";
+import { consumeRateLimit } from "@/lib/slidingWindowRateLimit";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+
+const PREVIEW_MAX_ATTEMPTS = 10;
+const PREVIEW_WINDOW_MS = 15 * 60_000;
 
 const bodySchema = z.object({
   password: z.string().min(1).max(200),
@@ -18,6 +23,19 @@ export async function POST(req: Request) {
   if (seatDenied) return seatDenied;
   if (!session?.user?.employeeId || !session.user.companyId || !session.user.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const ip = getClientIp(req);
+  const rate = consumeRateLimit(
+    `face-preview:${session.user.id}:${ip}`,
+    PREVIEW_MAX_ATTEMPTS,
+    PREVIEW_WINDOW_MS
+  );
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "RATE_LIMITED", retryAfterMs: rate.retryAfterMs },
+      { status: 429 }
+    );
   }
 
   let json: unknown;
