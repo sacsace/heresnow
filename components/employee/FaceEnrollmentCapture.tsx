@@ -452,7 +452,7 @@ export function FaceEnrollmentCapture({
           type="button"
           className="mt-3 flex min-h-[2.75rem] w-full items-center justify-center rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] text-sm font-semibold text-[var(--foreground)]"
           onClick={onCancel}
-          disabled={disabled || phase === "saving"}
+          disabled={disabled}
         >
           {t("account.faceCancelReEnroll")}
         </button>
