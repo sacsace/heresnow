@@ -72,11 +72,12 @@ export async function syncEmployeeFaceFields(employeeId: string): Promise<void> 
 
   const latest = creds[creds.length - 1]!;
   const preview = [...creds].reverse().find((c) => c.previewUrl)?.previewUrl ?? null;
+  const descriptor = parseFaceDescriptor(latest.descriptor);
 
   await prisma.employee.update({
     where: { id: employeeId },
     data: {
-      faceDescriptor: latest.descriptor,
+      faceDescriptor: descriptor ?? Prisma.DbNull,
       faceEnrolledAt: creds[0]!.createdAt,
       facePreviewUrl: preview,
     },
