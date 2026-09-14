@@ -27,15 +27,34 @@ export async function GET() {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const count = await prisma.pushSubscription.count({
-    where: { userId: session.user.id },
-  });
+  const configured = isWebPushConfigured();
+  let count = 0;
+  let dbReady = true;
+  try {
+    count = await prisma.pushSubscription.count({
+      where: { userId: session.user.id },
+    });
+  } catch {
+    dbReady = false;
+    return NextResponse.json(
+      {
+        error: "DB_NOT_READY",
+        configured,
+        vapidPublicKey: getVapidPublicKey(),
+        subscribed: false,
+        subscriptionCount: 0,
+        dbReady: false,
+      },
+      { status: 503 }
+    );
+  }
 
   return NextResponse.json({
-    configured: isWebPushConfigured(),
+    configured,
     vapidPublicKey: getVapidPublicKey(),
     subscribed: count > 0,
     subscriptionCount: count,
+    dbReady,
   });
 }
 

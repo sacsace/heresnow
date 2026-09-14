@@ -95,8 +95,11 @@ export const ko = {
     passkeyDeleteFail: "지문/기기 로그인 삭제에 실패했습니다.",
     passkeyDeleted: "지문/기기 로그인이 삭제되었습니다.",
     pushTitle: "출근 알림",
+    pushToggleLabel: "출근 알림",
+    pushToggleHint: "토글을 켜면 이 기기로 정규 출근 15분 전·후 알림을 받습니다.",
     pushLead:
       "정규 출근 15분 전·15분 후에 이 기기로 알림을 보냅니다. 홈 화면에 추가(PWA)한 휴대폰·브라우저에서 사용하세요.",
+    pushDbNotReady: "서버 DB 마이그레이션이 필요합니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.",
     pushLoading: "알림 설정 불러오는 중…",
     pushNotSupported: "현재 기기/브라우저는 푸시 알림을 지원하지 않습니다.",
     pushNotConfigured: "서버에 푸시 알림이 아직 설정되지 않았습니다. 관리자에게 문의해 주세요.",
@@ -1299,8 +1302,11 @@ export const en = {
     passkeyDeleteFail: "Could not delete biometric sign-in.",
     passkeyDeleted: "Biometric sign-in deleted.",
     pushTitle: "Check-in reminders",
+    pushToggleLabel: "Check-in reminders",
+    pushToggleHint: "When on, this device receives alerts 15 minutes before and after your scheduled check-in.",
     pushLead:
       "Get notified 15 minutes before and after your scheduled check-in time. Works best on phones with the app added to the home screen (PWA).",
+    pushDbNotReady: "A server database migration is pending. Try again later or contact your administrator.",
     pushLoading: "Loading notification settings…",
     pushNotSupported: "This device/browser does not support push notifications.",
     pushNotConfigured: "Push notifications are not configured on the server yet. Contact your administrator.",
