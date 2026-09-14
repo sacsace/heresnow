@@ -87,6 +87,7 @@ export async function GET(req: Request) {
           include: {
             attendance: {
               select: {
+                employeeId: true,
                 type: true,
                 timestamp: true,
                 isEarlyLeave: true,
@@ -99,6 +100,50 @@ export async function GET(req: Request) {
         })
       : Promise.resolve([]),
   ]);
+
+  const checkInByCheckout = new Map<string, string>();
+  if (exceptions.length > 0) {
+    const checkoutTimes = exceptions.map((ex) => ex.attendance.timestamp.getTime());
+    const employeeIds = [...new Set(exceptions.map((ex) => ex.attendance.employeeId))];
+    const windowStart = new Date(Math.min(...checkoutTimes) - 48 * 60 * 60 * 1000);
+    const checkIns = await prisma.attendanceRecord.findMany({
+      where: {
+        companyId,
+        employeeId: { in: employeeIds },
+        type: "CHECK_IN",
+        timestamp: { gte: windowStart },
+      },
+      orderBy: { timestamp: "asc" },
+      select: { id: true, employeeId: true, timestamp: true },
+    });
+
+    const checkInsByEmployee = new Map<string, typeof checkIns>();
+    for (const row of checkIns) {
+      const list = checkInsByEmployee.get(row.employeeId) ?? [];
+      list.push(row);
+      checkInsByEmployee.set(row.employeeId, list);
+    }
+
+    for (const ex of exceptions) {
+      const checkoutAt = ex.attendance.timestamp;
+      const list = checkInsByEmployee.get(ex.attendance.employeeId) ?? [];
+      let matched: (typeof checkIns)[number] | null = null;
+      for (let i = list.length - 1; i >= 0; i -= 1) {
+        if (list[i].timestamp < checkoutAt) {
+          matched = list[i];
+          break;
+        }
+      }
+      if (matched) {
+        checkInByCheckout.set(ex.attendanceId, matched.timestamp.toISOString());
+      }
+    }
+  }
+
+  const exceptionsWithCheckIn = exceptions.map((ex) => ({
+    ...ex,
+    checkInAt: checkInByCheckout.get(ex.attendanceId) ?? null,
+  }));
 
   const requestsWithAcl = requests.map((item) => ({
     ...item,
@@ -113,5 +158,5 @@ export async function GET(req: Request) {
       }),
   }));
 
-  return NextResponse.json({ requests: requestsWithAcl, exceptions });
+  return NextResponse.json({ requests: requestsWithAcl, exceptions: exceptionsWithCheckIn });
 }

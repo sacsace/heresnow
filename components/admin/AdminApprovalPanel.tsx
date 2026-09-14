@@ -47,6 +47,7 @@ type ExceptionRow = {
   status: string;
   createdAt: string;
   resolvedAt: string | null;
+  checkInAt?: string | null;
   attendance: {
     type: string;
     timestamp: string;
@@ -263,6 +264,8 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
           sourceLabel: t("approvals.receivedSourcePunch"),
           employeeName: x.attendance.employee.name,
           dateLabel: formatWhen(x.attendance.timestamp),
+          checkInLabel: x.checkInAt ? formatWhen(x.checkInAt) : undefined,
+          checkOutLabel: formatWhen(x.attendance.timestamp),
           detail: detail || undefined,
           reason: x.reason,
           status: x.status,

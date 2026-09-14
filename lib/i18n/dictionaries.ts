@@ -268,6 +268,8 @@ export const ko = {
     duplicateWorkDate: "같은 날짜·종류로 이미 신청한 내역이 있습니다.",
     detailExtra: "추가 정보",
     detailProcessed: "처리",
+    detailCheckIn: "출근 일시",
+    detailCheckOut: "퇴근 일시",
     filterTypeAll: "전체",
   },
   admin: {
@@ -1442,6 +1444,8 @@ export const en = {
     duplicateWorkDate: "You already have a request for this date and type.",
     detailExtra: "Details",
     detailProcessed: "Processed",
+    detailCheckIn: "Check-in",
+    detailCheckOut: "Check-out",
     filterTypeAll: "All",
   },
   admin: {

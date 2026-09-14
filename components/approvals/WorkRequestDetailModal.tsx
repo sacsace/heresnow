@@ -11,6 +11,8 @@ export type WorkRequestDetail = {
   sourceLabel?: string;
   employeeName?: string;
   dateLabel: string;
+  checkInLabel?: string;
+  checkOutLabel?: string;
   detail?: string;
   reason: string;
   status: string;
@@ -129,7 +131,18 @@ export function WorkRequestDetailModal({
           {detail.employeeName ? (
             <DetailField label={t("approvals.receivedColEmployee")}>{detail.employeeName}</DetailField>
           ) : null}
-          <DetailField label={t("approvals.receivedColDate")}>{detail.dateLabel}</DetailField>
+          {detail.checkInLabel ? (
+            <DetailField label={t("approvals.detailCheckIn")}>{detail.checkInLabel}</DetailField>
+          ) : null}
+          <DetailField
+            label={
+              detail.checkOutLabel
+                ? t("approvals.detailCheckOut")
+                : t("approvals.receivedColDate")
+            }
+          >
+            {detail.checkOutLabel ?? detail.dateLabel}
+          </DetailField>
           {detail.detail ? (
             <DetailField label={t("approvals.detailExtra")}>{detail.detail}</DetailField>
           ) : null}
