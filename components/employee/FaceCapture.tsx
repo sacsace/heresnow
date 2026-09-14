@@ -82,7 +82,7 @@ const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
 const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 3;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
-const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.22;
+const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.17;
 const ENROLL_ANGLE_COUNT = 3;
 const ENROLL_FRAMES_PER_ANGLE = 3;
 const ENROLL_MIN_QUALITY_PERCENT = 50;
@@ -712,7 +712,9 @@ export function FaceCapture({
           const requiredFrames =
             profileKindRef.current === "kiosk"
               ? HIGH_ACCURACY_FRAME_COUNT_KIOSK
-              : HIGH_ACCURACY_FRAME_COUNT;
+              : profileKindRef.current === "login"
+                ? 3
+                : HIGH_ACCURACY_FRAME_COUNT;
           if (qualityBufferRef.current.length < requiredFrames) {
             setStatus(tRef.current("employee.faceStabilizing"));
             return;

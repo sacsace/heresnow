@@ -2,6 +2,7 @@ import type { Role } from "@prisma/client";
 import {
   bestProbeDistance,
   FACE_IDENTIFY_MIN_GAP_LOGIN,
+  FACE_IDENTIFY_MIN_RATIO_LOGIN,
   FACE_MATCH_THRESHOLD_LOGIN,
   FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT,
   parseFaceDescriptor,
@@ -64,13 +65,16 @@ export function pickFaceLoginMatch(
     return { reason: "no_match", bestDistance: best.distance };
   }
 
-  if (scored.length > 1) {
-    const second = scored[1]!;
+  const closeMatches = scored.filter((s) => s.distance < FACE_MATCH_THRESHOLD_LOGIN);
+  if (closeMatches.length > 1) {
+    const second = closeMatches[1]!;
     const gap = second.distance - best.distance;
+    const ratio = gap / Math.max(best.distance, 0.01);
     const confident = best.distance <= FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT;
-    const clearWinner = gap >= FACE_IDENTIFY_MIN_GAP_LOGIN;
-    const ratioWinner = gap / Math.max(best.distance, 0.01) >= 0.1;
-    if (!confident && !clearWinner && !ratioWinner) {
+    const clearWinner = gap >= FACE_IDENTIFY_MIN_GAP_LOGIN && ratio >= FACE_IDENTIFY_MIN_RATIO_LOGIN;
+
+    // 여러 계정이 동시에 매칭되면 1·2위 격차가 충분할 때만 허용
+    if (!clearWinner && (!confident || gap < FACE_IDENTIFY_MIN_GAP_LOGIN * 0.75)) {
       return {
         reason: "ambiguous",
         bestDistance: best.distance,

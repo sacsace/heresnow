@@ -1,14 +1,17 @@
 /** face-api.js 유클리드 거리 기준 (낮을수록 동일인) — 1:1 출퇴근 검증 */
-export const FACE_MATCH_THRESHOLD = 0.48;
+export const FACE_MATCH_THRESHOLD = 0.45;
 
-/** 로그인 1:N — 회사 범위 1:N + minGap (출근보다 약간 여유) */
-export const FACE_MATCH_THRESHOLD_LOGIN = 0.55;
+/** 로그인 1:N — 오탐(타 계정 로그인) 방지를 위해 출근보다 엄격 */
+export const FACE_MATCH_THRESHOLD_LOGIN = 0.47;
 
-/** 로그인 — 매우 확실할 때 모호성 검사 생략 */
-export const FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT = 0.42;
+/** 로그인 — 이 거리 이하일 때만 2순위와 격차 검사 완화 */
+export const FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT = 0.36;
 
 /** 출입문 단말 — 고정 카메라·다중 프레임 평균과 함께 사용 */
-export const FACE_MATCH_THRESHOLD_DOOR = 0.45;
+export const FACE_MATCH_THRESHOLD_DOOR = 0.42;
+
+/** 다른 직원 계정에 동일 얼굴 등록 차단 */
+export const FACE_ENROLL_CONFLICT_MAX_DISTANCE = 0.42;
 
 export const FACE_DESCRIPTOR_LENGTH = 128;
 
@@ -125,7 +128,10 @@ export function identifySingleFaceMatchMulti<T extends MultiFaceDescriptorCandid
 export const FACE_IDENTIFY_MIN_GAP = 0.08;
 
 /** 로그인 1:N — 2명 이상 근접 매칭 시 최소 격차 */
-export const FACE_IDENTIFY_MIN_GAP_LOGIN = 0.05;
+export const FACE_IDENTIFY_MIN_GAP_LOGIN = 0.1;
+
+/** 로그인 1:N — 1·2위 상대 격차 (best 대비) */
+export const FACE_IDENTIFY_MIN_RATIO_LOGIN = 0.18;
 
 export const FACE_IDENTIFY_MIN_GAP_DOOR = 0.12;
 

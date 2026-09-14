@@ -159,6 +159,7 @@ export function FaceLoginSection({
           mode="verify"
           autoVerify
           verifyOnClientOnly
+          highAccuracyScan
           scanWhenFaceVisible
           blockRetryUntilFaceAbsent={false}
           profileKind="login"
