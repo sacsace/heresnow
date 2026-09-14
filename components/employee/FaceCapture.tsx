@@ -18,7 +18,6 @@ import {
 } from "@/lib/faceMatch";
 import {
   descriptorToArray,
-  detectFaceInFrame,
   extractFaceDescriptor,
   extractFaceDetection,
   loadFaceModels,
