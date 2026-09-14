@@ -791,6 +791,8 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                 <FaceCapture
                   mode="verify"
                   autoVerify
+                  fastScan
+                  scanWhenFaceVisible
                   disabled={checkInFaceDisabled}
                   onVerified={(descriptor) => submitCheckIn(descriptor)}
                   onError={setMsg}

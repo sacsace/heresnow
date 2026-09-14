@@ -79,6 +79,7 @@ const AUTO_SCAN_INTERVAL_MS = 650;
 const AUTO_SCAN_INTERVAL_MS_FAST = 160;
 const AUTO_SCAN_INTERVAL_MS_IDLE = 500;
 const AUTO_SCAN_INITIAL_DELAY_MS = 120;
+const AUTO_SCAN_INITIAL_DELAY_MS_FAST = 50;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
 const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 3;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
@@ -374,6 +375,37 @@ export function FaceCapture({
     [scanWhenFaceVisible]
   );
 
+  const finishServerVerify = useCallback(
+    async (arr: number[]): Promise<boolean> => {
+      const r = await fetch("/api/employee/face", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ descriptor: arr }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg =
+          typeof j.error === "string" ? j.error : tRef.current("employee.faceVerifyFail");
+        setStatus(msg);
+        onErrorRef.current?.(msg);
+        if (scanWhenFaceVisible && blockRetryUntilFaceAbsentRef.current) {
+          verifyBlockedUntilNoFaceRef.current = true;
+        }
+        return false;
+      }
+      setStatus(tRef.current("employee.faceVerifyOk"));
+      const punchOk = await onVerifiedRef.current?.(arr);
+      if (punchOk === false) {
+        setStatus(tRef.current("employee.faceVerifyRetry"));
+        return false;
+      }
+      scanStoppedRef.current = true;
+      setAutoScanDone(true);
+      return true;
+    },
+    [scanWhenFaceVisible]
+  );
+
   const runCapture = useCallback(
     async (opts?: { silentNoFace?: boolean }) => {
       if (!videoRef.current || !ready || busyRef.current || disabled) return false;
@@ -441,28 +473,7 @@ export function FaceCapture({
           return finishClientVerify(arr);
         }
 
-        const r = await fetch("/api/employee/face", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ descriptor: arr }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          const msg =
-            typeof j.error === "string" ? j.error : tRef.current("employee.faceVerifyFail");
-          setStatus(msg);
-          onErrorRef.current?.(msg);
-          return false;
-        }
-        setStatus(tRef.current("employee.faceVerifyOk"));
-        const punchOk = await onVerifiedRef.current?.(arr);
-        if (punchOk === false) {
-          setStatus(tRef.current("employee.faceVerifyRetry"));
-          return false;
-        }
-        scanStoppedRef.current = true;
-        setAutoScanDone(true);
-        return true;
+        return finishServerVerify(arr);
       } catch {
         const msg = tRef.current("employee.faceProcessFail");
         setStatus(msg);
@@ -473,7 +484,7 @@ export function FaceCapture({
         setBusy(false);
       }
     },
-    [disabled, mode, ready, verifyOnClientOnly, finishClientVerify, multiAngleEnroll, submitEnrollment]
+    [disabled, mode, ready, verifyOnClientOnly, finishClientVerify, finishServerVerify, multiAngleEnroll, submitEnrollment]
   );
 
   useEffect(() => {
@@ -656,25 +667,17 @@ export function FaceCapture({
       if (!v) return;
 
       if (scanWhenFaceVisible) {
-        let extracted: Awaited<ReturnType<typeof extractFaceDetection>> | null = null;
         const kind = profileKindRef.current;
         const useHighAccuracy = highAccuracyScanRef.current && verifyOnClientOnly;
-        const singlePassExtract = useHighAccuracy || verifyOnClientOnly;
-        let faceVisible = false;
-        if (singlePassExtract) {
-          // 출입문 단말: 얼굴 존재 확인 + descriptor 추출을 1회 추론으로 처리
-          extracted = await extractFaceDetection(
-            v,
-            kind === "kiosk"
-              ? KIOSK_EXTRACT_OPTIONS
-              : kind === "login"
-                ? LOGIN_FACE_EXTRACT_OPTIONS
-                : undefined
-          );
-          faceVisible = !!extracted;
-        } else {
-          faceVisible = await detectFaceInFrame(v, { profileKind: kind });
-        }
+        const extracted = await extractFaceDetection(
+          v,
+          kind === "kiosk"
+            ? KIOSK_EXTRACT_OPTIONS
+            : kind === "login"
+              ? LOGIN_FACE_EXTRACT_OPTIONS
+              : undefined
+        );
+        const faceVisible = !!extracted;
         if (cancelled || scanStoppedRef.current) return;
 
         const wasInFrame = faceInFrameRef.current;
@@ -695,26 +698,12 @@ export function FaceCapture({
           return;
         }
 
-        if (verifyOnClientOnly && extracted) {
-          if (!useHighAccuracy) {
-            busyRef.current = true;
-            setBusy(true);
-            try {
-              await finishClientVerify(descriptorToArray(extracted.descriptor));
-            } finally {
-              busyRef.current = false;
-              setBusy(false);
-            }
-            return;
-          }
-
+        if (useHighAccuracy) {
           qualityBufferRef.current.push(descriptorToArray(extracted.descriptor));
           const requiredFrames =
             profileKindRef.current === "kiosk"
               ? HIGH_ACCURACY_FRAME_COUNT_KIOSK
-              : profileKindRef.current === "login"
-                ? 3
-                : HIGH_ACCURACY_FRAME_COUNT;
+              : HIGH_ACCURACY_FRAME_COUNT;
           if (qualityBufferRef.current.length < requiredFrames) {
             setStatus(tRef.current("employee.faceStabilizing"));
             return;
@@ -744,6 +733,21 @@ export function FaceCapture({
           }
           return;
         }
+
+        busyRef.current = true;
+        setBusy(true);
+        try {
+          const arr = descriptorToArray(extracted.descriptor);
+          if (verifyOnClientOnly) {
+            await finishClientVerify(arr);
+          } else {
+            await finishServerVerify(arr);
+          }
+        } finally {
+          busyRef.current = false;
+          setBusy(false);
+        }
+        return;
       }
 
       await runCapture({ silentNoFace: true });
@@ -773,6 +777,7 @@ export function FaceCapture({
       }
     }
 
+    const initialDelay = fastScan ? AUTO_SCAN_INITIAL_DELAY_MS_FAST : AUTO_SCAN_INITIAL_DELAY_MS;
     const initial = setTimeout(() => {
       if (cancelled) return;
       const v = videoRef.current as VideoWithRvf | null;
@@ -781,7 +786,7 @@ export function FaceCapture({
       } else {
         void tick();
       }
-    }, AUTO_SCAN_INITIAL_DELAY_MS);
+    }, initialDelay);
 
     return () => {
       cancelled = true;
@@ -799,6 +804,7 @@ export function FaceCapture({
     scanIdleLabel,
     verifyOnClientOnly,
     finishClientVerify,
+    finishServerVerify,
   ]);
 
   const enrollStepLeadKeys = [
