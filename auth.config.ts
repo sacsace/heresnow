@@ -134,11 +134,12 @@ export const authConfig = {
     },
   },
   events: {
-    async signOut(message) {
+    signOut(message) {
       const token = "token" in message ? message.token : null;
       if (token?.sub && typeof token.sessionNonce === "string") {
-        const { revokeUserSession } = await import("@/lib/userSessions");
-        await revokeUserSession(token.sub, token.sessionNonce);
+        void import("@/lib/userSessions").then(({ revokeUserSession }) =>
+          revokeUserSession(token.sub!, token.sessionNonce!)
+        );
       }
     },
   },

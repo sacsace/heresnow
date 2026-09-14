@@ -6,6 +6,11 @@ import { FaceEnrollmentCapture } from "@/components/employee/FaceEnrollmentCaptu
 import { useI18n } from "@/components/LanguageProvider";
 import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import {
+  faceEnrollmentGridCols,
+  groupFaceCredentials,
+  MAX_FACE_ENROLLMENTS,
+} from "@/lib/faceEnrollmentGroups";
+import {
   bannerInfo,
   bannerSuccess,
   btnActionEqual,
@@ -27,47 +32,7 @@ type FaceCredentialItem = {
   batchId?: string | null;
 };
 
-type FaceEnrollmentGroup = {
-  key: string;
-  batchId: string | null;
-  createdAt: string;
-  lastUsedAt: string | null;
-  hasPreview: boolean;
-  previewCredentialId: string | null;
-  sampleCount: number;
-};
-
-function groupFaceCredentials(items: FaceCredentialItem[]): FaceEnrollmentGroup[] {
-  const map = new Map<string, FaceEnrollmentGroup>();
-  for (const item of items) {
-    const key = item.batchId ?? item.id;
-    const existing = map.get(key);
-    if (existing) {
-      existing.sampleCount += 1;
-      if (item.hasPreview) {
-        existing.hasPreview = true;
-        existing.previewCredentialId = item.id;
-      }
-      if (
-        item.lastUsedAt &&
-        (!existing.lastUsedAt || item.lastUsedAt > existing.lastUsedAt)
-      ) {
-        existing.lastUsedAt = item.lastUsedAt;
-      }
-    } else {
-      map.set(key, {
-        key,
-        batchId: item.batchId ?? null,
-        createdAt: item.createdAt,
-        lastUsedAt: item.lastUsedAt,
-        hasPreview: item.hasPreview,
-        previewCredentialId: item.hasPreview ? item.id : null,
-        sampleCount: 1,
-      });
-    }
-  }
-  return [...map.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-}
+import type { FaceEnrollmentGroup } from "@/lib/faceEnrollmentGroups";
 
 type FaceStatus = {
   enrolled: boolean;
@@ -77,7 +42,11 @@ type FaceStatus = {
   credentials: FaceCredentialItem[];
 };
 
-export function FaceManagementCard() {
+type Props = {
+  className?: string;
+};
+
+export function FaceManagementCard({ className = "" }: Props) {
   const { t } = useI18n();
   const [status, setStatus] = useState<FaceStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,13 +132,14 @@ export function FaceManagementCard() {
     () => groupFaceCredentials(status?.credentials ?? []),
     [status?.credentials]
   );
+  const atEnrollmentLimit = enrollmentGroups.length >= MAX_FACE_ENROLLMENTS;
 
   if (!loading && status === null && !error) {
     return null;
   }
 
   return (
-    <section className={card}>
+    <section className={`${card} ${className}`.trim()}>
       <div className={cardHeader}>
         <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">
           {t("account.faceTitle")}
@@ -178,7 +148,7 @@ export function FaceManagementCard() {
           {t("account.faceLead")}
         </p>
       </div>
-      <div className={`${cardBody} space-y-4`}>
+      <div className={`${cardBody} flex flex-1 flex-col space-y-4`}>
         {loading ? (
           <p className={hint}>{t("common.loading")}</p>
         ) : error && !status ? (
@@ -193,11 +163,11 @@ export function FaceManagementCard() {
             {enrollmentGroups.length === 0 ? (
               <p className={hint}>{t("account.faceNone")}</p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              <div className={`grid w-full gap-2 ${faceEnrollmentGridCols(enrollmentGroups.length)}`}>
                 {enrollmentGroups.map((group, index) => (
                   <div
                     key={group.key}
-                    className="flex min-w-0 flex-col rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] px-2 py-2"
+                    className="flex min-w-0 flex-col rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] px-2.5 py-2.5"
                   >
                     <p className="truncate text-[0.75rem] font-semibold text-[var(--foreground)]">
                       {t("account.faceCredentialLabel").replace("{n}", String(index + 1))}
@@ -232,11 +202,11 @@ export function FaceManagementCard() {
                         </span>
                       ) : null}
                     </p>
-                    <div className="mt-auto flex flex-row gap-1 pt-1.5">
+                    <div className="mt-auto flex flex-row flex-nowrap gap-1 pt-1.5">
                       {group.hasPreview && group.previewCredentialId ? (
                         <button
                           type="button"
-                          className={`${btnSecondary} h-7 min-w-0 flex-1 px-1.5 text-[0.625rem]`}
+                          className={`${btnSecondary} h-7 min-w-0 flex-1 whitespace-nowrap px-1 text-[0.625rem]`}
                           onClick={() => {
                             setError(null);
                             setSuccess(null);
@@ -250,7 +220,7 @@ export function FaceManagementCard() {
                       ) : null}
                       <button
                         type="button"
-                        className={`${btnSecondary} h-7 min-w-0 flex-1 px-1.5 text-[0.625rem]`}
+                        className={`${btnSecondary} h-7 min-w-0 flex-1 whitespace-nowrap px-1 text-[0.625rem]`}
                         onClick={() => setDeleteTarget(group)}
                         disabled={busy}
                       >
@@ -270,7 +240,16 @@ export function FaceManagementCard() {
                   setSuccess(t("account.faceEnrollOk"));
                   void load();
                 }}
-                onError={(msg) => setError(msg)}
+                onError={(msg) =>
+                  setError(
+                    msg === "FACE_ENROLLMENT_LIMIT"
+                      ? t("account.faceEnrollLimit").replace(
+                          "{max}",
+                          String(MAX_FACE_ENROLLMENTS)
+                        )
+                      : msg
+                  )
+                }
                 onCancel={() => {
                   setEnrolling(false);
                   setError(null);
@@ -319,36 +298,46 @@ export function FaceManagementCard() {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                {enrollmentGroups.length > 0 ? (
+              <>
+                <div className="mt-auto flex flex-row gap-2 pt-2">
+                  {enrollmentGroups.length > 0 ? (
+                    <button
+                      type="button"
+                      className={`${btnSecondary} ${btnActionEqual} min-w-0 flex-1 whitespace-nowrap`}
+                      onClick={() => {
+                        setError(null);
+                        setSuccess(null);
+                        setTestingFace(true);
+                      }}
+                      disabled={busy}
+                    >
+                      {t("account.faceTestButton")}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    className={`${btnSecondary} ${btnActionEqual} sm:max-w-xs`}
+                    className={`${btnPrimary} ${btnActionEqual} min-w-0 flex-1 whitespace-nowrap`}
                     onClick={() => {
                       setError(null);
                       setSuccess(null);
-                      setTestingFace(true);
+                      setEnrolling(true);
                     }}
-                    disabled={busy}
+                    disabled={busy || atEnrollmentLimit}
                   >
-                    {t("account.faceTestButton")}
+                    {enrollmentGroups.length > 0
+                      ? t("account.faceAddButton")
+                      : t("account.faceEnrollFirstButton")}
                   </button>
+                </div>
+                {atEnrollmentLimit ? (
+                  <p className={`${hint} pt-1`}>
+                    {t("account.faceEnrollLimit").replace(
+                      "{max}",
+                      String(MAX_FACE_ENROLLMENTS)
+                    )}
+                  </p>
                 ) : null}
-                <button
-                  type="button"
-                  className={`${btnPrimary} ${btnActionEqual} sm:max-w-xs`}
-                  onClick={() => {
-                    setError(null);
-                    setSuccess(null);
-                    setEnrolling(true);
-                  }}
-                  disabled={busy}
-                >
-                  {enrollmentGroups.length > 0
-                    ? t("account.faceAddButton")
-                    : t("account.faceEnrollFirstButton")}
-                </button>
-              </div>
+              </>
             )}
           </>
         ) : null}

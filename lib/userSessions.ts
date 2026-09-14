@@ -113,6 +113,8 @@ export async function extendUserSessionExpiry(
 }
 
 export async function revokeUserSession(userId: string, nonce: string): Promise<void> {
-  await prisma.userSession.deleteMany({ where: { userId, nonce } });
-  await prisma.userSessionKick.deleteMany({ where: { userId, nonce } }).catch(() => {});
+  await Promise.all([
+    prisma.userSession.deleteMany({ where: { userId, nonce } }),
+    prisma.userSessionKick.deleteMany({ where: { userId, nonce } }).catch(() => {}),
+  ]);
 }

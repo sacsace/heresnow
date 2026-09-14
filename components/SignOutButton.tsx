@@ -13,10 +13,8 @@ export function SignOutButton({ className = "" }: { className?: string }) {
     if (busy) return;
     setBusy(true);
     try {
-      await signOut({ redirect: false });
+      await signOut({ callbackUrl: "/login" });
     } catch {
-      /* 세션 API 실패 시에도 로그인 화면으로 이동 */
-    } finally {
       window.location.assign("/login");
     }
   }

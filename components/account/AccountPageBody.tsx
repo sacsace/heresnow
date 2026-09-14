@@ -60,8 +60,10 @@ export function AccountPageBody({ email, name, role }: Props) {
 
         <ChangePasswordCard className="lg:flex lg:h-full lg:min-h-0 lg:flex-col" />
       </div>
-      <PasskeyManagementCard />
-      <FaceManagementCard />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+        <PasskeyManagementCard className="lg:flex lg:h-full lg:min-h-0 lg:flex-col" />
+        <FaceManagementCard className="lg:flex lg:h-full lg:min-h-0 lg:flex-col" />
+      </div>
     </div>
   );
 }

@@ -25,7 +25,11 @@ type PasskeyItem = {
   lastUsedAt: string | null;
 };
 
-export function PasskeyManagementCard() {
+type Props = {
+  className?: string;
+};
+
+export function PasskeyManagementCard({ className = "" }: Props) {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
   const [supported, setSupported] = useState(false);
@@ -125,12 +129,12 @@ export function PasskeyManagementCard() {
   }
 
   return (
-    <section className={card}>
+    <section className={`${card} ${className}`.trim()}>
       <div className={cardHeader}>
         <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">{t("account.passkeyTitle")}</p>
         <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">{t("account.passkeyLead")}</p>
       </div>
-      <div className={`${cardBody} space-y-4`}>
+      <div className={`${cardBody} flex flex-1 flex-col space-y-4`}>
         {mounted && !supported ? <p className={bannerInfo}>{t("account.passkeyNotSupported")}</p> : null}
         {!mounted || loading ? <p className={hint}>{t("common.loading")}</p> : null}
         {error ? <p className={errorText}>{error}</p> : null}
@@ -141,7 +145,7 @@ export function PasskeyManagementCard() {
         ) : null}
 
         {mounted && !loading && items.length > 0 ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className={`grid gap-2 ${items.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
             {items.map((item) => (
               <div
                 key={item.id}
@@ -179,7 +183,7 @@ export function PasskeyManagementCard() {
         <button
           type="button"
           disabled={!mounted || !supported || busy || loading}
-          className={`${btnPrimary} ${btnActionEqual} sm:max-w-xs`}
+          className={`${btnPrimary} ${btnActionEqual}`}
           onClick={() => void registerPasskey()}
         >
           {busy ? t("account.passkeyRegistering") : t("account.passkeyRegister")}

@@ -76,6 +76,7 @@ export const ko = {
     faceEnrolledAtLabel: "등록 일시",
     faceEnrollFirstButton: "안면 등록하기",
     faceAddButton: "안면 추가 등록",
+    faceEnrollLimit: "안면은 최대 {max}개까지 등록할 수 있습니다.",
     faceEnrollCaptureTitle: "안면 등록",
     faceEnrollCaptureLead: "정면·좌·우 등 5개 각도를 자동 캡처합니다. 등록 완성도 100%가 되면 자동 저장됩니다.",
     faceEnrollOk: "안면이 등록되었습니다.",
@@ -1360,6 +1361,7 @@ export const en = {
     faceEnrolledAtLabel: "Enrolled at",
     faceEnrollFirstButton: "Enroll face",
     faceAddButton: "Add face enrollment",
+    faceEnrollLimit: "You can register up to {max} face enrollments.",
     faceEnrollCaptureTitle: "Enroll face",
     faceEnrollCaptureLead:
       "Automatically captures 5 angles. Saves when enrollment reaches 100%.",

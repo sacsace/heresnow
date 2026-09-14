@@ -148,12 +148,6 @@ export default auth((req) => {
     }
   }
 
-  if (pathname === "/api/auth/signout" && method === "POST") {
-    const res = NextResponse.next();
-    res.headers.set("Clear-Site-Data", "\"cache\", \"cookies\", \"storage\"");
-    return res;
-  }
-
   const isAuthPage = pathname.startsWith("/login");
   const isDevHealth =
     process.env.NODE_ENV === "development" && pathname === "/api/dev/health";

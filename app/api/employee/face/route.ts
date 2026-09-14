@@ -10,6 +10,10 @@ import {
   syncEmployeeFaceFields,
 } from "@/lib/faceCredentials";
 import {
+  countFaceEnrollmentGroups,
+  MAX_FACE_ENROLLMENTS,
+} from "@/lib/faceEnrollmentGroups";
+import {
   validateEnrollmentBatch,
   type EnrollmentPoseType,
   type EnrollmentSample,
@@ -82,11 +86,21 @@ export async function GET() {
     return NextResponse.json({ error: "직원 정보가 없습니다." }, { status: 403 });
   }
 
+  const credentialItems = emp.faceCredentials.map((c) => ({
+    id: c.id,
+    createdAt: c.createdAt.toISOString(),
+    lastUsedAt: c.lastUsedAt?.toISOString() ?? null,
+    hasPreview: c.previewUrl != null,
+    batchId: c.enrollmentBatchId,
+  }));
+
   return NextResponse.json({
     enrolled: emp.faceEnrolledAt != null,
     enrolledAt: emp.faceEnrolledAt?.toISOString() ?? null,
     hasPreview: emp.faceCredentials.some((c) => c.previewUrl != null),
     faceRecognitionEnabled: emp.company.faceRecognitionEnabled,
+    enrollmentCount: countFaceEnrollmentGroups(credentialItems),
+    maxEnrollments: MAX_FACE_ENROLLMENTS,
     credentials: emp.faceCredentials.map((c) => ({
       id: c.id,
       createdAt: c.createdAt.toISOString(),
@@ -140,6 +154,32 @@ export async function POST(req: Request) {
 
   const disabled = await assertFaceRecognitionEnabled(session.user.companyId);
   if (disabled) return disabled;
+
+  const existingCredentials = await prisma.employeeFaceCredential.findMany({
+    where: { employeeId: session.user.employeeId },
+    select: {
+      id: true,
+      createdAt: true,
+      lastUsedAt: true,
+      previewUrl: true,
+      enrollmentBatchId: true,
+    },
+  });
+  const enrollmentCount = countFaceEnrollmentGroups(
+    existingCredentials.map((c) => ({
+      id: c.id,
+      createdAt: c.createdAt.toISOString(),
+      lastUsedAt: c.lastUsedAt?.toISOString() ?? null,
+      hasPreview: c.previewUrl != null,
+      batchId: c.enrollmentBatchId,
+    }))
+  );
+  if (enrollmentCount >= MAX_FACE_ENROLLMENTS) {
+    return NextResponse.json(
+      { error: "FACE_ENROLLMENT_LIMIT", maxEnrollments: MAX_FACE_ENROLLMENTS },
+      { status: 400 }
+    );
+  }
 
   let json: unknown;
   try {
