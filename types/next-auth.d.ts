@@ -17,5 +17,7 @@ declare module "next-auth/jwt" {
     role?: Role;
     companyId?: string | null;
     employeeId?: string | null;
+    sessionNonce?: string | null;
+    sessionMaxAge?: number;
   }
 }

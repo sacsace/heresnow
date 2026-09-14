@@ -1,8 +1,8 @@
 import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { parseStaySignedIn } from "@/lib/sessionDuration";
+import { parseStaySignedIn, sessionMaxAgeSec } from "@/lib/sessionDuration";
+import { issueUserSession } from "@/lib/userSessions";
 import { prisma } from "@/lib/prisma";
-import { randomUUID } from "crypto";
 
 export async function authorizeCredentials(
   credentials: Partial<Record<"email" | "password" | "staySignedIn", unknown>>
@@ -28,11 +28,8 @@ export async function authorizeCredentials(
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return null;
 
-  const sessionNonce = randomUUID();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { sessionNonce },
-  });
+  const staySignedIn = parseStaySignedIn(credentials.staySignedIn);
+  const { sessionNonce } = await issueUserSession(user.id, sessionMaxAgeSec(staySignedIn));
 
   return {
     id: user.id,
@@ -41,6 +38,6 @@ export async function authorizeCredentials(
     companyId: user.companyId,
     employeeId: user.employee?.id ?? null,
     sessionNonce,
-    staySignedIn: parseStaySignedIn(credentials.staySignedIn),
+    staySignedIn,
   };
 }

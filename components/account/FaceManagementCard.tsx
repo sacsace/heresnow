@@ -193,42 +193,50 @@ export function FaceManagementCard() {
             {enrollmentGroups.length === 0 ? (
               <p className={hint}>{t("account.faceNone")}</p>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                 {enrollmentGroups.map((group, index) => (
                   <div
                     key={group.key}
-                    className="rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] px-3 py-2.5"
+                    className="flex min-w-0 flex-col rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] px-2 py-2"
                   >
-                    <p className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
+                    <p className="truncate text-[0.75rem] font-semibold text-[var(--foreground)]">
                       {t("account.faceCredentialLabel").replace("{n}", String(index + 1))}
                     </p>
-                    <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
-                      {t("account.faceCredentialCreated").replace(
-                        "{time}",
-                        new Date(group.createdAt).toLocaleString()
-                      )}
+                    <p
+                      className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.625rem] leading-tight text-[var(--apple-label-secondary)]"
+                    >
+                      <span
+                        className="shrink-0"
+                        title={new Date(group.createdAt).toLocaleString()}
+                      >
+                        {new Date(group.createdAt).toLocaleDateString(undefined, {
+                          month: "numeric",
+                          day: "numeric",
+                        })}
+                      </span>
+                      {group.sampleCount > 1 ? (
+                        <span className="shrink-0">
+                          {group.sampleCount}
+                          {t("account.faceCredentialSampleShort")}
+                        </span>
+                      ) : null}
+                      {group.lastUsedAt ? (
+                        <span
+                          className="shrink-0"
+                          title={new Date(group.lastUsedAt).toLocaleString()}
+                        >
+                          {new Date(group.lastUsedAt).toLocaleDateString(undefined, {
+                            month: "numeric",
+                            day: "numeric",
+                          })}
+                        </span>
+                      ) : null}
                     </p>
-                    {group.sampleCount > 1 ? (
-                      <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
-                        {t("account.faceCredentialSamples").replace(
-                          "{count}",
-                          String(group.sampleCount)
-                        )}
-                      </p>
-                    ) : null}
-                    {group.lastUsedAt ? (
-                      <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
-                        {t("account.faceCredentialLastUsed").replace(
-                          "{time}",
-                          new Date(group.lastUsedAt).toLocaleString()
-                        )}
-                      </p>
-                    ) : null}
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="mt-auto flex flex-row gap-1 pt-1.5">
                       {group.hasPreview && group.previewCredentialId ? (
                         <button
                           type="button"
-                          className={`${btnSecondary} h-8 px-3 text-[0.75rem]`}
+                          className={`${btnSecondary} h-7 min-w-0 flex-1 px-1.5 text-[0.625rem]`}
                           onClick={() => {
                             setError(null);
                             setSuccess(null);
@@ -237,12 +245,12 @@ export function FaceManagementCard() {
                           }}
                           disabled={busy}
                         >
-                          {t("account.faceViewButton")}
+                          {t("account.faceViewButtonShort")}
                         </button>
                       ) : null}
                       <button
                         type="button"
-                        className={`${btnSecondary} h-8 px-3 text-[0.75rem]`}
+                        className={`${btnSecondary} h-7 min-w-0 flex-1 px-1.5 text-[0.625rem]`}
                         onClick={() => setDeleteTarget(group)}
                         disabled={busy}
                       >

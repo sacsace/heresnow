@@ -276,7 +276,7 @@ model User {
   email            String    @unique
   passwordHash     String
   role             Role      @default(EMPLOYEE)
-  /// 단일 로그인 강제를 위한 현재 유효 세션 식별값
+  /// @deprecated UserSession.nonce 사용 — 마이그레이션 호환용
   sessionNonce     String?
   consentGivenAt   DateTime?
   consentVersion   String?
@@ -290,6 +290,34 @@ model User {
   passkeys      UserPasskeyCredential[]
   pushSubscriptions PushSubscription[]
   faceLoginTokens FaceLoginToken[]
+  sessions      UserSession[]
+}
+
+/// 사용자당 최대 2대 동시 로그인 (UserSession)
+model UserSession {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nonce      String   @unique
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime?
+
+  @@index([userId])
+  @@index([userId, lastUsedAt])
+}
+
+/// 다른 기기 로그인 등으로 세션이 종료됐을 때 클라이언트 안내용
+model UserSessionKick {
+  id        String   @id @default(cuid())
+  userId    String
+  nonce     String
+  reason    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([userId, nonce])
+  @@index([expiresAt])
 }
 
 /// 안면 로그인 1회용 토큰 (jti)

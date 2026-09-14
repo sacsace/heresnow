@@ -34,7 +34,11 @@ const DEFAULT_STATUS: PushStatus = {
   dbReady: true,
 };
 
-export function PushNotificationCard() {
+type Props = {
+  className?: string;
+};
+
+export function PushNotificationCard({ className = "" }: Props) {
   const { t, locale } = useI18n();
   const [mounted, setMounted] = useState(false);
   const [supported, setSupported] = useState(false);
@@ -180,12 +184,12 @@ export function PushNotificationCard() {
   const showUnsupported = mounted && !supported && !iosNeedsHomeScreen;
 
   return (
-    <section className={card}>
+    <section className={`${card} ${className}`.trim()}>
       <div className={cardHeader}>
         <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">{t("account.pushTitle")}</p>
         <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">{t("account.pushLead")}</p>
       </div>
-      <div className={`${cardBody} space-y-3`}>
+      <div className={`${cardBody} flex flex-1 flex-col space-y-3`}>
         {showUnsupported ? (
           <p className={hint}>{t("account.pushNotSupported")}</p>
         ) : (

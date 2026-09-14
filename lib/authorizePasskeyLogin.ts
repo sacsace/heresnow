@@ -1,8 +1,8 @@
 import type { Role } from "@prisma/client";
 import { verifyPasskeyLoginToken } from "@/lib/passkeyLoginToken";
-import { parseStaySignedIn } from "@/lib/sessionDuration";
+import { parseStaySignedIn, sessionMaxAgeSec } from "@/lib/sessionDuration";
+import { issueUserSession } from "@/lib/userSessions";
 import { prisma } from "@/lib/prisma";
-import { randomUUID } from "crypto";
 
 export async function authorizePasskeyLogin(
   credentials: Partial<Record<"loginToken" | "staySignedIn", unknown>>
@@ -32,11 +32,8 @@ export async function authorizePasskeyLogin(
   }
   if (!user) return null;
 
-  const sessionNonce = randomUUID();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { sessionNonce },
-  });
+  const staySignedIn = parseStaySignedIn(credentials.staySignedIn);
+  const { sessionNonce } = await issueUserSession(user.id, sessionMaxAgeSec(staySignedIn));
 
   return {
     id: user.id,
@@ -45,7 +42,7 @@ export async function authorizePasskeyLogin(
     companyId: user.companyId,
     employeeId: user.employee?.id ?? null,
     sessionNonce,
-    staySignedIn: parseStaySignedIn(credentials.staySignedIn),
+    staySignedIn,
   };
 }
 

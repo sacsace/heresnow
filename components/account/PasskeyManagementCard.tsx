@@ -141,25 +141,30 @@ export function PasskeyManagementCard() {
         ) : null}
 
         {mounted && !loading && items.length > 0 ? (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {items.map((item) => (
               <div
                 key={item.id}
-                className="rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] px-3 py-2.5"
+                className="flex min-w-0 flex-col rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] px-2.5 py-2.5"
               >
-                <p className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
+                <p className="truncate text-[0.8125rem] font-semibold text-[var(--foreground)]">
                   {item.nickname || t("account.passkeyDefaultName")}
                 </p>
-                <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
+                <p
+                  className="mt-0.5 truncate text-[0.6875rem] leading-tight text-[var(--apple-label-secondary)]"
+                  title={
+                    item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleString() : undefined
+                  }
+                >
                   {t("account.passkeyLastUsed").replace(
                     "{time}",
                     item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleString() : "-"
                   )}
                 </p>
-                <div className="mt-2">
+                <div className="mt-auto pt-2">
                   <button
                     type="button"
-                    className={`${btnSecondary} h-8 px-3 text-[0.75rem]`}
+                    className={`${btnSecondary} h-7 w-full px-2 text-[0.6875rem]`}
                     onClick={() => void deletePasskey(item.id)}
                     disabled={busy}
                   >

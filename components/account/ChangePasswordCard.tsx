@@ -16,7 +16,11 @@ import {
 } from "@/lib/uiStyles";
 import { useState } from "react";
 
-export function ChangePasswordCard() {
+type Props = {
+  className?: string;
+};
+
+export function ChangePasswordCard({ className = "" }: Props) {
   const { t } = useI18n();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -94,7 +98,7 @@ export function ChangePasswordCard() {
   }
 
   return (
-    <section className={card}>
+    <section className={`${card} ${className}`.trim()}>
       <div className={cardHeader}>
         <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">
           {t("account.changePasswordTitle")}
@@ -103,7 +107,11 @@ export function ChangePasswordCard() {
           {t("account.changePasswordLead")}
         </p>
       </div>
-      <form className={`${cardBody} space-y-4`} onSubmit={onSubmit} autoComplete="off">
+      <form
+        className={`${cardBody} flex flex-1 flex-col space-y-4`}
+        onSubmit={onSubmit}
+        autoComplete="off"
+      >
         <div>
           <label className={label} htmlFor="current-password">
             {t("account.currentPassword")}
@@ -159,7 +167,7 @@ export function ChangePasswordCard() {
           </div>
         )}
 
-        <div className="pt-2">
+        <div className="mt-auto pt-2">
           <button
             type="submit"
             disabled={busy}

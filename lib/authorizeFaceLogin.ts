@@ -1,8 +1,8 @@
 import type { Role } from "@prisma/client";
 import { consumeFaceLoginToken } from "@/lib/faceLoginToken";
-import { parseStaySignedIn } from "@/lib/sessionDuration";
+import { parseStaySignedIn, sessionMaxAgeSec } from "@/lib/sessionDuration";
+import { issueUserSession } from "@/lib/userSessions";
 import { prisma } from "@/lib/prisma";
-import { randomUUID } from "crypto";
 
 export async function authorizeFaceLogin(
   credentials: Partial<Record<"loginToken" | "staySignedIn", unknown>>
@@ -32,11 +32,8 @@ export async function authorizeFaceLogin(
   }
 
   if (!user?.employee?.id) return null;
-  const sessionNonce = randomUUID();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { sessionNonce },
-  });
+  const staySignedIn = parseStaySignedIn(credentials.staySignedIn);
+  const { sessionNonce } = await issueUserSession(user.id, sessionMaxAgeSec(staySignedIn));
 
   return {
     id: user.id,
@@ -45,6 +42,6 @@ export async function authorizeFaceLogin(
     companyId: user.companyId,
     employeeId: user.employee.id,
     sessionNonce,
-    staySignedIn: parseStaySignedIn(credentials.staySignedIn),
+    staySignedIn,
   };
 }

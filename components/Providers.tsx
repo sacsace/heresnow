@@ -2,6 +2,7 @@
 
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { MobileAppInstallPrompt } from "@/components/MobileAppInstallPrompt";
+import { SessionKickWatcher } from "@/components/SessionKickWatcher";
 import { PushServiceWorkerRegistrar } from "@/components/PushServiceWorkerRegistrar";
 import type { Locale } from "@/lib/i18n/dictionaries";
 import { SessionProvider } from "next-auth/react";
@@ -17,6 +18,7 @@ export function Providers({
   return (
     <SessionProvider refetchInterval={30 * 60} refetchOnWindowFocus>
       <LanguageProvider initialLocale={initialLocale}>
+        <SessionKickWatcher />
         {children}
         <PushServiceWorkerRegistrar />
         <MobileAppInstallPrompt />

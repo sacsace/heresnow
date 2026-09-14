@@ -23,12 +23,9 @@ export const authConfig = {
     error(error) {
       const authErr = error as { type?: string; name?: string };
       const type = authErr.type ?? authErr.name ?? "";
-      // Wrong email/password — expected; UI already shows login.errorCredentials.
       if (type === "CredentialsSignin" && process.env.NODE_ENV === "development") {
         return;
       }
-      // Stale or invalid session cookie (AUTH_SECRET changed, expired token, etc.).
-      // Auth.js clears the cookie; user should sign in again.
       if (type === "JWTSessionError") {
         return;
       }
@@ -36,7 +33,6 @@ export const authConfig = {
         console.error("[auth]", error);
         return;
       }
-      // 운영 로그에는 에러 객체 원문 대신 최소 분류값만 남겨 민감정보 노출을 줄인다.
       console.error("[auth]", type || "UnknownAuthError");
     },
     warn(code) {
@@ -78,14 +74,30 @@ export const authConfig = {
           token,
           sessionMaxAgeSec(parseStaySignedIn((user as { staySignedIn?: unknown }).staySignedIn))
         );
-      } else if (trigger === "update" && typeof token.sessionMaxAge === "number") {
-        applySessionExpiry(token, token.sessionMaxAge);
+        return token;
       }
 
       const runtime = (globalThis as { EdgeRuntime?: string }).EdgeRuntime;
       const isEdgeRuntime = typeof runtime === "string" && runtime.length > 0;
+
+      if (!isEdgeRuntime && trigger === "update" && typeof token.sessionMaxAge === "number") {
+        applySessionExpiry(token, token.sessionMaxAge);
+        if (token.sub && typeof token.sessionNonce === "string") {
+          const { extendUserSessionExpiry } = await import("@/lib/userSessions");
+          void extendUserSessionExpiry(token.sub, token.sessionNonce, token.sessionMaxAge);
+        }
+      } else if (trigger === "update" && typeof token.sessionMaxAge === "number") {
+        applySessionExpiry(token, token.sessionMaxAge);
+      }
+
       if (!isEdgeRuntime && token.sub && typeof token.sessionNonce === "string") {
         try {
+          const { validateUserSession } = await import("@/lib/userSessions");
+          const sessionValid = await validateUserSession(token.sub, token.sessionNonce);
+          if (!sessionValid) {
+            return {};
+          }
+
           const { prisma } = await import("@/lib/prisma");
           const current = await prisma.user.findUnique({
             where: { id: token.sub },
@@ -93,15 +105,12 @@ export const authConfig = {
               email: true,
               role: true,
               companyId: true,
-              sessionNonce: true,
               employee: { select: { id: true } },
             },
           });
-          if (!current?.sessionNonce || current.sessionNonce !== token.sessionNonce) {
+          if (!current) {
             return {};
           }
-          // 세션 중 역할이 바뀌어도 즉시 반영한다.
-          // 정책: SUPER_ADMIN은 오직 root 식별자만 허용.
           token.role =
             current.role === "SUPER_ADMIN" && (current.email ?? "").trim().toLowerCase() !== "root"
               ? "COMPANY_ADMIN"
@@ -109,7 +118,6 @@ export const authConfig = {
           token.companyId = current.companyId ?? null;
           token.employeeId = current.employee?.id ?? null;
         } catch {
-          // 인증 검증 실패 시 기존 토큰 유지(가용성 우선)
           return token;
         }
       }
@@ -123,6 +131,15 @@ export const authConfig = {
         session.user.employeeId = (token.employeeId as string | null) ?? null;
       }
       return session;
+    },
+  },
+  events: {
+    async signOut(message) {
+      const token = "token" in message ? message.token : null;
+      if (token?.sub && typeof token.sessionNonce === "string") {
+        const { revokeUserSession } = await import("@/lib/userSessions");
+        await revokeUserSession(token.sub, token.sessionNonce);
+      }
     },
   },
 } satisfies NextAuthConfig;

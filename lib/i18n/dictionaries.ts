@@ -49,6 +49,7 @@ export const ko = {
     title: "내 계정",
     subtitle: "비밀번호를 변경하거나 계정 정보를 확인합니다.",
     profileLabel: "계정",
+    nameLabel: "이름",
     roleLabel: "역할",
     changePasswordTitle: "비밀번호 변경",
     changePasswordLead:
@@ -83,6 +84,7 @@ export const ko = {
     faceCredentialLabel: "안면 {n}",
     faceCredentialCreated: "등록: {time}",
     faceCredentialSamples: "{count}개 각도 샘플",
+    faceCredentialSampleShort: "개",
     faceCredentialLastUsed: "마지막 사용: {time}",
     faceDelete: "삭제",
     faceDeleteConfirm: "이 안면 등록을 삭제할까요?",
@@ -103,6 +105,7 @@ export const ko = {
     faceDisabledNote: "이 회사는 안면 인식을 사용하지 않습니다.",
     faceLoadFail: "안면 등록 정보를 불러오지 못했습니다.",
     faceViewButton: "등록된 얼굴 보기",
+    faceViewButtonShort: "보기",
     faceViewTitle: "등록된 얼굴",
     faceViewPasswordLead: "본인 확인을 위해 비밀번호를 입력해 주세요.",
     faceViewShownLead: "등록 시 저장된 얼굴 미리보기입니다.",
@@ -177,6 +180,8 @@ export const ko = {
     registered: "가입이 완료되었습니다. 동의 절차 후 로그인하세요.",
     sessionInvalid:
       "로그인 정보가 만료되었거나 DB가 초기화되었습니다. 다시 로그인해 주세요.",
+    sessionAnotherDevice:
+      "다른 기기에서 로그인되어 이 기기의 로그인이 종료되었습니다. 다시 로그인해 주세요.",
     dbUnreachable:
       "서버가 PostgreSQL에 연결하지 못했습니다. .env 의 DATABASE_URL(비밀번호)을 확인한 뒤 터미널에서 npm run db:verify 를 실행하세요.",
     dbNoUsers: "DB에는 연결됐지만 계정이 없습니다. npm run db:seed 를 실행하세요.",
@@ -1327,6 +1332,7 @@ export const en = {
     title: "My Account",
     subtitle: "Change your password or review your account details.",
     profileLabel: "Account",
+    nameLabel: "Name",
     roleLabel: "Role",
     changePasswordTitle: "Change password",
     changePasswordLead:
@@ -1363,6 +1369,7 @@ export const en = {
     faceCredentialLabel: "Face {n}",
     faceCredentialCreated: "Enrolled: {time}",
     faceCredentialSamples: "{count} angle samples",
+    faceCredentialSampleShort: " samples",
     faceCredentialLastUsed: "Last used: {time}",
     faceDelete: "Delete",
     faceDeleteConfirm: "Delete this face enrollment?",
@@ -1384,6 +1391,7 @@ export const en = {
     faceDisabledNote: "Face recognition is not used by this company.",
     faceLoadFail: "Could not load face enrollment status.",
     faceViewButton: "View enrolled face",
+    faceViewButtonShort: "View",
     faceViewTitle: "Enrolled face",
     faceViewPasswordLead: "Enter your password to verify your identity.",
     faceViewShownLead: "Preview saved when you enrolled your face.",
