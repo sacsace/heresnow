@@ -1,10 +1,13 @@
 "use client";
 
+import { FacePreviewModal } from "@/components/account/FacePreviewModal";
 import { FaceCapture } from "@/components/employee/FaceCapture";
 import { useI18n } from "@/components/LanguageProvider";
 import {
   bannerInfo,
   bannerSuccess,
+  btnActionEqual,
+  btnActionRow,
   btnPrimary,
   btnSecondary,
   card,
@@ -18,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 type FaceStatus = {
   enrolled: boolean;
   enrolledAt: string | null;
+  hasPreview: boolean;
   faceRecognitionEnabled: boolean;
 };
 
@@ -28,6 +32,8 @@ export function FaceManagementCard() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [reEnrolling, setReEnrolling] = useState(false);
+  const [testingFace, setTestingFace] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,6 +51,7 @@ export function FaceManagementCard() {
         setStatus({
           enrolled: Boolean(j.enrolled),
           enrolledAt: j.enrolledAt ?? null,
+          hasPreview: Boolean(j.hasPreview),
           faceRecognitionEnabled: Boolean(j.faceRecognitionEnabled),
         });
       } else {
@@ -129,6 +136,7 @@ export function FaceManagementCard() {
               <div className="space-y-3">
                 <FaceCapture
                   mode="enroll"
+                  profileKind="login"
                   onEnrolled={() => {
                     setReEnrolling(false);
                     setSuccess(t("account.faceReEnrollOk"));
@@ -138,7 +146,7 @@ export function FaceManagementCard() {
                 />
                 <button
                   type="button"
-                  className={`${btnSecondary} w-full sm:w-auto`}
+                  className={`${btnSecondary} ${btnActionEqual}`}
                   onClick={() => {
                     setReEnrolling(false);
                     setError(null);
@@ -147,24 +155,94 @@ export function FaceManagementCard() {
                   {t("account.faceCancelReEnroll")}
                 </button>
               </div>
+            ) : testingFace ? (
+              <div className="space-y-3">
+                <FaceCapture
+                  mode="verify"
+                  profileKind="login"
+                  verifyTitle={t("account.faceTestButton")}
+                  verifyLead={t("login.faceVerifyLead")}
+                  onVerified={async (descriptor) => {
+                    const r = await fetch("/api/employee/face", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ descriptor }),
+                    });
+                    if (r.ok) {
+                      setTestingFace(false);
+                      setError(null);
+                      setSuccess(t("account.faceTestOk"));
+                      return true;
+                    }
+                    setSuccess(null);
+                    setError(t("account.faceTestFail"));
+                    return false;
+                  }}
+                  onError={(msg) => setError(msg)}
+                />
+                <button
+                  type="button"
+                  className={`${btnSecondary} ${btnActionEqual}`}
+                  onClick={() => {
+                    setTestingFace(false);
+                    setError(null);
+                  }}
+                >
+                  {t("account.faceCancelTest")}
+                </button>
+              </div>
             ) : (
-              <button
-                type="button"
-                className={`${btnPrimary} w-full sm:w-auto`}
-                onClick={() => {
-                  setError(null);
-                  setSuccess(null);
-                  setReEnrolling(true);
-                }}
-              >
-                {status.enrolled
-                  ? t("account.faceReEnrollButton")
-                  : t("account.faceEnrollFirstButton")}
-              </button>
+              <div className={btnActionRow}>
+                {status.enrolled && (
+                  <>
+                    <button
+                      type="button"
+                      className={`${btnSecondary} ${btnActionEqual}`}
+                      onClick={() => {
+                        setError(null);
+                        setSuccess(null);
+                        setPreviewOpen(true);
+                      }}
+                    >
+                      {t("account.faceViewButton")}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${btnSecondary} ${btnActionEqual}`}
+                      onClick={() => {
+                        setError(null);
+                        setSuccess(null);
+                        setTestingFace(true);
+                      }}
+                    >
+                      {t("account.faceTestButton")}
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className={`${btnPrimary} ${btnActionEqual}`}
+                  onClick={() => {
+                    setError(null);
+                    setSuccess(null);
+                    setReEnrolling(true);
+                  }}
+                >
+                  {status.enrolled
+                    ? t("account.faceReEnrollButton")
+                    : t("account.faceEnrollFirstButton")}
+                </button>
+              </div>
             )}
           </>
         ) : null}
       </div>
+
+      <FacePreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        hasPreview={Boolean(status?.hasPreview)}
+      />
     </section>
   );
 }

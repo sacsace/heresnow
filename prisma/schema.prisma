@@ -327,6 +327,8 @@ model Employee {
   /// 128차원 안면 임베딩(JSON 배열). 출근 시 본인 확인용
   faceDescriptor Json?
   faceEnrolledAt DateTime?
+  /// 등록 시 캡처한 얼굴 미리보기 (data URL). 비밀번호 확인 후에만 조회
+  facePreviewUrl String?
   /// COMPANY=회사 기본, SHIFT=교대(A/B/C), CUSTOM=개별 지정
   workScheduleType   String   @default("COMPANY")
   /// SHIFT 일 때 A | B | C

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
 import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
+import { isValidFacePreviewUrl } from "@/lib/facePreviewValidation";
 import { FACE_DESCRIPTOR_LENGTH, isFaceMatch, parseFaceDescriptor } from "@/lib/faceMatch";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -10,6 +11,7 @@ import { z } from "zod";
 
 const enrollSchema = z.object({
   descriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH),
+  previewUrl: z.string().max(1_000_000).optional(),
 });
 
 export async function GET() {
@@ -24,6 +26,7 @@ export async function GET() {
     where: { id: session.user.employeeId, companyId: session.user.companyId },
     select: {
       faceEnrolledAt: true,
+      facePreviewUrl: true,
       company: { select: { faceRecognitionEnabled: true } },
     },
   });
@@ -34,6 +37,7 @@ export async function GET() {
   return NextResponse.json({
     enrolled: emp.faceEnrolledAt != null,
     enrolledAt: emp.faceEnrolledAt?.toISOString() ?? null,
+    hasPreview: emp.facePreviewUrl != null,
     faceRecognitionEnabled: emp.company.faceRecognitionEnabled,
   });
 }
@@ -80,11 +84,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "유효한 안면 데이터가 필요합니다." }, { status: 400 });
   }
 
+  const previewUrl = parsed.data.previewUrl;
+  if (previewUrl != null && !isValidFacePreviewUrl(previewUrl)) {
+    return NextResponse.json({ error: "유효한 얼굴 미리보기가 필요합니다." }, { status: 400 });
+  }
+
   await prisma.employee.update({
     where: { id: session.user.employeeId },
     data: {
       faceDescriptor: descriptor,
       faceEnrolledAt: new Date(),
+      facePreviewUrl: previewUrl ?? null,
     },
   });
 

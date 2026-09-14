@@ -4,6 +4,7 @@ import { useI18n } from "@/components/LanguageProvider";
 import {
   bannerInfo,
   bannerSuccess,
+  btnActionEqual,
   btnPrimary,
   btnSecondary,
   card,
@@ -13,7 +14,7 @@ import {
   hint,
 } from "@/lib/uiStyles";
 import { startRegistration } from "@simplewebauthn/browser";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type PasskeyItem = {
   id: string;
@@ -26,15 +27,18 @@ type PasskeyItem = {
 
 export function PasskeyManagementCard() {
   const { t } = useI18n();
+  const [mounted, setMounted] = useState(false);
+  const [supported, setSupported] = useState(false);
   const [items, setItems] = useState<PasskeyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const supported = useMemo(
-    () => typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined",
-    []
-  );
+
+  useEffect(() => {
+    setMounted(true);
+    setSupported(typeof window.PublicKeyCredential !== "undefined");
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,8 +59,9 @@ export function PasskeyManagementCard() {
   }, [t]);
 
   useEffect(() => {
+    if (!mounted) return;
     void load();
-  }, [load]);
+  }, [mounted, load]);
 
   async function registerPasskey() {
     if (!supported) {
@@ -126,16 +131,16 @@ export function PasskeyManagementCard() {
         <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">{t("account.passkeyLead")}</p>
       </div>
       <div className={`${cardBody} space-y-4`}>
-        {!supported ? <p className={bannerInfo}>{t("account.passkeyNotSupported")}</p> : null}
-        {loading ? <p className={hint}>{t("common.loading")}</p> : null}
+        {mounted && !supported ? <p className={bannerInfo}>{t("account.passkeyNotSupported")}</p> : null}
+        {!mounted || loading ? <p className={hint}>{t("common.loading")}</p> : null}
         {error ? <p className={errorText}>{error}</p> : null}
         {success ? <p className={bannerSuccess}>{success}</p> : null}
 
-        {!loading && supported && items.length === 0 ? (
+        {mounted && !loading && supported && items.length === 0 ? (
           <p className={hint}>{t("account.passkeyNone")}</p>
         ) : null}
 
-        {!loading && items.length > 0 ? (
+        {mounted && !loading && items.length > 0 ? (
           <div className="space-y-2">
             {items.map((item) => (
               <div
@@ -168,8 +173,8 @@ export function PasskeyManagementCard() {
 
         <button
           type="button"
-          disabled={!supported || busy}
-          className={`${btnPrimary} w-full sm:w-auto`}
+          disabled={!mounted || !supported || busy || loading}
+          className={`${btnPrimary} ${btnActionEqual} sm:max-w-xs`}
           onClick={() => void registerPasskey()}
         >
           {busy ? t("account.passkeyRegistering") : t("account.passkeyRegister")}

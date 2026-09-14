@@ -2,6 +2,7 @@
 
 import { AppLogo } from "@/components/AppLogo";
 import { FaceLoginSection } from "@/components/auth/FaceLoginSection";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import {
@@ -366,10 +367,9 @@ function LoginForm() {
             </div>
             <div className={authFieldGroup}>
               <label className={authLabel}>{t("login.password")}</label>
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="current-password"
-                className={authInput}
+                inputClassName={authInput}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={MIN_PASSWORD_LENGTH}

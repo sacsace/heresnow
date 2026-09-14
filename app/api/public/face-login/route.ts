@@ -10,12 +10,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { FACE_DESCRIPTOR_LENGTH } from "@/lib/faceMatch";
 
-const FACE_LOGIN_MAX_ATTEMPTS = 15;
+const FACE_LOGIN_MAX_ATTEMPTS = 120;
 const FACE_LOGIN_WINDOW_MS = 60_000;
 
 const bodySchema = z.object({
   descriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH),
-  companyName: z.string().min(1),
+  companyName: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -51,18 +51,30 @@ export async function POST(req: Request) {
 
   const company = await resolveFaceLoginCompanyId(parsed.data.companyName);
   if (!company.ok) {
-    const status =
-      company.reason === "missing_name" ? 400 : company.reason === "ambiguous" ? 409 : 404;
+    const status = company.reason === "ambiguous" ? 409 : 404;
     return NextResponse.json({ error: company.reason }, { status });
   }
 
   try {
-    const user = await matchFaceLoginUser(probe, company.companyId);
-    if (!user) {
-      return NextResponse.json({ error: "no_match" }, { status: 401 });
+    const result = await matchFaceLoginUser(probe, company.companyId);
+    if ("reason" in result) {
+      const status =
+        result.reason === "ambiguous"
+          ? 409
+          : result.reason === "no_enrolled"
+            ? 404
+            : 401;
+      return NextResponse.json(
+        {
+          error: result.reason,
+          bestDistance: result.bestDistance,
+          secondDistance: result.secondDistance,
+        },
+        { status }
+      );
     }
 
-    const loginToken = createFaceLoginToken(user.id);
+    const loginToken = createFaceLoginToken(result.user.id);
     return NextResponse.json({ loginToken });
   } catch (e) {
     if (process.env.NODE_ENV === "development") {

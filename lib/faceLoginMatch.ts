@@ -1,8 +1,9 @@
 import type { Role } from "@prisma/client";
 import {
+  euclideanDistance,
   FACE_IDENTIFY_MIN_GAP_LOGIN,
   FACE_MATCH_THRESHOLD_LOGIN,
-  identifySingleFaceMatch,
+  FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT,
   parseFaceDescriptor,
 } from "@/lib/faceMatch";
 import { prisma } from "@/lib/prisma";
@@ -29,14 +30,68 @@ export type FaceLoginUser = {
   employeeId: string;
 };
 
+export type FaceLoginPickFailure = {
+  reason: "no_enrolled" | "no_match" | "ambiguous";
+  bestDistance?: number;
+  secondDistance?: number;
+};
+
+type ScoredCandidate = {
+  employeeId: string;
+  distance: number;
+};
+
+/** 1:N — 전 후보 거리 비교 */
+export function pickFaceLoginMatch(
+  employees: Array<{ id: string; faceDescriptor: unknown }>,
+  probe: number[]
+): { employeeId: string } | FaceLoginPickFailure {
+  const scored: ScoredCandidate[] = [];
+
+  for (const emp of employees) {
+    const stored = parseFaceDescriptor(emp.faceDescriptor);
+    if (!stored) continue;
+    scored.push({ employeeId: emp.id, distance: euclideanDistance(stored, probe) });
+  }
+
+  if (scored.length === 0) {
+    return { reason: employees.length === 0 ? "no_enrolled" : "no_match" };
+  }
+
+  scored.sort((a, b) => a.distance - b.distance);
+  const best = scored[0]!;
+
+  if (best.distance >= FACE_MATCH_THRESHOLD_LOGIN) {
+    return { reason: "no_match", bestDistance: best.distance };
+  }
+
+  if (scored.length > 1) {
+    const second = scored[1]!;
+    const gap = second.distance - best.distance;
+    const confident = best.distance <= FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT;
+    const clearWinner = gap >= FACE_IDENTIFY_MIN_GAP_LOGIN;
+    const ratioWinner = gap / Math.max(best.distance, 0.01) >= 0.1;
+    if (!confident && !clearWinner && !ratioWinner) {
+      return {
+        reason: "ambiguous",
+        bestDistance: best.distance,
+        secondDistance: second.distance,
+      };
+    }
+  }
+
+  return { employeeId: best.employeeId };
+}
+
+/** 로그인 1:N — companyId가 있으면 해당 회사, null이면 전체 검색 */
 export async function matchFaceLoginUser(
   probe: number[],
-  companyId: string
-): Promise<FaceLoginUser | null> {
+  companyId: string | null
+): Promise<{ user: FaceLoginUser } | FaceLoginPickFailure> {
   const employees = await prisma.employee.findMany({
     where: {
-      companyId,
       faceEnrolledAt: { not: null },
+      ...(companyId ? { companyId } : {}),
       company: { faceRecognitionEnabled: true },
     },
     select: {
@@ -53,20 +108,19 @@ export async function matchFaceLoginUser(
     },
   });
 
-  const identified = identifySingleFaceMatch(
-    employees,
-    probe,
-    FACE_MATCH_THRESHOLD_LOGIN,
-    FACE_IDENTIFY_MIN_GAP_LOGIN
-  );
-  if (!identified) return null;
+  const picked = pickFaceLoginMatch(employees, probe);
+  if ("reason" in picked) return picked;
 
-  const emp = identified.match;
+  const emp = employees.find((e) => e.id === picked.employeeId);
+  if (!emp) return { reason: "no_match" };
+
   return {
-    id: emp.user.id,
-    email: emp.user.email,
-    role: emp.user.role as Role,
-    companyId: emp.user.companyId,
-    employeeId: emp.id,
+    user: {
+      id: emp.user.id,
+      email: emp.user.email,
+      role: emp.user.role as Role,
+      companyId: emp.user.companyId,
+      employeeId: emp.id,
+    },
   };
 }

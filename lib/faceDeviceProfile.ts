@@ -64,8 +64,8 @@ export function getFaceDeviceProfile(kind: FaceProfileKind = "default"): FaceDev
   if (kind === "login") {
     return {
       preferWasmBackend: ios,
-      detectorInputSize: 320,
-      detectorScoreThreshold: 0.58,
+      detectorInputSize: 416,
+      detectorScoreThreshold: 0.5,
       likelyInAppBrowser: isLikelyInAppBrowser(),
       isMobile: mobile,
     };

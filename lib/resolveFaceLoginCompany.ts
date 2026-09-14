@@ -5,17 +5,17 @@ import {
 import { prisma } from "@/lib/prisma";
 
 export type FaceLoginCompanyResolve =
-  | { ok: true; companyId: string }
-  | { ok: false; reason: "missing_name" | "not_found" | "ambiguous" };
+  | { ok: true; companyId: string | null }
+  | { ok: false; reason: "not_found" | "ambiguous" };
 
 /**
- * 안면 로그인 1:N 범위 — 회사명(부분·Private Limited 생략 가능)으로 테넌트 특정.
+ * 안면 로그인 1:N 범위 — 회사명 생략 시 전체, 입력 시 해당 회사로 한정.
  */
 export async function resolveFaceLoginCompanyId(
   companyName?: string | null
 ): Promise<FaceLoginCompanyResolve> {
   const trimmed = companyName?.trim() ?? "";
-  if (!trimmed) return { ok: false, reason: "missing_name" };
+  if (!trimmed) return { ok: true, companyId: null };
 
   const candidates = await prisma.company.findMany({
     where: { faceRecognitionEnabled: true },

@@ -4,6 +4,7 @@ import { useI18n } from "@/components/LanguageProvider";
 import { isStrongPassword } from "@/lib/passwordPolicy";
 import {
   bannerSuccess,
+  btnActionEqual,
   btnPrimary,
   card,
   cardBody,
@@ -162,7 +163,7 @@ export function ChangePasswordCard() {
           <button
             type="submit"
             disabled={busy}
-            className={`${btnPrimary} w-full sm:w-auto`}
+            className={`${btnPrimary} ${btnActionEqual} sm:max-w-xs`}
           >
             {busy ? t("account.submitting") : t("account.submit")}
           </button>

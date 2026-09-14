@@ -10,6 +10,7 @@ import {
   type CameraAccessFailureKind,
   type FaceProfileKind,
 } from "@/lib/faceDeviceProfile";
+import { captureVideoFrameAsJpegDataUrl } from "@/lib/facePreviewCapture";
 import { averageFaceDescriptors } from "@/lib/faceMatch";
 import {
   descriptorToArray,
@@ -51,6 +52,9 @@ type Props = {
   profileKind?: FaceProfileKind;
   /** 연속 프레임 평균으로 인식 안정화 (출입문 단말) */
   highAccuracyScan?: boolean;
+  /** false: 실패 후에도 얼굴을 프레임에 유지한 채 재시도 (로그인) */
+  blockRetryUntilFaceAbsent?: boolean;
+  verifyRetryLabel?: string;
   onEnrolled?: () => void;
   onVerified?: (descriptor: number[]) => boolean | void | Promise<boolean | void>;
   onError?: (message: string) => void;
@@ -68,7 +72,7 @@ const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
 const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 3;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
-const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.14;
+const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.22;
 
 const KIOSK_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "kiosk",
@@ -121,6 +125,8 @@ export function FaceCapture({
   rootClassName,
   profileKind = "default",
   highAccuracyScan = false,
+  blockRetryUntilFaceAbsent = true,
+  verifyRetryLabel,
   onEnrolled,
   onVerified,
   onError,
@@ -140,6 +146,10 @@ export function FaceCapture({
   profileKindRef.current = profileKind;
   const highAccuracyScanRef = useRef(highAccuracyScan);
   highAccuracyScanRef.current = highAccuracyScan;
+  const blockRetryUntilFaceAbsentRef = useRef(blockRetryUntilFaceAbsent);
+  blockRetryUntilFaceAbsentRef.current = blockRetryUntilFaceAbsent;
+  const verifyRetryLabelRef = useRef(verifyRetryLabel);
+  verifyRetryLabelRef.current = verifyRetryLabel;
   const onFaceAbsentRef = useRef(onFaceAbsent);
   onFaceAbsentRef.current = onFaceAbsent;
   const onVerifiedRef = useRef(onVerified);
@@ -289,8 +299,8 @@ export function FaceCapture({
     async (arr: number[]): Promise<boolean> => {
       const verified = await onVerifiedRef.current?.(arr);
       if (verified === false) {
-        setStatus(tRef.current("employee.faceVerifyRetry"));
-        if (scanWhenFaceVisible) {
+        setStatus(verifyRetryLabelRef.current ?? tRef.current("employee.faceVerifyRetry"));
+        if (scanWhenFaceVisible && blockRetryUntilFaceAbsentRef.current) {
           verifyBlockedUntilNoFaceRef.current = true;
         }
         return false;
@@ -326,8 +336,26 @@ export function FaceCapture({
             : profileKindRef.current === "login"
               ? LOGIN_FACE_EXTRACT_OPTIONS
               : undefined;
-        const desc = await extractFaceDescriptor(v, extractOpts);
-        if (!desc) {
+        let arr: number[] | null = null;
+        if (mode === "enroll" && profileKindRef.current === "login") {
+          const samples: number[][] = [];
+          for (let i = 0; i < 3; i += 1) {
+            if (i > 0) {
+              await new Promise((r) => setTimeout(r, 150));
+            }
+            const sample = await extractFaceDescriptor(v, extractOpts);
+            if (sample) samples.push(descriptorToArray(sample));
+          }
+          arr = averageFaceDescriptors(samples);
+          if (!arr && samples.length > 0) {
+            arr = samples[0]!;
+          }
+        } else {
+          const desc = await extractFaceDescriptor(v, extractOpts);
+          if (desc) arr = descriptorToArray(desc);
+        }
+
+        if (!arr) {
           if (!opts?.silentNoFace) {
             const msg = tRef.current("employee.faceNotDetected");
             setStatus(msg);
@@ -337,13 +365,16 @@ export function FaceCapture({
           }
           return false;
         }
-        const arr = descriptorToArray(desc);
 
         if (mode === "enroll") {
+          const previewUrl = captureVideoFrameAsJpegDataUrl(v);
           const r = await fetch("/api/employee/face", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ descriptor: arr }),
+            body: JSON.stringify({
+              descriptor: arr,
+              ...(previewUrl ? { previewUrl } : {}),
+            }),
           });
           const j = await r.json().catch(() => ({}));
           if (!r.ok) {

@@ -25,9 +25,9 @@ export function FaceLoginSection({
   const signInStartedRef = useRef(false);
   const retryBlockedUntilRef = useRef(0);
   const LOGIN_TIMEOUT_MS = 12_000;
+  const FAILED_RETRY_COOLDOWN_MS = 5_000;
   const [companyName, setCompanyName] = useState("");
   const trimmedCompany = companyName.trim();
-  const faceReady = trimmedCompany.length > 0;
 
   function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
     return new Promise<T>((resolve, reject) => {
@@ -46,7 +46,7 @@ export function FaceLoginSection({
 
   const handleVerified = useCallback(
     async (descriptor: number[]) => {
-      if (signInStartedRef.current || disabled || !trimmedCompany) return false;
+      if (signInStartedRef.current || disabled) return false;
       if (Date.now() < retryBlockedUntilRef.current) return false;
 
       signInStartedRef.current = true;
@@ -58,7 +58,7 @@ export function FaceLoginSection({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               descriptor,
-              companyName: trimmedCompany,
+              ...(trimmedCompany ? { companyName: trimmedCompany } : {}),
             }),
           }),
           LOGIN_TIMEOUT_MS
@@ -66,21 +66,26 @@ export function FaceLoginSection({
         const matchBody = (await matchRes.json().catch(() => ({}))) as {
           loginToken?: string;
           error?: string;
+          retryAfterMs?: number;
         };
 
         if (!matchRes.ok) {
           signInStartedRef.current = false;
           if (matchRes.status === 429) {
-            // 과도한 자동 재시도로 인한 깜빡임/요청폭주 방지
-            retryBlockedUntilRef.current = Date.now() + 10_000;
+            retryBlockedUntilRef.current =
+              Date.now() + Math.max(matchBody.retryAfterMs ?? 0, 15_000);
             onError(t("login.errorFaceRateLimit"));
-          } else if (matchBody.error === "missing_name") {
-            onError(t("login.faceCompanyRequired"));
           } else if (matchBody.error === "not_found") {
+            retryBlockedUntilRef.current = Date.now() + FAILED_RETRY_COOLDOWN_MS;
             onError(t("login.errorFaceCompanyNotFound"));
           } else if (matchBody.error === "ambiguous") {
-            onError(t("login.errorFaceCompanyAmbiguous"));
+            retryBlockedUntilRef.current = Date.now() + FAILED_RETRY_COOLDOWN_MS;
+            onError(t("login.errorFaceAmbiguous"));
+          } else if (matchBody.error === "no_enrolled") {
+            retryBlockedUntilRef.current = Date.now() + FAILED_RETRY_COOLDOWN_MS;
+            onError(t("login.errorFaceNoEnrolled"));
           } else {
+            retryBlockedUntilRef.current = Date.now() + FAILED_RETRY_COOLDOWN_MS;
             onError(t("login.errorFaceCredentials"));
           }
           return false;
@@ -128,7 +133,12 @@ export function FaceLoginSection({
   return (
     <>
       <div className={authFieldGroup}>
-        <label className={authLabel}>{t("login.faceCompanyName")}</label>
+        <label className={authLabel}>
+          {t("login.faceCompanyName")}{" "}
+          <span className="font-normal text-[var(--apple-label-tertiary)]">
+            ({t("login.faceCompanyOptional")})
+          </span>
+        </label>
         <input
           type="text"
           autoComplete="organization"
@@ -140,29 +150,25 @@ export function FaceLoginSection({
             retryBlockedUntilRef.current = 0;
             onError(null);
           }}
-          required
         />
-        <p className={authHint}>
-          {faceReady ? t("login.faceCompanyHint") : t("login.faceEnterCompanyToStart")}
-        </p>
+        <p className={authHint}>{t("login.faceCompanyHint")}</p>
       </div>
       {error && <p className={authError}>{error}</p>}
-      {faceReady ? (
-        <FaceCapture
-          key={trimmedCompany.toLowerCase()}
-          mode="verify"
-          autoVerify
-          verifyOnClientOnly
-          highAccuracyScan
-          scanWhenFaceVisible
-          profileKind="login"
-          disabled={disabled}
-          verifyTitle={t("login.faceVerifyTitle")}
-          verifyLead={t("login.faceVerifyLead")}
-          onVerified={handleVerified}
-          onError={(message) => onError(message)}
-        />
-      ) : null}
+      <FaceCapture
+        key={trimmedCompany.toLowerCase() || "all"}
+        mode="verify"
+        autoVerify
+        verifyOnClientOnly
+        scanWhenFaceVisible
+        blockRetryUntilFaceAbsent={false}
+        profileKind="login"
+        disabled={disabled}
+        verifyTitle={t("login.faceVerifyTitle")}
+        verifyLead={t("login.faceVerifyLead")}
+        verifyRetryLabel={t("login.faceVerifyRetry")}
+        onVerified={handleVerified}
+        onError={(message) => onError(message)}
+      />
     </>
   );
 }

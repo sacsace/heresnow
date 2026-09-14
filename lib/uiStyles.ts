@@ -173,7 +173,13 @@ export const btnPrimary =
 export const btnPrimaryFull = `w-full ${btnPrimary} py-2.5`;
 
 export const btnSecondary =
-  "inline-flex h-9 min-h-[2.25rem] touch-manipulation items-center justify-center rounded-[0.625rem] border border-[var(--separator)] bg-white px-4 text-[0.8125rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-tertiary)] active:opacity-80 disabled:opacity-40 sm:text-[0.875rem]";
+  "inline-flex min-h-[2.25rem] touch-manipulation items-center justify-center rounded-[0.625rem] border border-[var(--separator)] bg-white px-5 py-2.5 text-[0.9375rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-tertiary)] active:opacity-80 disabled:opacity-40";
+
+/** 계정 등 — 나란히 배치 시 동일 너비 */
+export const btnActionRow =
+  "grid grid-cols-1 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]";
+
+export const btnActionEqual = "w-full";
 
 export const btnDestructive =
   "text-[0.8125rem] font-medium text-[var(--apple-red)] hover:underline";
