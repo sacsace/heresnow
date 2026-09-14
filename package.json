@@ -20,7 +20,9 @@
     "db:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-db.ps1",
     "db:studio": "prisma studio",
     "db:verify": "npx tsx scripts/db-verify.ts",
-    "test:attendance-core": "tsx scripts/test-attendance-core.ts"
+    "test:attendance-core": "tsx scripts/test-attendance-core.ts",
+    "vapid:generate": "node scripts/generate-vapid-keys.mjs",
+    "test:push:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/test-push-local.ps1"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -46,6 +48,7 @@
     "razorpay": "^2.9.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
@@ -59,6 +62,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
     "eslint": "^9",

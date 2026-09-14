@@ -161,6 +161,7 @@ export default auth((req) => {
   const isPublicApi =
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/public") ||
+    pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/integrations/") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/favicon.png" ||

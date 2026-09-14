@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckInPushBanner } from "@/components/employee/CheckInPushBanner";
 import { FaceCapture } from "@/components/employee/FaceCapture";
 import { loadFaceModels } from "@/lib/faceRecognitionClient";
 import { StaticMap } from "@/components/admin/StaticMap";
@@ -660,6 +661,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   return (
     <div className={embedded ? "min-w-0" : "min-w-0 space-y-6 sm:space-y-8"}>
       {!embedded && <AttendanceTrustHero variant="employee" />}
+      {!embedded && <CheckInPushBanner />}
 
       <section className={card}>
         <div className={cardHeader}>

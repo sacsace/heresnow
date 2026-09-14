@@ -88,6 +88,11 @@ enum IntegrationOutboxStatus {
   FAILED
 }
 
+enum CheckInReminderKind {
+  BEFORE_15
+  AFTER_15
+}
+
 /// 좌석 구간 요금 (월/연 구분, 슈퍼관리자 수정)
 model PricingTier {
   id             String         @id @default(cuid())
@@ -281,6 +286,7 @@ model User {
   resolvedWorkRequests    WorkRequest[]    @relation("WorkRequestResolver")
   assignedWorkRequests    WorkRequest[]    @relation("WorkRequestAssignedApprover")
   passkeys      UserPasskeyCredential[]
+  pushSubscriptions PushSubscription[]
 }
 
 model UserPasskeyCredential {
@@ -333,9 +339,40 @@ model Employee {
 
   attendanceRecords AttendanceRecord[]
   workRequests      WorkRequest[]
+  checkInReminderLogs CheckInReminderLog[]
 
   @@index([companyId])
   @@index([departmentId])
+}
+
+/// Web Push 구독 (휴대폰·PWA 출근 알림)
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String
+  p256dh    String
+  auth      String
+  locale    String   @default("ko")
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+}
+
+/// 출근 ±15분 알림 중복 방지
+model CheckInReminderLog {
+  id           String              @id @default(cuid())
+  employeeId   String
+  employee     Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  workDate     String
+  reminderKind CheckInReminderKind
+  sentAt       DateTime            @default(now())
+
+  @@unique([employeeId, workDate, reminderKind])
+  @@index([employeeId, workDate])
 }
 
 /// 조기 퇴근·초과 근무 사전 신청

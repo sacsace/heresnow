@@ -2,6 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import { AppLogo } from "@/components/AppLogo";
+import { isIos, isMobileDevice, isStandaloneApp } from "@/lib/pwaPlatform";
 import { btnPrimary, btnSecondary } from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
 
@@ -21,29 +22,6 @@ function isProductionMobileHost(): boolean {
     return true;
   }
   return false;
-}
-
-function isMobileDevice(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
-  const nav = navigator as Navigator & { maxTouchPoints?: number };
-  return navigator.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1;
-}
-
-function isStandaloneApp(): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.matchMedia("(display-mode: standalone)").matches) return true;
-  const nav = window.navigator as Navigator & { standalone?: boolean };
-  return nav.standalone === true;
-}
-
-function isIos(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  if (/iPad|iPhone|iPod/.test(ua)) return true;
-  const nav = navigator as Navigator & { maxTouchPoints?: number };
-  return navigator.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1;
 }
 
 function isDismissedRecently(): boolean {
