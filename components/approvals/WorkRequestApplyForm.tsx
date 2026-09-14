@@ -56,7 +56,7 @@ export function WorkRequestApplyForm({
       const list = j.approvers ?? [];
       setApprovers(list);
       setAssignedApproverUserId((prev) =>
-        prev && list.some((a) => a.userId === prev) ? prev : (list[0]?.userId ?? "")
+        prev && list.some((a) => a.userId === prev) ? prev : ""
       );
     } else {
       setApprovers([]);
@@ -190,6 +190,9 @@ export function WorkRequestApplyForm({
             required
             disabled={submitting}
           >
+            <option value="" disabled>
+              {t("approvals.approverSelectPlaceholder")}
+            </option>
             {approvers.map((option) => (
               <option key={option.userId} value={option.userId}>
                 {approverLabel(option)}
