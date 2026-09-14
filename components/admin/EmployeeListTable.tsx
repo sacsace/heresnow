@@ -31,12 +31,14 @@ const rowControlStatic =
 const rowInput =
   "h-7 w-full min-w-0 rounded-[0.4375rem] bg-[var(--fill-secondary)] px-2 text-[0.75rem] leading-none text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60";
 const empTable = "w-full min-w-full text-left text-[0.8125rem] sm:text-[0.875rem]";
-const empTh = "px-3 py-2 whitespace-nowrap sm:px-3.5";
-const empTd = "px-3 py-2 align-middle text-[var(--foreground)] sm:px-3.5";
+const empTh = "px-2 py-2 whitespace-nowrap sm:px-2.5";
+const empTd = "px-2 py-1.5 align-middle text-[var(--foreground)] sm:px-2.5 sm:py-2";
+const empThLabel =
+  "text-[0.6875rem] font-semibold leading-snug text-[var(--apple-label-secondary)] sm:text-[0.75rem]";
 const empBtnDanger =
   "inline-flex h-7 touch-manipulation items-center justify-center rounded-md bg-[var(--apple-red)]/10 px-2.5 text-[0.75rem] font-medium text-[var(--apple-red)] transition-colors hover:bg-[var(--apple-red)]/16 disabled:opacity-40";
 
-const WIDTH_STORAGE_KEY = "heresnow_employee_col_widths_v6";
+const WIDTH_STORAGE_KEY = "heresnow_employee_col_widths_v7";
 
 type ResizableCol = "name" | "email" | "password" | "role" | "department";
 type SortKey = ResizableCol;
@@ -45,27 +47,27 @@ type SortDir = "asc" | "desc";
 type ColWidths = Record<ResizableCol, number> & { actions: number };
 
 const DEFAULT_WIDTHS: ColWidths = {
-  name: 128,
-  email: 168,
-  password: 48,
-  role: 112,
-  department: 108,
-  actions: 60,
+  name: 104,
+  email: 136,
+  password: 72,
+  role: 100,
+  department: 96,
+  actions: 68,
 };
 
 const MIN_WIDTHS: ColWidths = {
-  name: 88,
-  email: 112,
-  password: 44,
-  role: 96,
-  department: 88,
-  actions: 52,
+  name: 80,
+  email: 108,
+  password: 64,
+  role: 88,
+  department: 80,
+  actions: 56,
 };
 
-const LOGIN_COL_WIDTH = 96;
-const SCHEDULE_COL_WIDTH = 132;
-const SELECT_COL_WIDTH = 56;
-const TEAM_LEADER_COL_WIDTH = 64;
+const LOGIN_COL_WIDTH = 84;
+const SCHEDULE_COL_WIDTH = 116;
+const SELECT_COL_WIDTH = 48;
+const TEAM_LEADER_COL_WIDTH = 56;
 
 const ROLE_ORDER: Role[] = ["EMPLOYEE", "DOOR", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN"];
 
@@ -80,7 +82,7 @@ function loadStoredWidths(): ColWidths {
       const v = parsed[key];
       if (typeof v === "number" && Number.isFinite(v)) {
         const clamped =
-          key === "email" ? Math.min(v, 188) : key === "name" ? Math.min(v, 160) : v;
+          key === "email" ? Math.min(v, 168) : key === "name" ? Math.min(v, 132) : v;
         next[key] = Math.max(MIN_WIDTHS[key], clamped);
       }
     }
@@ -258,17 +260,15 @@ export function EmployeeListTable({
 
   const fixedHeaderCell = (
     label: string,
-    width: number,
+    minWidth: number,
     opts?: { align?: "left" | "center"; title?: string }
   ) => (
     <th
       className={`${empTh} ${opts?.align === "center" ? "text-center" : "text-left"}`}
-      style={{ width, minWidth: width }}
+      style={{ minWidth }}
       title={opts?.title ?? label}
     >
-      <span className="block text-[0.6875rem] font-semibold leading-snug text-[var(--apple-label-secondary)] sm:text-[0.75rem]">
-        {label}
-      </span>
+      <span className={`block whitespace-nowrap ${empThLabel}`}>{label}</span>
     </th>
   );
 
@@ -276,7 +276,7 @@ export function EmployeeListTable({
     <th
       key={key}
       className={`${empTh} relative select-none text-left`}
-      style={{ width: widths[key], minWidth: MIN_WIDTHS[key] }}
+      style={{ minWidth: MIN_WIDTHS[key] }}
       aria-sort={
         key !== "password" && sortKey === key
           ? sortDir === "asc"
@@ -286,12 +286,12 @@ export function EmployeeListTable({
       }
     >
       {key === "password" ? (
-        <span className="block truncate pr-2">{label}</span>
+        <span className={`block whitespace-nowrap pr-2 ${empThLabel}`}>{label}</span>
       ) : (
         <button
           type="button"
           onClick={() => toggleSort(key)}
-          className="inline-flex max-w-full items-center truncate pr-3 text-inherit hover:text-[var(--foreground)]"
+          className={`inline-flex items-center whitespace-nowrap pr-4 ${empThLabel} hover:text-[var(--foreground)]`}
         >
           {label}
           {sortArrow(key)}
@@ -322,29 +322,42 @@ export function EmployeeListTable({
   const allSelected =
     showSelect && employees.length > 0 && employees.every((e) => selectedIds!.has(e.id));
 
+  const tableMinWidth =
+    widths.name +
+    widths.email +
+    widths.role +
+    widths.department +
+    widths.password +
+    widths.actions +
+    SCHEDULE_COL_WIDTH +
+    (showSelect ? SELECT_COL_WIDTH : 0) +
+    (showLoginStatus ? LOGIN_COL_WIDTH : 0) +
+    (onChangeTeamLeader ? TEAM_LEADER_COL_WIDTH : 0);
+
+  const colPct = (px: number) => `${(px / tableMinWidth) * 100}%`;
+
   return (
-    <div className="w-full min-w-0">
-      <table className={empTable} style={{ tableLayout: "fixed", width: "100%" }}>
+    <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+      <table
+        className={empTable}
+        style={{ tableLayout: "fixed", width: "100%", minWidth: tableMinWidth }}
+      >
         <colgroup>
-          {showSelect && <col style={{ width: SELECT_COL_WIDTH }} />}
-          <col style={{ width: widths.name }} />
-          <col style={{ width: widths.email }} />
-          <col style={{ width: widths.role }} />
-          <col style={{ width: widths.department }} />
-          {showLoginStatus && (
-            <col style={{ width: LOGIN_COL_WIDTH, minWidth: LOGIN_COL_WIDTH }} />
-          )}
-          {onChangeTeamLeader && (
-            <col style={{ width: TEAM_LEADER_COL_WIDTH, minWidth: TEAM_LEADER_COL_WIDTH }} />
-          )}
-          <col style={{ width: SCHEDULE_COL_WIDTH, minWidth: SCHEDULE_COL_WIDTH }} />
-          <col style={{ width: widths.password, minWidth: MIN_WIDTHS.password }} />
-          <col style={{ width: widths.actions, minWidth: MIN_WIDTHS.actions }} />
+          {showSelect && <col style={{ width: colPct(SELECT_COL_WIDTH) }} />}
+          <col style={{ width: colPct(widths.name) }} />
+          <col style={{ width: colPct(widths.email) }} />
+          <col style={{ width: colPct(widths.role) }} />
+          <col style={{ width: colPct(widths.department) }} />
+          {showLoginStatus && <col style={{ width: colPct(LOGIN_COL_WIDTH) }} />}
+          {onChangeTeamLeader && <col style={{ width: colPct(TEAM_LEADER_COL_WIDTH) }} />}
+          <col style={{ width: colPct(SCHEDULE_COL_WIDTH) }} />
+          <col style={{ width: colPct(widths.password) }} />
+          <col style={{ width: colPct(widths.actions) }} />
         </colgroup>
         <thead className={tableHead}>
           <tr>
             {showSelect && (
-              <th className={`${empTh} text-center`} style={{ width: SELECT_COL_WIDTH }}>
+              <th className={`${empTh} text-center`} style={{ minWidth: SELECT_COL_WIDTH }}>
                 <div className="flex items-center justify-center gap-1.5">
                   <span
                     className="w-4 shrink-0 text-center text-[0.6875rem] font-medium text-[var(--apple-label-tertiary)]"
@@ -379,11 +392,8 @@ export function EmployeeListTable({
               { title: t("admin.empScheduleCol") }
             )}
             {headerCell("password", t("admin.employeesPasswordColLabel"), true)}
-            <th
-              className={`${empTh} text-center`}
-              style={{ width: widths.actions, minWidth: MIN_WIDTHS.actions }}
-            >
-              <span className="block text-[0.6875rem] font-semibold leading-snug text-[var(--apple-label-secondary)] sm:text-[0.75rem]">
+            <th className={`${empTh} text-center`} style={{ minWidth: MIN_WIDTHS.actions }}>
+              <span className={`block whitespace-nowrap ${empThLabel}`}>
                 {t("admin.employeesColActions")}
               </span>
             </th>

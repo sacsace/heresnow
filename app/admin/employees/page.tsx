@@ -868,7 +868,7 @@ export default function AdminEmployeesPage() {
         )}
         {rowError && <p className={`mb-3 ${errorText}`}>{rowError}</p>}
 
-        <div className={`${card} min-w-0 overflow-hidden`}>
+        <div className={`${card} min-w-0`}>
           <div className={tableToolbar}>
             <div className={`${searchFiltersRow} w-full`}>
               <div className={`${searchFieldCol} ${searchFieldWrap}`}>
