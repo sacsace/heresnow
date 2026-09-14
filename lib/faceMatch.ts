@@ -1,8 +1,8 @@
 /** face-api.js 유클리드 거리 기준 (낮을수록 동일인) — 1:1 출퇴근 검증 */
 export const FACE_MATCH_THRESHOLD = 0.45;
 
-/** 로그인 1:N — 오탐(타 계정 로그인) 방지를 위해 출근보다 엄격 */
-export const FACE_MATCH_THRESHOLD_LOGIN = 0.47;
+/** 로그인 1:N — 1:1 테스트·출근과 동일 거리 기준 (+ pickFaceLoginMatch 모호성 검사) */
+export const FACE_MATCH_THRESHOLD_LOGIN = FACE_MATCH_THRESHOLD;
 
 /** 로그인 — 이 거리 이하일 때만 2순위와 격차 검사 완화 */
 export const FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT = 0.36;
