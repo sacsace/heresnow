@@ -487,7 +487,7 @@ export function FaceCapture({
       timer = setTimeout(() => void tick(), ms);
     };
 
-    async function completeEnrollStep(stepSamples: number[]) {
+    async function completeEnrollStep(stepSamples: number[][]) {
       enrollAllSamplesRef.current.push(...stepSamples);
       enrollStepBufferRef.current = [];
       setEnrollFrameCount(0);
