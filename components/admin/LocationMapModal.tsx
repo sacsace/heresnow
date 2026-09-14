@@ -2,9 +2,11 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import { btnSecondary, link } from "@/lib/uiStyles";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "leaflet/dist/leaflet.css";
+
+type MapBaseLayer = "street" | "satellite";
 
 type Props = {
   open: boolean;
@@ -18,12 +20,46 @@ type Props = {
 export function LocationMapModal({ open, onClose, lat, lng, title, subtitle }: Props) {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
+  const [baseLayer, setBaseLayer] = useState<MapBaseLayer>("street");
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<import("leaflet").Map | null>(null);
+  const streetLayerRef = useRef<import("leaflet").TileLayer | null>(null);
+  const satelliteLayerRef = useRef<import("leaflet").TileLayer | null>(null);
+  const baseLayerRef = useRef(baseLayer);
+  baseLayerRef.current = baseLayer;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!open) setBaseLayer("street");
+  }, [open]);
+
+  const applyBaseLayer = useCallback((layer: MapBaseLayer) => {
+    const map = mapInstanceRef.current;
+    const street = streetLayerRef.current;
+    const satellite = satelliteLayerRef.current;
+    if (!map || !street || !satellite) return;
+
+    try {
+      if (layer === "street") {
+        if (map.hasLayer(satellite)) map.removeLayer(satellite);
+        if (!map.hasLayer(street)) street.addTo(map);
+        return;
+      }
+
+      if (map.hasLayer(street)) map.removeLayer(street);
+      if (!map.hasLayer(satellite)) satellite.addTo(map);
+    } catch {
+      // map.remove() 직후 레이어 전환 시 무시
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    applyBaseLayer(baseLayer);
+  }, [open, baseLayer, applyBaseLayer]);
 
   useEffect(() => {
     if (!open) return;
@@ -72,12 +108,39 @@ export function LocationMapModal({ open, onClose, lat, lng, title, subtitle }: P
         scrollWheelZoom: true,
       }).setView([lat, lng], 16);
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        maxZoom: 20,
-        subdomains: "abcd",
-      }).addTo(map);
+      const street = L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          maxZoom: 20,
+          subdomains: "abcd",
+        }
+      );
+      const osmFallback = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+        maxZoom: 19,
+        subdomains: "abc",
+      });
+      street.on("tileerror", () => {
+        const active = mapInstanceRef.current;
+        if (!active || cancelled || !active.hasLayer(street)) return;
+        active.removeLayer(street);
+        if (!active.hasLayer(osmFallback)) osmFallback.addTo(active);
+      });
+
+      const satellite = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        {
+          attribution:
+            '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Maxar, Earthstar Geographics',
+          maxZoom: 19,
+        }
+      );
+
+      streetLayerRef.current = street;
+      satelliteLayerRef.current = satellite;
+      applyBaseLayer(baseLayerRef.current);
 
       L.circleMarker([lat, lng], {
         radius: 10,
@@ -101,6 +164,7 @@ export function LocationMapModal({ open, onClose, lat, lng, title, subtitle }: P
 
       map.whenReady(() => {
         if (cancelled || mapInstanceRef.current !== map) return;
+        applyBaseLayer(baseLayerRef.current);
         safeInvalidateSize();
         timeoutIds.push(window.setTimeout(safeInvalidateSize, 100));
         timeoutIds.push(window.setTimeout(safeInvalidateSize, 400));
@@ -111,12 +175,14 @@ export function LocationMapModal({ open, onClose, lat, lng, title, subtitle }: P
       cancelled = true;
       for (const id of timeoutIds) window.clearTimeout(id);
       mapInstanceRef.current = null;
+      streetLayerRef.current = null;
+      satelliteLayerRef.current = null;
       if (map) {
         map.remove();
         map = null;
       }
     };
-  }, [open, lat, lng, title]);
+  }, [open, lat, lng, title, applyBaseLayer]);
 
   if (!open || !mounted) return null;
 
@@ -156,6 +222,38 @@ export function LocationMapModal({ open, onClose, lat, lng, title, subtitle }: P
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-hidden p-4 sm:p-5">
+          <div className="mb-2 flex justify-end">
+            <div
+              className="flex rounded-[0.625rem] bg-[var(--fill-secondary)] p-0.5"
+              role="group"
+              aria-label={t("admin.monthlyMapLayerLabel")}
+            >
+              <button
+                type="button"
+                aria-pressed={baseLayer === "street"}
+                className={`rounded-[0.5rem] px-2.5 py-1 text-[0.75rem] font-medium transition-colors ${
+                  baseLayer === "street"
+                    ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--apple-label-secondary)]"
+                }`}
+                onClick={() => setBaseLayer("street")}
+              >
+                {t("admin.monthlyMapLayerStreet")}
+              </button>
+              <button
+                type="button"
+                aria-pressed={baseLayer === "satellite"}
+                className={`rounded-[0.5rem] px-2.5 py-1 text-[0.75rem] font-medium transition-colors ${
+                  baseLayer === "satellite"
+                    ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--apple-label-secondary)]"
+                }`}
+                onClick={() => setBaseLayer("satellite")}
+              >
+                {t("admin.monthlyMapLayerSatellite")}
+              </button>
+            </div>
+          </div>
           <div
             ref={mapContainerRef}
             className="h-[min(24rem,55vh)] w-full min-h-[16rem] rounded-2xl bg-[var(--fill-tertiary)] ring-1 ring-black/[0.04]"

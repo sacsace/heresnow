@@ -1,0 +1,5 @@
+# Railway Cron — 5분마다 출근 ±15분 Web Push 배치 호출
+[deploy]
+startCommand = "/bin/sh /invoke.sh"
+cronSchedule = "*/5 * * * *"
+restartPolicyType = "NEVER"
