@@ -19,6 +19,8 @@ export type DayMapMarker = {
   businessTripReason: string | null;
 };
 
+type MapBaseLayer = "street" | "satellite";
+
 type Props = {
   /** 단일 날짜 모드 */
   date?: string;
@@ -35,6 +37,9 @@ export function AdminDayAttendanceMap({ date, from, to, companyId, className }: 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<import("leaflet").Map | null>(null);
   const layerGroupRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const streetLayerRef = useRef<import("leaflet").TileLayer | null>(null);
+  const satelliteLayerRef = useRef<import("leaflet").TileLayer | null>(null);
+  const [baseLayer, setBaseLayer] = useState<MapBaseLayer>("street");
   const [markers, setMarkers] = useState<DayMapMarker[]>([]);
   const [timezone, setTimezone] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,10 +139,19 @@ export function AdminDayAttendanceMap({ date, from, to, companyId, className }: 
         mapInstanceRef.current = L.map(mapContainerRef.current, {
           scrollWheelZoom: true,
         }).setView([37.5665, 126.978], 11);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        streetLayerRef.current = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
           maxZoom: 19,
-        }).addTo(mapInstanceRef.current);
+        });
+        satelliteLayerRef.current = L.tileLayer(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          {
+            attribution:
+              '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Maxar, Earthstar Geographics',
+            maxZoom: 19,
+          }
+        );
+        streetLayerRef.current.addTo(mapInstanceRef.current);
         layerGroupRef.current = L.layerGroup().addTo(mapInstanceRef.current);
       }
 
@@ -211,6 +225,22 @@ export function AdminDayAttendanceMap({ date, from, to, companyId, className }: 
   }, [loading, markers, t, isRange, dateLocale]);
 
   useEffect(() => {
+    const map = mapInstanceRef.current;
+    const street = streetLayerRef.current;
+    const satellite = satelliteLayerRef.current;
+    if (!map || !street || !satellite) return;
+
+    if (baseLayer === "street") {
+      if (map.hasLayer(satellite)) map.removeLayer(satellite);
+      if (!map.hasLayer(street)) street.addTo(map);
+      return;
+    }
+
+    if (map.hasLayer(street)) map.removeLayer(street);
+    if (!map.hasLayer(satellite)) satellite.addTo(map);
+  }, [baseLayer]);
+
+  useEffect(() => {
     if (loading || markers.length === 0) return;
     const id = window.setTimeout(() => {
       mapInstanceRef.current?.invalidateSize();
@@ -224,6 +254,8 @@ export function AdminDayAttendanceMap({ date, from, to, companyId, className }: 
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
         layerGroupRef.current = null;
+        streetLayerRef.current = null;
+        satelliteLayerRef.current = null;
       }
     };
   }, []);
@@ -258,10 +290,42 @@ export function AdminDayAttendanceMap({ date, from, to, companyId, className }: 
       )}
       {!loading && !error && markers.length > 0 && (
         <>
-          <p className="mb-2 text-xs text-[var(--apple-label-secondary)]">
-            {t("admin.monthlyMapCountLabel")}: {markers.length}
-            {timezone ? ` · ${timezone}` : ""}
-          </p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-[var(--apple-label-secondary)]">
+              {t("admin.monthlyMapCountLabel")}: {markers.length}
+              {timezone ? ` · ${timezone}` : ""}
+            </p>
+            <div
+              className="flex rounded-[0.625rem] bg-[var(--fill-secondary)] p-0.5"
+              role="group"
+              aria-label={t("admin.monthlyMapLayerLabel")}
+            >
+              <button
+                type="button"
+                aria-pressed={baseLayer === "street"}
+                className={`rounded-[0.5rem] px-2.5 py-1 text-[0.75rem] font-medium transition-colors ${
+                  baseLayer === "street"
+                    ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--apple-label-secondary)]"
+                }`}
+                onClick={() => setBaseLayer("street")}
+              >
+                {t("admin.monthlyMapLayerStreet")}
+              </button>
+              <button
+                type="button"
+                aria-pressed={baseLayer === "satellite"}
+                className={`rounded-[0.5rem] px-2.5 py-1 text-[0.75rem] font-medium transition-colors ${
+                  baseLayer === "satellite"
+                    ? "bg-[var(--grouped-bg)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--apple-label-secondary)]"
+                }`}
+                onClick={() => setBaseLayer("satellite")}
+              >
+                {t("admin.monthlyMapLayerSatellite")}
+              </button>
+            </div>
+          </div>
           <div
             ref={mapContainerRef}
             className={`z-0 h-[min(36rem,65vh)] w-full min-h-[21rem] rounded-2xl bg-[var(--fill-tertiary)] ring-1 ring-black/[0.04] ${mapInitError ? "hidden" : ""}`}
