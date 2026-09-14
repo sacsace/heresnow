@@ -17,6 +17,8 @@ export type PunchStatus = {
   today: string;
   /** 지금 퇴근하면 조퇴 — 사유 입력·승인 절차가 필요 */
   earlyLeaveExpected?: boolean;
+  /** 지금 퇴근하면 초과 근무 — 사유 입력·승인 절차가 필요 */
+  overtimeExpected?: boolean;
   /** 퇴근 후 4시간 이내 재출근 — 사유 입력·승인 절차가 필요 */
   reCheckInApprovalRequired?: boolean;
   /** 출근 후 48시간 초과 — 퇴근 가능, 기록 시각만 보정 */

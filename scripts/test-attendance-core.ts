@@ -39,6 +39,8 @@ const companySchedule = {
   workScheduleByDay: null,
 };
 
+const punchOpts = { workSchedule: companySchedule };
+
 run("1) no record allows check-in", () => {
   const now = zdt("2026-08-10 09:00:00");
   const r = evaluatePunchEligibility(now, TZ, null);
@@ -78,7 +80,12 @@ run("5) check-out then check-out is blocked", () => {
 run("6) cooldown blocks re-check-in within 4 hours", () => {
   const outAt = zdt("2026-08-10 18:00:00");
   const now = new Date(outAt.getTime() + 3 * 60 * 60 * 1000);
-  const r = evaluatePunchEligibility(now, TZ, { type: "CHECK_OUT", timestamp: outAt });
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
   assert.equal(r.canCheckIn, false);
   assert.equal(r.checkInBlock, "COOLDOWN");
 });
@@ -86,30 +93,114 @@ run("6) cooldown blocks re-check-in within 4 hours", () => {
 run("7) re-check-in allowed exactly at 4 hours", () => {
   const outAt = zdt("2026-08-10 18:00:00");
   const now = new Date(outAt.getTime() + FOUR_H_MS);
-  const r = evaluatePunchEligibility(now, TZ, { type: "CHECK_OUT", timestamp: outAt });
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
   assert.equal(r.canCheckIn, true);
 });
 
 run("8) re-check-in allowed after 5 hours", () => {
   const outAt = zdt("2026-08-10 18:00:00");
   const now = new Date(outAt.getTime() + 5 * 60 * 60 * 1000);
-  const r = evaluatePunchEligibility(now, TZ, { type: "CHECK_OUT", timestamp: outAt });
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
   assert.equal(r.canCheckIn, true);
 });
 
-run("9) midnight exception allows check-in before 4 hours", () => {
+run("9) midnight does not bypass 4-hour cooldown", () => {
   const outAt = zdt("2026-08-10 23:00:00");
   const now = zdt("2026-08-11 00:30:00");
-  const r = evaluatePunchEligibility(now, TZ, { type: "CHECK_OUT", timestamp: outAt });
-  assert.equal(r.canCheckIn, true);
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
+  assert.equal(r.canCheckIn, false);
+  assert.equal(r.checkInBlock, "COOLDOWN");
 });
 
-run("10) timezone-based day boundary is respected", () => {
+run("10) timezone-based day boundary still requires 4 hours", () => {
   const ny = "America/New_York";
   const outAt = zdt("2026-08-10 23:00:00", ny);
   const now = zdt("2026-08-11 00:30:00", ny);
-  const r = evaluatePunchEligibility(now, ny, { type: "CHECK_OUT", timestamp: outAt });
+  const r = evaluatePunchEligibility(
+    now,
+    ny,
+    { type: "CHECK_OUT", timestamp: outAt },
+    { workSchedule: companySchedule }
+  );
+  assert.equal(r.canCheckIn, false);
+  assert.equal(r.checkInBlock, "COOLDOWN");
+});
+
+run("9b) immediate re-check-in after check-out is blocked", () => {
+  const outAt = zdt("2026-08-10 18:00:00");
+  const now = new Date(outAt.getTime() + 60_000);
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
+  assert.equal(r.canCheckIn, false);
+  assert.equal(r.checkInBlock, "COOLDOWN");
+});
+
+run("9c) re-check-in allowed after midnight once 4 hours passed", () => {
+  const outAt = zdt("2026-08-10 23:00:00");
+  const now = new Date(outAt.getTime() + FOUR_H_MS);
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
   assert.equal(r.canCheckIn, true);
+});
+
+run("9d) dawn checkout allows check-in 60 min before scheduled start", () => {
+  const outAt = zdt("2026-08-11 05:00:00");
+  const now = zdt("2026-08-11 08:00:00");
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
+  assert.equal(r.canCheckIn, true);
+});
+
+run("9e) dawn checkout blocks immediate re-check-in before early window", () => {
+  const outAt = zdt("2026-08-11 05:00:00");
+  const now = zdt("2026-08-11 05:30:00");
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
+  assert.equal(r.canCheckIn, false);
+  assert.equal(r.checkInBlock, "COOLDOWN");
+});
+
+run("9f) nextCheckInAt uses earlier of 4h and 60-min-before-start", () => {
+  const outAt = zdt("2026-08-11 05:00:00");
+  const now = zdt("2026-08-11 05:30:00");
+  const r = evaluatePunchEligibility(
+    now,
+    TZ,
+    { type: "CHECK_OUT", timestamp: outAt },
+    punchOpts
+  );
+  assert.equal(isoMinute(new Date(r.nextCheckInAt!)), isoMinute(zdt("2026-08-11 08:00:00")));
 });
 
 run("11) check-out blocked at +1 minute", () => {

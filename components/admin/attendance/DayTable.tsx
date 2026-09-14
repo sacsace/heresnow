@@ -261,12 +261,16 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
                       lat={r.checkIn.latitude}
                       lng={r.checkIn.longitude}
                       label={mapLabel(r.employeeName, "checkIn")}
+                      subtitle={locationLabel(r.checkIn, t) ?? undefined}
+                      noKeyFallback="modal"
                     />
                   ) : r.checkOut ? (
                     <StaticMap
                       lat={r.checkOut.latitude}
                       lng={r.checkOut.longitude}
                       label={mapLabel(r.employeeName, "checkOut")}
+                      subtitle={locationLabel(r.checkOut, t) ?? undefined}
+                      noKeyFallback="modal"
                     />
                   ) : (
                     "—"

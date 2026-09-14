@@ -36,7 +36,7 @@ export const EMPLOYEE_BULK_LABELS_EN: EmployeeBulkTemplateLabels = {
   sheetDepartments: "Departments",
   colEmail: "Email",
   colName: "Name",
-  colPassword: "Temporary password",
+  colPassword: "Temporary Password",
   colDepartment: "Department",
   colRole: "Role",
   exampleNote: "Example (delete before upload)",

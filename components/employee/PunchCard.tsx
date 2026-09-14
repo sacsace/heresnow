@@ -39,6 +39,16 @@ import {
 import type { AttendanceType } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+function recordStatusLabel(
+  status: string,
+  t: (key: string) => string
+): string {
+  if (status === "PENDING") return t("employee.recordStatusPending");
+  if (status === "APPROVED") return t("employee.recordStatusApproved");
+  if (status === "REJECTED") return t("employee.recordStatusRejected");
+  return status;
+}
+
 type RecordRow = {
   id: string;
   type: AttendanceType;
@@ -78,6 +88,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const [businessTripLocation, setBusinessTripLocation] = useState("");
   const [businessTripReason, setBusinessTripReason] = useState("");
   const [earlyLeaveReason, setEarlyLeaveReason] = useState("");
+  const [overtimeReason, setOvertimeReason] = useState("");
   const [reCheckInReason, setReCheckInReason] = useState("");
   const [checkOutFaceStarted, setCheckOutFaceStarted] = useState(false);
   const [memo, setMemo] = useState("");
@@ -481,6 +492,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       setMsg(t("employee.earlyLeaveReasonRequired"));
       return false;
     }
+    if (punchStatus?.overtimeExpected && !punchStatus?.lateCheckOutPastWindow && !overtimeReason.trim()) {
+      setMsg(t("employee.overtimeReasonRequired"));
+      return false;
+    }
 
     setMsg(null);
     setBusy(true);
@@ -497,10 +512,14 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         accuracy: acc,
         memo: memo.trim() || undefined,
         earlyLeaveReason: earlyLeaveReason.trim() || undefined,
+        overtimeReason: overtimeReason.trim() || undefined,
         ...(faceDescriptor ? { faceDescriptor } : {}),
       });
       if (!result.ok) {
-        if (result.message === t("employee.earlyLeaveReasonRequired")) {
+        if (
+          result.message === t("employee.earlyLeaveReasonRequired") ||
+          result.message === t("employee.overtimeReasonRequired")
+        ) {
           await reloadPunchStatus();
         }
         setMsg(result.message);
@@ -511,6 +530,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       setMsg(typeof j.message === "string" ? j.message : t("employee.saved"));
       setMemo("");
       setEarlyLeaveReason("");
+      setOvertimeReason("");
       const recordId = typeof j.id === "string" ? j.id : null;
       setBusy(false);
       void loadRecords();
@@ -554,14 +574,20 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     (Boolean(punchStatus?.reCheckInApprovalRequired) && !reCheckInReason.trim()) ||
     (checkInMode === "businessTrip" &&
       (!businessTripLocation.trim() || !businessTripReason.trim()));
-  const checkOutSubmitLabel = punchStatus?.earlyLeaveExpected && !punchStatus?.lateCheckOutPastWindow
-    ? t("employee.earlyLeaveSubmitButton")
-    : t("employee.checkOutOnly");
+  const checkOutSubmitLabel =
+    punchStatus?.earlyLeaveExpected && !punchStatus?.lateCheckOutPastWindow
+      ? t("employee.earlyLeaveSubmitButton")
+      : punchStatus?.overtimeExpected && !punchStatus?.lateCheckOutPastWindow
+        ? t("employee.overtimeSubmitButton")
+        : t("employee.checkOutOnly");
   const checkOutFaceDisabled =
     busy ||
     (Boolean(punchStatus?.earlyLeaveExpected) &&
       !punchStatus?.lateCheckOutPastWindow &&
-      !earlyLeaveReason.trim());
+      !earlyLeaveReason.trim()) ||
+    (Boolean(punchStatus?.overtimeExpected) &&
+      !punchStatus?.lateCheckOutPastWindow &&
+      !overtimeReason.trim());
 
   const lateCheckOutRecordedPreview = useMemo(() => {
     if (!punchStatus?.lateCheckOutRecordedAt) return null;
@@ -881,6 +907,31 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                 />
               </div>
             )}
+            {punchStatus?.overtimeExpected && !punchStatus?.lateCheckOutPastWindow && (
+              <div className={`${bannerInfo} mb-3 space-y-2`}>
+                <p className="!bg-transparent !p-0 text-[0.8125rem] font-semibold">
+                  {punchStatus.workEndTime
+                    ? t("employee.overtimeNoticeWithTime").replace(
+                        "{time}",
+                        punchStatus.workEndTime
+                      )
+                    : t("employee.overtimeNotice")}
+                </p>
+                <label className={label}>
+                  {t("employee.overtimeReasonLabel")}
+                  <span className="text-[var(--apple-red)]"> *</span>
+                </label>
+                <textarea
+                  className={`${input} min-h-[5rem]`}
+                  rows={3}
+                  value={overtimeReason}
+                  onChange={(e) => setOvertimeReason(e.target.value)}
+                  placeholder={t("employee.overtimeReasonPlaceholder")}
+                  maxLength={2000}
+                  disabled={busy}
+                />
+              </div>
+            )}
             {faceRequired ? (
               !checkOutFaceStarted ? (
                 <button
@@ -1132,7 +1183,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                           )}
                           {exception && (
                             <span className="text-[var(--apple-label-tertiary)]">
-                              {t("employee.recordException")}: {exception.status}
+                              {t("employee.recordExceptionApproval").replace(
+                                "{status}",
+                                recordStatusLabel(exception.status, t)
+                              )}
                             </span>
                           )}
                           {!isHoliday && !isLate && !isEarly && !isOvertime && !exception && (
@@ -1141,7 +1195,9 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                         </div>
                       </td>
                       <td className={`${td} whitespace-nowrap text-right sm:text-left`}>
-                        <span className={statusBadge(status)}>{status}</span>
+                        <span className={statusBadge(status)}>
+                          {recordStatusLabel(status, t)}
+                        </span>
                       </td>
                     </tr>
                   );

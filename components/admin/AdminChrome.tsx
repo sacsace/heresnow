@@ -51,9 +51,16 @@ export function AdminChrome({
       {
         id: "people",
         label: "People",
+        items: withExpiryGate([{ href: "/admin/employees", label: t("admin.navEmployees") }]),
+      },
+      {
+        id: "approval",
+        label: t("admin.navApprovalGroup"),
         items: withExpiryGate([
-          { href: "/admin/employees", label: t("admin.navEmployees") },
-          { href: "/admin/exceptions", label: t("admin.navExceptions") },
+          {
+            href: "/admin/approvals",
+            label: t("approvals.navTitle"),
+          },
         ]),
       },
       {
@@ -168,8 +175,8 @@ export function AdminChrome({
       ? t("admin.navMyPunchLead")
       : activeItem?.href === "/admin/employees"
         ? t("admin.navEmployeesLead")
-        : activeItem?.href === "/admin/exceptions"
-          ? t("admin.navExceptionsLead")
+        : activeItem?.href === "/admin/approvals"
+          ? t("approvals.navLead")
           : activeItem?.href === "/admin/billing"
             ? t("admin.navBillingLead")
             : activeItem?.href === "/admin/settings"

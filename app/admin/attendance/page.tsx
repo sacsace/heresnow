@@ -512,7 +512,7 @@ export default function AdminAttendancePage() {
                     className={`${btnSecondary} h-9`}
                     onClick={showExportPicker}
                   >
-                    Excel
+                    {t("admin.attendanceDownloadButton")}
                   </button>
                 )}
               </div>
@@ -526,9 +526,9 @@ export default function AdminAttendancePage() {
 
       {tab === "map" ? (
         mapMode === "single" ? (
-          <AdminDayAttendanceMap date={mapDate} />
+          <AdminDayAttendanceMap key={`single-${mapDate}`} date={mapDate} />
         ) : (
-          <AdminDayAttendanceMap from={mapFrom} to={mapTo} />
+          <AdminDayAttendanceMap key={`range-${mapFrom}-${mapTo}`} from={mapFrom} to={mapTo} />
         )
       ) : loading ? (
         <p className="text-[1rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>

@@ -21,6 +21,7 @@ export type EmployeeRow = {
   loginEligible?: boolean;
   loginEligibleByAdmin?: boolean;
   seatRank?: number;
+  isTeamLeader?: boolean;
 };
 
 const rowControl =
@@ -29,16 +30,13 @@ const rowControlStatic =
   "flex h-7 w-full items-center rounded-[0.4375rem] bg-[var(--fill-tertiary)] px-2 text-[0.75rem] text-[var(--apple-label-secondary)]";
 const rowInput =
   "h-7 w-full min-w-0 rounded-[0.4375rem] bg-[var(--fill-secondary)] px-2 text-[0.75rem] leading-none text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60";
-const rowPasswordMask =
-  "flex h-7 w-full min-w-0 items-center rounded-[0.4375rem] bg-[var(--fill-secondary)] px-2 text-[0.75rem] tracking-[0.18em] text-[var(--apple-label-secondary)] outline-none transition-[box-shadow,background-color] hover:bg-[var(--fill-secondary-hover)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:cursor-default disabled:opacity-60";
-
 const empTable = "w-full min-w-full text-left text-[0.8125rem] sm:text-[0.875rem]";
 const empTh = "px-3 py-2 whitespace-nowrap sm:px-3.5";
 const empTd = "px-3 py-2 align-middle text-[var(--foreground)] sm:px-3.5";
 const empBtnDanger =
   "inline-flex h-7 touch-manipulation items-center justify-center rounded-md bg-[var(--apple-red)]/10 px-2.5 text-[0.75rem] font-medium text-[var(--apple-red)] transition-colors hover:bg-[var(--apple-red)]/16 disabled:opacity-40";
 
-const WIDTH_STORAGE_KEY = "heresnow_employee_col_widths_v4";
+const WIDTH_STORAGE_KEY = "heresnow_employee_col_widths_v6";
 
 type ResizableCol = "name" | "email" | "password" | "role" | "department";
 type SortKey = ResizableCol;
@@ -47,26 +45,27 @@ type SortDir = "asc" | "desc";
 type ColWidths = Record<ResizableCol, number> & { actions: number };
 
 const DEFAULT_WIDTHS: ColWidths = {
-  name: 148,
-  email: 220,
-  password: 96,
-  role: 132,
-  department: 128,
-  actions: 56,
+  name: 128,
+  email: 168,
+  password: 48,
+  role: 112,
+  department: 108,
+  actions: 60,
 };
 
 const MIN_WIDTHS: ColWidths = {
-  name: 96,
-  email: 140,
-  password: 80,
-  role: 100,
-  department: 96,
-  actions: 48,
+  name: 88,
+  email: 112,
+  password: 44,
+  role: 96,
+  department: 88,
+  actions: 52,
 };
 
-const LOGIN_COL_WIDTH = 120;
-const SCHEDULE_COL_WIDTH = 148;
+const LOGIN_COL_WIDTH = 96;
+const SCHEDULE_COL_WIDTH = 132;
 const SELECT_COL_WIDTH = 56;
+const TEAM_LEADER_COL_WIDTH = 64;
 
 const ROLE_ORDER: Role[] = ["EMPLOYEE", "DOOR", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN"];
 
@@ -80,7 +79,9 @@ function loadStoredWidths(): ColWidths {
     for (const key of Object.keys(DEFAULT_WIDTHS) as (keyof ColWidths)[]) {
       const v = parsed[key];
       if (typeof v === "number" && Number.isFinite(v)) {
-        next[key] = Math.max(MIN_WIDTHS[key], v);
+        const clamped =
+          key === "email" ? Math.min(v, 188) : key === "name" ? Math.min(v, 160) : v;
+        next[key] = Math.max(MIN_WIDTHS[key], clamped);
       }
     }
     return next;
@@ -121,6 +122,7 @@ type Props = {
   onDelete: (emp: EmployeeRow) => void;
   deleteDisabledReason: (emp: EmployeeRow, isSelf: boolean) => string | undefined;
   roleLabel: (role: string) => string;
+  onChangeTeamLeader?: (emp: EmployeeRow, isTeamLeader: boolean) => void;
   canEditSchedule?: boolean;
   onEditSchedule?: (emp: EmployeeRow) => void;
   selectedIds?: Set<string>;
@@ -151,6 +153,7 @@ export function EmployeeListTable({
   onDelete,
   deleteDisabledReason,
   roleLabel,
+  onChangeTeamLeader,
   canEditSchedule = false,
   onEditSchedule,
   selectedIds,
@@ -253,6 +256,22 @@ export function EmployeeListTable({
     );
   };
 
+  const fixedHeaderCell = (
+    label: string,
+    width: number,
+    opts?: { align?: "left" | "center"; title?: string }
+  ) => (
+    <th
+      className={`${empTh} ${opts?.align === "center" ? "text-center" : "text-left"}`}
+      style={{ width, minWidth: width }}
+      title={opts?.title ?? label}
+    >
+      <span className="block text-[0.6875rem] font-semibold leading-snug text-[var(--apple-label-secondary)] sm:text-[0.75rem]">
+        {label}
+      </span>
+    </th>
+  );
+
   const headerCell = (key: SortKey, label: string, resizable: boolean) => (
     <th
       key={key}
@@ -300,36 +319,26 @@ export function EmployeeListTable({
 
   const showSelect = Boolean(onToggleSelect && selectedIds);
   const showLoginStatus = employees.some((e) => e.loginEligible !== undefined);
-  const tableMinWidth =
-    (showSelect ? SELECT_COL_WIDTH : 0) +
-    widths.name +
-    widths.email +
-    widths.password +
-    widths.role +
-    widths.department +
-    (showLoginStatus ? LOGIN_COL_WIDTH : 0) +
-    SCHEDULE_COL_WIDTH +
-    widths.actions;
   const allSelected =
     showSelect && employees.length > 0 && employees.every((e) => selectedIds!.has(e.id));
 
   return (
-    <div className="overflow-x-auto">
-      <table
-        className={empTable}
-        style={{ tableLayout: "fixed", width: "100%", minWidth: tableMinWidth }}
-      >
+    <div className="w-full min-w-0">
+      <table className={empTable} style={{ tableLayout: "fixed", width: "100%" }}>
         <colgroup>
           {showSelect && <col style={{ width: SELECT_COL_WIDTH }} />}
           <col style={{ width: widths.name }} />
           <col style={{ width: widths.email }} />
-          <col style={{ width: widths.password }} />
           <col style={{ width: widths.role }} />
           <col style={{ width: widths.department }} />
           {showLoginStatus && (
             <col style={{ width: LOGIN_COL_WIDTH, minWidth: LOGIN_COL_WIDTH }} />
           )}
+          {onChangeTeamLeader && (
+            <col style={{ width: TEAM_LEADER_COL_WIDTH, minWidth: TEAM_LEADER_COL_WIDTH }} />
+          )}
           <col style={{ width: SCHEDULE_COL_WIDTH, minWidth: SCHEDULE_COL_WIDTH }} />
+          <col style={{ width: widths.password, minWidth: MIN_WIDTHS.password }} />
           <col style={{ width: widths.actions, minWidth: MIN_WIDTHS.actions }} />
         </colgroup>
         <thead className={tableHead}>
@@ -354,28 +363,29 @@ export function EmployeeListTable({
             )}
             {headerCell("name", t("admin.employeesNameLabel"), true)}
             {headerCell("email", t("admin.employeesEmailLabel"), true)}
-            {headerCell("password", t("admin.employeesPasswordColLabel"), true)}
             {headerCell("role", t("admin.employeesRoleLabel"), true)}
             {headerCell("department", t("admin.employeesDepartmentLabel"), true)}
-            {showLoginStatus && (
-              <th
-                className={`${empTh} text-center`}
-                style={{ width: LOGIN_COL_WIDTH, minWidth: LOGIN_COL_WIDTH }}
-              >
-                {t("admin.employeesLoginStatusCol")}
-              </th>
+            {showLoginStatus &&
+              fixedHeaderCell(t("admin.employeesLoginStatusCol"), LOGIN_COL_WIDTH, {
+                align: "center",
+              })}
+            {onChangeTeamLeader &&
+              fixedHeaderCell(t("admin.employeesTeamLeaderCol"), TEAM_LEADER_COL_WIDTH, {
+                align: "center",
+              })}
+            {fixedHeaderCell(
+              locale === "en" ? t("admin.empScheduleColShort") : t("admin.empScheduleCol"),
+              SCHEDULE_COL_WIDTH,
+              { title: t("admin.empScheduleCol") }
             )}
-            <th
-              className={`${empTh} text-left`}
-              style={{ width: SCHEDULE_COL_WIDTH, minWidth: SCHEDULE_COL_WIDTH }}
-            >
-              {t("admin.empScheduleCol")}
-            </th>
+            {headerCell("password", t("admin.employeesPasswordColLabel"), true)}
             <th
               className={`${empTh} text-center`}
               style={{ width: widths.actions, minWidth: MIN_WIDTHS.actions }}
             >
-              {t("admin.employeesColActions")}
+              <span className="block text-[0.6875rem] font-semibold leading-snug text-[var(--apple-label-secondary)] sm:text-[0.75rem]">
+                {t("admin.employeesColActions")}
+              </span>
             </th>
           </tr>
         </thead>
@@ -435,10 +445,11 @@ export function EmployeeListTable({
                     <input
                       type="email"
                       autoComplete="off"
-                      className={rowInput}
+                      className={`${rowInput} truncate`}
                       defaultValue={e.user.email}
                       key={`email-${e.id}-${e.user.email}`}
                       disabled={isBusy}
+                      title={e.user.email}
                       aria-label={t("admin.employeesEmailLabel")}
                       onBlur={(ev) => onSaveEmail(e, ev.target.value)}
                       onKeyDown={(ev) => {
@@ -446,48 +457,9 @@ export function EmployeeListTable({
                       }}
                     />
                   ) : (
-                    <p className={`${rowControlStatic} truncate`}>{e.user.email}</p>
-                  )}
-                </td>
-                <td className={empTd}>
-                  {canEditProfile ? (
-                    editingPassword ? (
-                      <input
-                        type="password"
-                        minLength={MIN_PASSWORD_LENGTH}
-                        autoComplete="new-password"
-                        autoFocus
-                        className={rowInput}
-                        placeholder="····"
-                        value={passwordDraft}
-                        disabled={isBusy}
-                        aria-label={t("admin.employeesPasswordLabel")}
-                        onChange={(ev) => onPasswordDraftChange(ev.target.value)}
-                        onBlur={() => onPasswordEditFinish(e.id)}
-                        onKeyDown={(ev) => {
-                          if (ev.key === "Enter") {
-                            ev.preventDefault();
-                            onPasswordEditFinish(e.id);
-                          }
-                          if (ev.key === "Escape") onPasswordEditCancel();
-                        }}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        className={`${rowPasswordMask} w-full cursor-pointer`}
-                        disabled={isBusy}
-                        title={t("admin.employeesPasswordReset")}
-                        aria-label={t("admin.employeesPasswordReset")}
-                        onClick={() => onPasswordEditStart(e.id)}
-                      >
-                        ********
-                      </button>
-                    )
-                  ) : (
-                    <span className={rowPasswordMask} aria-hidden>
-                      ********
-                    </span>
+                    <p className={`${rowControlStatic} truncate`} title={e.user.email}>
+                      {e.user.email}
+                    </p>
                   )}
                 </td>
                 <td className={empTd}>
@@ -538,39 +510,62 @@ export function EmployeeListTable({
                   <td className={`${empTd} text-center`}>
                     {e.loginEligible ? (
                       <span
-                        className="inline-flex whitespace-nowrap rounded-md bg-[var(--apple-green)]/12 px-2 py-0.5 text-[0.75rem] font-medium leading-none text-[var(--apple-green-dark)]"
+                        className="inline-flex max-w-full truncate rounded-md bg-[var(--apple-green)]/12 px-1.5 py-0.5 text-[0.6875rem] font-medium leading-none text-[var(--apple-green-dark)] sm:px-2 sm:text-[0.75rem]"
                         title={
                           e.loginEligibleByAdmin
                             ? e.user.role === "DOOR"
                               ? t("admin.employeesLoginEligibleDoor")
                               : t("admin.employeesLoginEligibleAdmin")
                             : e.seatRank != null
-                              ? `#${e.seatRank}`
-                              : undefined
+                              ? `${t("admin.employeesLoginEligible")} #${e.seatRank}`
+                              : t("admin.employeesLoginEligible")
                         }
                       >
-                          {e.loginEligibleByAdmin
+                        {e.loginEligibleByAdmin
                           ? e.user.role === "DOOR"
-                            ? t("admin.employeesLoginEligibleDoor")
-                            : t("admin.employeesLoginEligibleAdmin")
+                            ? locale === "en"
+                              ? t("admin.employeesLoginEligibleDoorShort")
+                              : t("admin.employeesLoginEligibleDoor")
+                            : locale === "en"
+                              ? t("admin.employeesLoginEligibleAdminShort")
+                              : t("admin.employeesLoginEligibleAdmin")
                           : t("admin.employeesLoginEligible")}
                       </span>
                     ) : (
-                      <span className="inline-flex whitespace-nowrap rounded-md bg-[var(--apple-red)]/10 px-2 py-0.5 text-[0.75rem] font-medium leading-none text-[var(--apple-red)]">
+                      <span
+                        className="inline-flex rounded-md bg-[var(--apple-red)]/10 px-1.5 py-0.5 text-[0.6875rem] font-medium leading-none text-[var(--apple-red)] sm:px-2 sm:text-[0.75rem]"
+                        title={t("admin.employeesLoginIneligible")}
+                      >
                         {t("admin.employeesLoginIneligible")}
                       </span>
                     )}
                   </td>
                 )}
+                {onChangeTeamLeader && (
+                  <td className={`${empTd} text-center`}>
+                    {canEditProfile ? (
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-[var(--apple-blue)]"
+                        checked={Boolean(e.isTeamLeader)}
+                        disabled={isBusy}
+                        aria-label={t("admin.employeesTeamLeaderLabel").replace("{name}", e.name)}
+                        onChange={(ev) => onChangeTeamLeader(e, ev.target.checked)}
+                      />
+                    ) : e.isTeamLeader ? (
+                      <span className="text-[0.75rem] text-[var(--apple-label-secondary)]">✓</span>
+                    ) : null}
+                  </td>
+                )}
                 <td className={empTd}>
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="min-w-0 truncate text-[0.75rem] text-[var(--apple-label-secondary)]">
+                  <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-1.5">
+                    <span className="min-w-0 truncate text-[0.6875rem] text-[var(--apple-label-secondary)] sm:text-[0.75rem]">
                       {e.scheduleSummary ?? "—"}
                     </span>
                     {canEditSchedule && onEditSchedule && (
                       <button
                         type="button"
-                        className="shrink-0 text-[0.75rem] font-medium text-[var(--apple-blue)] hover:underline"
+                        className="shrink-0 self-start text-[0.6875rem] font-medium text-[var(--apple-blue)] hover:underline sm:text-[0.75rem]"
                         disabled={isBusy}
                         onClick={() => onEditSchedule(e)}
                       >
@@ -578,6 +573,50 @@ export function EmployeeListTable({
                       </button>
                     )}
                   </div>
+                </td>
+                <td className={`${empTd} text-center`}>
+                  {canEditProfile ? (
+                    editingPassword ? (
+                      <input
+                        type="password"
+                        minLength={MIN_PASSWORD_LENGTH}
+                        autoComplete="new-password"
+                        autoFocus
+                        className={`${rowInput} min-w-[7rem]`}
+                        placeholder="····"
+                        value={passwordDraft}
+                        disabled={isBusy}
+                        aria-label={t("admin.employeesPasswordLabel")}
+                        onChange={(ev) => onPasswordDraftChange(ev.target.value)}
+                        onBlur={() => onPasswordEditFinish(e.id)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter") {
+                            ev.preventDefault();
+                            onPasswordEditFinish(e.id);
+                          }
+                          if (ev.key === "Escape") onPasswordEditCancel();
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-[0.4375rem] bg-[var(--fill-secondary)] text-[0.875rem] text-[var(--apple-label-secondary)] transition-colors hover:bg-[var(--fill-secondary-hover)] disabled:opacity-60"
+                        disabled={isBusy}
+                        title={t("admin.employeesPasswordReset")}
+                        aria-label={t("admin.employeesPasswordReset")}
+                        onClick={() => onPasswordEditStart(e.id)}
+                      >
+                        ···
+                      </button>
+                    )
+                  ) : (
+                    <span
+                      className="inline-flex h-7 w-7 items-center justify-center text-[0.875rem] text-[var(--apple-label-tertiary)]"
+                      aria-hidden
+                    >
+                      ···
+                    </span>
+                  )}
                 </td>
                 <td className={`${empTd} text-center`}>
                   {canEditProfile ? (

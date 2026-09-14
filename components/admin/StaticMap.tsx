@@ -1,15 +1,18 @@
 "use client";
 
+import { LocationMapModal } from "@/components/admin/LocationMapModal";
 import { useI18n } from "@/components/LanguageProvider";
 import { link, mapSurface } from "@/lib/uiStyles";
+import { useState } from "react";
 
 type StaticMapProps = {
   lat: number;
   lng: number;
   label?: string;
+  subtitle?: string;
   className?: string;
-  /** 키 없음: link=텍스트 링크만(기본), embed=Google 지도 iframe */
-  noKeyFallback?: "link" | "embed";
+  /** 키 없음: link=텍스트 링크만(기본), embed=Google 지도 iframe, modal=앱 내 팝업 지도 */
+  noKeyFallback?: "link" | "embed" | "modal";
 };
 
 /**
@@ -17,11 +20,43 @@ type StaticMapProps = {
  * - `NEXT_PUBLIC_GOOGLE_MAPS_KEY` 있으면 Static Maps 이미지
  * - 없으면 `noKeyFallback`: 링크만 또는 iframe 임베드(추가 API 키 불필요)
  */
-export function StaticMap({ lat, lng, label, className, noKeyFallback = "link" }: StaticMapProps) {
+export function StaticMap({
+  lat,
+  lng,
+  label,
+  subtitle,
+  className,
+  noKeyFallback = "link",
+}: StaticMapProps) {
   const { t, locale } = useI18n();
+  const [modalOpen, setModalOpen] = useState(false);
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
   const openUrl = `https://www.google.com/maps?q=${lat},${lng}`;
   const hl = locale === "en" ? "en" : "ko";
+
+  if (noKeyFallback === "modal") {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className={`text-[0.8125rem] ${link} ${className ?? ""}`}
+          aria-label={label ?? t("common.mapOpenLink")}
+          title={label ?? undefined}
+        >
+          {t("common.mapOpenLink")}
+        </button>
+        <LocationMapModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          lat={lat}
+          lng={lng}
+          title={label}
+          subtitle={subtitle}
+        />
+      </>
+    );
+  }
 
   if (!key) {
     if (noKeyFallback === "embed") {

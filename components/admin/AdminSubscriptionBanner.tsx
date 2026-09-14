@@ -66,6 +66,8 @@ export function AdminSubscriptionBanner({ companyId }: Props = {}) {
   const days = info.subscriptionEndsAt ? daysUntil(info.subscriptionEndsAt) : null;
   const expired = days !== null && days < 0;
   const expiringSoon = days !== null && days >= 0 && days <= 14;
+  const numberLocale = locale === "en" ? "en-IN" : "ko-KR";
+  const formatCount = (n: number) => n.toLocaleString(numberLocale);
 
   const accent = expired
     ? "border-[var(--apple-red)]/35 bg-[var(--apple-red)]/[0.06]"
@@ -95,14 +97,14 @@ export function AdminSubscriptionBanner({ companyId }: Props = {}) {
             <p className={`${hint} mt-1`}>
               {expired
                 ? t("admin.dashboardSubscriptionExpired")
-                : t("admin.dashboardSubscriptionDaysLeft").replace("{n}", String(days))}
+                : t("admin.dashboardSubscriptionDaysLeft").replace("{n}", formatCount(days))}
               {info.seatLimit > 0 &&
-                ` · ${t("admin.dashboardSubscriptionSeats").replace("{n}", String(info.seatLimit))}`}
+                ` · ${t("admin.dashboardSubscriptionSeats").replace("{n}", formatCount(info.seatLimit))}`}
             </p>
           )}
           {days === null && info.seatLimit > 0 && (
             <p className={`${hint} mt-1`}>
-              {t("admin.dashboardSubscriptionSeats").replace("{n}", String(info.seatLimit))}
+              {t("admin.dashboardSubscriptionSeats").replace("{n}", formatCount(info.seatLimit))}
             </p>
           )}
         </div>

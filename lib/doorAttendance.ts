@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
+import type { CompanyWorkSchedule } from "@/lib/companyWorkSchedule";
 import {
   capCheckOutTimestamp,
   evaluatePunchEligibility,
@@ -89,7 +90,8 @@ async function getDoorEmployeesForMatch(companyId: string): Promise<CachedDoorEm
 
 export async function getDoorPunchEligibility(
   companyId: string,
-  employeeId: string
+  employeeId: string,
+  workSchedule?: CompanyWorkSchedule | null
 ): Promise<DoorPunchEligibility> {
   const [company, lastRecord] = await Promise.all([
     prisma.company.findUnique({
@@ -106,7 +108,8 @@ export async function getDoorPunchEligibility(
   const eligibility = evaluatePunchEligibility(
     new Date(),
     tz,
-    lastRecord ? { type: lastRecord.type, timestamp: lastRecord.timestamp } : null
+    lastRecord ? { type: lastRecord.type, timestamp: lastRecord.timestamp } : null,
+    workSchedule ? { workSchedule } : undefined
   );
 
   return {
@@ -129,6 +132,7 @@ export async function createDoorAttendanceRecord(input: {
   timestamp?: Date;
   expectedLastType?: AttendanceType | null;
   expectedLastTimestamp?: string | null;
+  workSchedule?: CompanyWorkSchedule | null;
 }): Promise<{ id: string; type: AttendanceType; timestamp: Date }> {
   const company = await prisma.company.findUnique({
     where: { id: input.companyId },
@@ -157,7 +161,8 @@ export async function createDoorAttendanceRecord(input: {
     const eligibility = evaluatePunchEligibility(
       timestamp,
       tz,
-      latest ? { type: latest.type, timestamp: latest.timestamp } : null
+      latest ? { type: latest.type, timestamp: latest.timestamp } : null,
+      input.workSchedule ? { workSchedule: input.workSchedule } : undefined
     );
     if (input.type === "CHECK_IN" && !eligibility.canCheckIn) {
       throw { code: "CHECK_IN_BLOCKED" } as const;

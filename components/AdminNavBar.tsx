@@ -24,7 +24,7 @@ export function AdminNavBar() {
       { href: "/admin/punch", label: t("admin.navMyPunch") },
       { href: "/admin/employees", label: t("admin.navEmployees") },
       { href: "/admin/billing", label: t("admin.navBilling") },
-      { href: "/admin/exceptions", label: t("admin.navExceptions") },
+      { href: "/admin/approvals", label: t("approvals.navTitle") },
       { href: "/admin/attendance", label: t("admin.navAttendance") },
       { href: "/admin/settings", label: t("admin.navSettings") },
     ];

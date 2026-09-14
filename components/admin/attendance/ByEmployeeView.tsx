@@ -28,8 +28,8 @@ export function AttendanceByEmployeeView({ rows, dateLocale }: Props) {
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2 px-1">
               <p className={sectionLabel}>{head.employeeName}</p>
               <p className="text-[0.8125rem] text-[var(--apple-label-secondary)]">
-                {days} · {t("admin.attendanceByEmpComplete")} {complete} ·{" "}
-                {t("admin.attendanceByEmpHoliday")} {holiday}
+                {days} · {complete} {t("admin.attendanceByEmpComplete")} · {holiday}{" "}
+                {t("admin.attendanceByEmpHoliday")}
               </p>
             </div>
             <AttendanceDayTable rows={employeeRows} showEmployee={false} dateLocale={dateLocale} />

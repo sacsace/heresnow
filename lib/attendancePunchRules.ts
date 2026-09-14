@@ -1,4 +1,9 @@
 import type { AttendanceType } from "@prisma/client";
+import {
+  isEarlyCheckInWindowOpen,
+  resolveNextCheckInAfterCooldown,
+  type CompanyWorkSchedule,
+} from "@/lib/companyWorkSchedule";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 /** 퇴근 후 이 시간 이내 재출근 차단 */
@@ -27,13 +32,12 @@ export function calendarDayInTz(isoDate: Date, timeZone: string): string {
   }
 }
 
-function nextCalendarDayStr(dayStr: string): string {
-  const d = new Date(`${dayStr}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
 type PunchRecord = { type: AttendanceType; timestamp: Date };
+
+export type PunchEligibilityOptions = {
+  /** 퇴근 후 재출근 — 정규 출근 60분 전 창 판정용 */
+  workSchedule?: CompanyWorkSchedule | null;
+};
 
 export type PunchEligibility = {
   isCheckedIn: boolean;
@@ -52,16 +56,17 @@ export type PunchEligibility = {
 /**
  * 출퇴근 가능 여부 판정.
  * 규칙
- *  - 마지막 기록이 출근이면: 출근 불가, 퇴근 가능
+ *  - 마지막 기록이 출근이면: 출근 불가, 퇴근 가능(출근 후 3분 이상)
  *  - 마지막 기록이 퇴근이면:
- *      · 퇴근 후 4시간 이내(같은 회사일) → 출근 불가(COOLDOWN)
- *      · 4시간 경과 또는 회사 시간대 기준 날짜 변경 → 재출근 가능
+ *      · 퇴근 후 4시간 미경과 AND 정규 출근 60분 전 창 밖 → 출근 불가(COOLDOWN)
+ *      · 4시간 경과 OR 정규 출근 60분 전 → 재출근 가능
  *  - 기록이 없으면: 출근 가능
  */
 export function evaluatePunchEligibility(
   now: Date,
   tz: string,
-  lastRecord: PunchRecord | null
+  lastRecord: PunchRecord | null,
+  options?: PunchEligibilityOptions
 ): PunchEligibility {
   if (!lastRecord) {
     return {
@@ -95,12 +100,13 @@ export function evaluatePunchEligibility(
   }
 
   const elapsed = now.getTime() - lastRecord.timestamp.getTime();
-  const lastDay = calendarDayInTz(lastRecord.timestamp, tz);
-  const nowDay = calendarDayInTz(now, tz);
-  const midnightPass = lastDay !== nowDay;
   const fourHourPass = elapsed >= FOUR_H_MS;
+  const schedule = options?.workSchedule ?? null;
+  const earlyWindowOpen =
+    schedule != null &&
+    isEarlyCheckInWindowOpen(now, lastRecord.timestamp, tz, schedule);
 
-  if (fourHourPass || midnightPass) {
+  if (fourHourPass || earlyWindowOpen) {
     return {
       isCheckedIn: false,
       canCheckIn: true,
@@ -113,17 +119,13 @@ export function evaluatePunchEligibility(
     };
   }
 
-  const fourHourAt = new Date(lastRecord.timestamp.getTime() + FOUR_H_MS);
-  const nextDayStr = nextCalendarDayStr(lastDay);
-  const safeTz = (tz || "").trim() || "UTC";
-  let midnightAt: Date;
-  try {
-    midnightAt = fromZonedTime(`${nextDayStr} 00:00:00`, safeTz);
-  } catch {
-    midnightAt = fromZonedTime(`${nextDayStr} 00:00:00`, "UTC");
-  }
-  const nextAt =
-    fourHourAt.getTime() < midnightAt.getTime() ? fourHourAt : midnightAt;
+  const nextAt = resolveNextCheckInAfterCooldown(
+    now,
+    lastRecord.timestamp,
+    tz,
+    schedule,
+    FOUR_H_MS
+  );
 
   return {
     isCheckedIn: false,
@@ -144,7 +146,7 @@ export function checkInErrorMessage(
     return "이미 출근하였습니다. 먼저 퇴근해 주세요.";
   }
   if (block === "COOLDOWN") {
-    return "퇴근 후 4시간이 지나거나 자정이 지나야 다시 출근할 수 있습니다.";
+    return "퇴근 후 4시간이 지나거나 정규 출근 60분 전부터 다시 출근할 수 있습니다.";
   }
   return null;
 }

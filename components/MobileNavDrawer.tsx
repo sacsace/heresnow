@@ -13,6 +13,8 @@ export type MobileNavItem = {
   label: string;
   exact?: boolean;
   disabled?: boolean;
+  /** 같은 section 값을 가진 항목 위에 섹션 제목 표시 */
+  section?: string;
 };
 
 type Props = {
@@ -113,10 +115,18 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
           </div>
           <nav className="flex-1 overflow-y-auto p-2" aria-label={t("common.menu")}>
             <ul className="flex flex-col gap-0.5">
-              {items.map((it) => {
+              {items.map((it, index) => {
                 const active = isActive(it.href, it.exact);
+                const showSection =
+                  it.section &&
+                  (index === 0 || items[index - 1]?.section !== it.section);
                 return (
                   <li key={it.href}>
+                    {showSection ? (
+                      <p className="px-3 pb-1 pt-2 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-[var(--apple-label-tertiary)]">
+                        {it.section}
+                      </p>
+                    ) : null}
                     {it.disabled ? (
                       <span
                         aria-disabled="true"

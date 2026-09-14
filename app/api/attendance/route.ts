@@ -17,7 +17,6 @@ import {
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import {
   evaluateAttendanceWorkFlags,
-  evaluateCheckOutWorkFlags,
   evaluateFreePunchCheckOutWorkFlags,
   scheduledShiftEndAt,
 } from "@/lib/companyWorkSchedule";
@@ -35,6 +34,10 @@ import {
 import { prisma } from "@/lib/prisma";
 import { acquireAttendanceEmployeeLock } from "@/lib/attendanceLock";
 import { mapSiteRow, resolvePunchSiteContext } from "@/lib/attendanceSiteContext";
+import {
+  evaluateCheckoutOvertimeFlags,
+  overtimeRequiresApproval,
+} from "@/lib/overtimePolicy";
 import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
 import {
   checkGeofencePolicy,
@@ -57,6 +60,8 @@ const bodySchema = z
     businessTripReason: z.string().trim().min(1).max(2000).optional(),
     /** 정규 퇴근 시각 이전 퇴근 시 필수 — 관리자 승인 대상 */
     earlyLeaveReason: z.string().trim().min(1).max(2000).optional(),
+    /** 정규 퇴근 시각 이후 퇴근(초과 근무) 시 필수 — 관리자 승인 대상 */
+    overtimeReason: z.string().trim().min(1).max(2000).optional(),
     /** 퇴근 후 4시간 이내 재출근 시 필수 — 관리자 승인 대상 */
     reCheckInReason: z.string().trim().min(1).max(2000).optional(),
     photoUrl: z.string().max(2_000_000).optional().nullable(),
@@ -129,6 +134,7 @@ export async function POST(req: Request) {
     businessTripLocation,
     businessTripReason,
     earlyLeaveReason,
+    overtimeReason,
     reCheckInReason,
     photoUrl,
     deviceInfo,
@@ -162,6 +168,7 @@ export async function POST(req: Request) {
         faceRecognitionEnabled: true,
         freePunchEnabled: true,
         freePunchRequiredMinutes: true,
+        overtimeMode: true,
         geofenceMode: true,
         workStartTime: true,
         workEndTime: true,
@@ -201,6 +208,10 @@ export async function POST(req: Request) {
   const now = new Date();
   const freePunchEnabled =
     Boolean(company.freePunchEnabled) && employee.workScheduleType === "FREE";
+  const overtimeApprovalRequired = overtimeRequiresApproval({
+    overtimeMode: company.overtimeMode,
+    freePunchEnabled,
+  });
 
   const faceRequired = company.faceRecognitionEnabled;
   let faceMatched = false;
@@ -240,10 +251,12 @@ export async function POST(req: Request) {
     faceMatched = true;
   }
 
+  const effectiveScheduleForEligibility = resolveEmployeeWorkSchedule(employee, company);
+  const punchOptions = { workSchedule: effectiveScheduleForEligibility };
   const lastPunch = lastRecord
     ? { type: lastRecord.type, timestamp: lastRecord.timestamp }
     : null;
-  const eligibility = evaluatePunchEligibility(now, tz, lastPunch);
+  const eligibility = evaluatePunchEligibility(now, tz, lastPunch, punchOptions);
   const reCheckInApprovalRequired = freePunchEnabled ? false : eligibility.reCheckInApprovalRequired;
 
   if (type === "CHECK_IN") {
@@ -374,7 +387,14 @@ export async function POST(req: Request) {
             effectiveSchedule,
             company.freePunchRequiredMinutes
           )
-        : evaluateCheckOutWorkFlags(recordTimestamp, checkInAt, tz, effectiveSchedule)
+        : evaluateCheckoutOvertimeFlags({
+            checkOutAt: recordTimestamp,
+            checkInAt,
+            timeZone: tz,
+            schedule: effectiveSchedule,
+            overtimeMode: company.overtimeMode,
+            freePunchEnabled,
+          })
       : evaluateAttendanceWorkFlags(recordTimestamp, tz, type, effectiveSchedule);
   const normalizedWorkFlags =
     freePunchEnabled && type === "CHECK_IN"
@@ -390,12 +410,29 @@ export async function POST(req: Request) {
   // 조퇴(정규 퇴근시각 이전 퇴근) — 48시간 초과 예외 퇴근과 별도
   const earlyLeavePending =
     type === "CHECK_OUT" && normalizedWorkFlags.isEarlyLeave && !checkOutPastWindow && !freePunchEnabled;
+  const overtimePending =
+    type === "CHECK_OUT" &&
+    normalizedWorkFlags.isOvertime &&
+    !normalizedWorkFlags.isEarlyLeave &&
+    !checkOutPastWindow &&
+    overtimeApprovalRequired &&
+    !staleCheckOutNoOvertime;
   const trimmedEarlyReason = earlyLeaveReason?.trim() || null;
   if (earlyLeavePending && !trimmedEarlyReason) {
     return NextResponse.json(
       {
         error: "조퇴 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
         code: "EARLY_LEAVE_REASON_REQUIRED",
+      },
+      { status: 400 }
+    );
+  }
+  const trimmedOvertimeReason = overtimeReason?.trim() || null;
+  if (overtimePending && !trimmedOvertimeReason) {
+    return NextResponse.json(
+      {
+        error: "초과 근무 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
+        code: "OVERTIME_REASON_REQUIRED",
       },
       { status: 400 }
     );
@@ -414,12 +451,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const pendingApproval = earlyLeavePending || reCheckInPending;
+  const pendingApproval = earlyLeavePending || overtimePending || reCheckInPending;
   const pendingReason = earlyLeavePending
     ? trimmedEarlyReason
-    : reCheckInPending
-      ? trimmedReCheckInReason
-      : null;
+    : overtimePending
+      ? trimmedOvertimeReason
+      : reCheckInPending
+        ? trimmedReCheckInReason
+        : null;
 
   const userMemo = memo?.trim() || "";
   let recordMemo = userMemo;
@@ -478,7 +517,8 @@ export async function POST(req: Request) {
       const txEligibility = evaluatePunchEligibility(
         new Date(),
         tz,
-        latest ? { type: latest.type, timestamp: latest.timestamp } : null
+        latest ? { type: latest.type, timestamp: latest.timestamp } : null,
+        punchOptions
       );
       if (type === "CHECK_IN" && !txEligibility.canCheckIn) {
         throw {
@@ -517,10 +557,10 @@ export async function POST(req: Request) {
           deviceInfo: mergedDevice || null,
           isLate: normalizedWorkFlags.isLate,
           isEarlyLeave: normalizedWorkFlags.isEarlyLeave,
-          isOvertime: normalizedWorkFlags.isOvertime,
+          isOvertime: overtimePending ? false : normalizedWorkFlags.isOvertime,
           isHolidayWork: normalizedWorkFlags.isHolidayWork,
           lateMinutes: normalizedWorkFlags.lateMinutes,
-          overtimeMinutes: normalizedWorkFlags.overtimeMinutes,
+          overtimeMinutes: overtimePending ? 0 : normalizedWorkFlags.overtimeMinutes,
           recordTimezone: tz,
         },
         include: { site: { select: { name: true } } },
@@ -600,8 +640,10 @@ export async function POST(req: Request) {
       ? `퇴근 처리되었습니다. 출근 후 48시간이 지나 퇴근 시각은 출근일 기준 ${formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko")}(${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")})으로 기록됩니다.`
       : earlyLeavePending
         ? "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
-        : reCheckInPending
-          ? "재출근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+        : overtimePending
+          ? "초과 근무 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+          : reCheckInPending
+            ? "재출근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
           : outsideGeofence
             ? "근무지 반경 밖에서 기록되었습니다."
             : "정상 처리되었습니다.",

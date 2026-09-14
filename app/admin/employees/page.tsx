@@ -42,7 +42,6 @@ import {
   sectionLabel,
   select,
   tableToolbar,
-  tableWrap,
 } from "@/lib/uiStyles";
 import {
   assignableRolesForCaller,
@@ -66,6 +65,7 @@ type Emp = {
   loginEligible?: boolean;
   loginEligibleByAdmin?: boolean;
   seatRank?: number;
+  isTeamLeader?: boolean;
 };
 
 const profileEditRoles = new Set<Role>(["COMPANY_ADMIN", "HR_MANAGER", "SUPER_ADMIN"]);
@@ -652,6 +652,23 @@ export default function AdminEmployeesPage() {
     }
   }
 
+  async function changeTeamLeader(emp: Emp, isTeamLeader: boolean) {
+    if (Boolean(emp.isTeamLeader) === isTeamLeader) return;
+    const prev = Boolean(emp.isTeamLeader);
+    await patchEmployee(
+      emp.id,
+      { isTeamLeader },
+      {
+        optimistic: (list) =>
+          list.map((x) => (x.id === emp.id ? { ...x, isTeamLeader } : x)),
+        revert: () =>
+          setEmployees((list) =>
+            list.map((x) => (x.id === emp.id ? { ...x, isTeamLeader: prev } : x))
+          ),
+      }
+    );
+  }
+
   const seatLine = seatInfo
     ? t("admin.employeesSeatLine")
         .replace("{total}", String(seatInfo.registered))
@@ -851,7 +868,7 @@ export default function AdminEmployeesPage() {
         )}
         {rowError && <p className={`mb-3 ${errorText}`}>{rowError}</p>}
 
-        <div className={tableWrap}>
+        <div className={`${card} min-w-0 overflow-hidden`}>
           <div className={tableToolbar}>
             <div className={`${searchFiltersRow} w-full`}>
               <div className={`${searchFieldCol} ${searchFieldWrap}`}>
@@ -976,6 +993,7 @@ export default function AdminEmployeesPage() {
             selectedIds={canEditProfile ? selectedIds : undefined}
             onToggleSelect={canEditProfile ? toggleSelect : undefined}
             onToggleSelectAll={canEditProfile ? toggleSelectAll : undefined}
+            onChangeTeamLeader={canEditProfile ? changeTeamLeader : undefined}
           />
           )}
 

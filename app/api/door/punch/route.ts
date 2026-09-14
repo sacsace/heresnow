@@ -124,7 +124,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const eligibility = await getDoorPunchEligibility(companyId, employee.id);
+  const eligibility = await getDoorPunchEligibility(companyId, employee.id, effectiveSchedule);
 
   if (type === "CHECK_IN") {
     if (!eligibility.canCheckIn) {
@@ -194,6 +194,7 @@ export async function POST(req: Request) {
       timestamp: now,
       expectedLastType: eligibility.lastType,
       expectedLastTimestamp: eligibility.lastTimestamp,
+      workSchedule: effectiveSchedule,
     });
   } catch (error: unknown) {
     if (error && typeof error === "object" && "code" in error) {
@@ -235,7 +236,7 @@ export async function POST(req: Request) {
     throw error;
   }
 
-  const next = await getDoorPunchEligibility(companyId, employee.id);
+  const next = await getDoorPunchEligibility(companyId, employee.id, effectiveSchedule);
 
   return NextResponse.json({
     ok: true,

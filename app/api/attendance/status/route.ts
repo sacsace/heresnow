@@ -10,12 +10,18 @@ import {
   evaluatePunchEligibility,
   isCheckOutPastWindow,
   resolveLateCheckOutTimestamp,
+  THIRTY_H_MS,
   type LateCheckOutTimeBasis,
 } from "@/lib/attendancePunchRules";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { isCheckOutEarly } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { prisma } from "@/lib/prisma";
+import {
+  isCheckOutOvertimeApprovalRequired,
+  overtimeApplicationEnabled,
+  overtimeRequiresApproval,
+} from "@/lib/overtimePolicy";
 import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
 import { NextResponse } from "next/server";
 
@@ -35,6 +41,7 @@ export async function GET() {
       select: {
         timezone: true,
         freePunchEnabled: true,
+        overtimeMode: true,
         workStartTime: true,
         workEndTime: true,
         workDays: true,
@@ -63,6 +70,10 @@ export async function GET() {
   const now = new Date();
   const freePunchEnabled =
     Boolean(company.freePunchEnabled) && employee.workScheduleType === "FREE";
+  const overtimeApprovalRequired = overtimeRequiresApproval({
+    overtimeMode: company.overtimeMode,
+    freePunchEnabled,
+  });
 
   const lastRecord = await prisma.attendanceRecord.findFirst({
     where: {
@@ -76,7 +87,8 @@ export async function GET() {
   const eligibility = evaluatePunchEligibility(
     now,
     tz,
-    lastRecord ? { type: lastRecord.type, timestamp: lastRecord.timestamp } : null
+    lastRecord ? { type: lastRecord.type, timestamp: lastRecord.timestamp } : null,
+    { workSchedule: effectiveSchedule }
   );
 
   // "지금 퇴근하면 조퇴인가?" — 클라이언트가 사유 입력 UI 를 노출할지 결정
@@ -91,6 +103,29 @@ export async function GET() {
     eligibility.canCheckOut &&
     lastRecord?.type === "CHECK_IN" &&
     isCheckOutPastWindow(lastRecord.timestamp, now);
+
+  /** 출근 후 30~48시간 — POST 와 동일하게 OT 승인·사유 없음 */
+  const staleCheckOutNoOvertime =
+    eligibility.canCheckOut &&
+    lastRecord?.type === "CHECK_IN" &&
+    !lateCheckOutPastWindow &&
+    now.getTime() - lastRecord.timestamp.getTime() >= THIRTY_H_MS;
+
+  const overtimeExpected =
+    overtimeApprovalRequired &&
+    eligibility.canCheckOut &&
+    lastRecord?.type === "CHECK_IN" &&
+    !earlyLeaveExpected &&
+    !lateCheckOutPastWindow &&
+    !staleCheckOutNoOvertime &&
+    isCheckOutOvertimeApprovalRequired(
+      now,
+      lastRecord.timestamp,
+      tz,
+      effectiveSchedule,
+      company.overtimeMode,
+      freePunchEnabled
+    );
 
   let lateCheckOutRecordedAt: string | null = null;
   let lateCheckOutTimeBasis: LateCheckOutTimeBasis | null = null;
@@ -108,11 +143,17 @@ export async function GET() {
     lastTimestamp: lastRecord?.timestamp.toISOString() ?? null,
     today: calendarDayInTz(now, tz),
     earlyLeaveExpected,
+    overtimeExpected,
     lateCheckOutPastWindow,
     lateCheckOutRecordedAt,
     lateCheckOutTimeBasis,
     reCheckInApprovalRequired: freePunchEnabled ? false : eligibility.reCheckInApprovalRequired,
     freePunchEnabled,
+    overtimeApprovalRequired,
+    overtimeApplicationEnabled: overtimeApplicationEnabled({
+      overtimeMode: company.overtimeMode,
+      freePunchEnabled,
+    }),
     workEndTime: effectiveSchedule.workEndTime ?? company.workEndTime,
   });
 }

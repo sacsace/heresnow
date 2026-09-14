@@ -60,6 +60,7 @@ const patchSchema = z.object({
     )
     .nullable()
     .optional(),
+  isTeamLeader: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -212,6 +213,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const employeeData: Prisma.EmployeeUpdateInput = {
     ...schedulePatch,
     ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+    ...(parsed.data.isTeamLeader !== undefined
+      ? { isTeamLeader: parsed.data.isTeamLeader }
+      : {}),
   };
 
   if (parsed.data.departmentId !== undefined) {

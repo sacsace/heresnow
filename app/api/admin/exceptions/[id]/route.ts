@@ -2,6 +2,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
+import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
+import { evaluateCheckoutOvertimeFlags } from "@/lib/overtimePolicy";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -41,7 +44,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const ex = await prisma.attendanceException.findUnique({
     where: { id },
-    include: { attendance: true },
+    include: {
+      attendance: {
+        include: {
+          employee: {
+            select: {
+              workScheduleType: true,
+              shiftCode: true,
+              workStartTime: true,
+              workEndTime: true,
+              workScheduleByDay: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!ex) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -56,6 +73,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const approved = parsed.data.action === "approve";
+  const checkout = ex.attendance;
+  const isOvertimeApproval =
+    approved &&
+    checkout.type === "CHECK_OUT" &&
+    !checkout.isEarlyLeave &&
+    !checkout.isOvertime;
 
   await prisma.$transaction(async (tx) => {
     await tx.attendanceException.update({
@@ -65,9 +88,58 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         resolvedAt: new Date(),
       },
     });
+
+    let overtimePatch: { isOvertime: boolean; overtimeMinutes: number } | null = null;
+    if (isOvertimeApproval) {
+      const company = await tx.company.findUnique({
+        where: { id: ex.companyId },
+        select: {
+          timezone: true,
+          freePunchEnabled: true,
+          overtimeMode: true,
+          workStartTime: true,
+          workEndTime: true,
+          workDays: true,
+          workScheduleByDay: true,
+          shiftPresets: true,
+        },
+      });
+      const checkIn = await tx.attendanceRecord.findFirst({
+        where: {
+          companyId: ex.companyId,
+          employeeId: checkout.employeeId,
+          type: "CHECK_IN",
+          timestamp: { lte: checkout.timestamp },
+        },
+        orderBy: { timestamp: "desc" },
+      });
+      if (company && checkIn) {
+        const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
+        const schedule = resolveEmployeeWorkSchedule(checkout.employee, company);
+        const freePunchEnabled =
+          Boolean(company.freePunchEnabled) &&
+          checkout.employee.workScheduleType === "FREE";
+        const flags = evaluateCheckoutOvertimeFlags({
+          checkOutAt: checkout.timestamp,
+          checkInAt: checkIn.timestamp,
+          timeZone: tz,
+          schedule,
+          overtimeMode: company.overtimeMode,
+          freePunchEnabled,
+        });
+        overtimePatch = {
+          isOvertime: flags.isOvertime,
+          overtimeMinutes: flags.overtimeMinutes,
+        };
+      }
+    }
+
     await tx.attendanceRecord.update({
       where: { id: ex.attendanceId },
-      data: { status: approved ? "APPROVED" : "REJECTED" },
+      data: {
+        status: approved ? "APPROVED" : "REJECTED",
+        ...(overtimePatch ?? {}),
+      },
     });
     await tx.approvalLog.create({
       data: {

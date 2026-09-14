@@ -51,6 +51,7 @@ const companySelect = {
   faceRecognitionEnabled: true,
   freePunchEnabled: true,
   freePunchRequiredMinutes: true,
+  overtimeMode: true,
   workStartTime: true,
   workEndTime: true,
   workDays: true,
@@ -67,6 +68,7 @@ function settingsPayload(
     faceRecognitionEnabled: boolean;
     freePunchEnabled: boolean;
     freePunchRequiredMinutes: number;
+    overtimeMode: string;
     workStartTime: string | null;
     workEndTime: string | null;
     workDays: string | null;
@@ -83,6 +85,7 @@ function settingsPayload(
     faceRecognitionEnabled: company.faceRecognitionEnabled,
     freePunchEnabled: company.freePunchEnabled,
     freePunchRequiredWorkTime: minutesToHHmm(company.freePunchRequiredMinutes),
+    overtimeMode: company.overtimeMode,
     workStartTime: company.workStartTime,
     workEndTime: company.workEndTime,
     workDays: company.workDays,
@@ -179,6 +182,7 @@ const patchSchema = z
       .record(z.enum(["A", "B", "C"]), shiftPresetSchema)
       .optional(),
     geofenceMode: z.enum(["OFF", "WARN", "BLOCK"]).optional(),
+    overtimeMode: z.enum(["AUTO", "AFTER_APPROVAL"]).optional(),
   })
   .refine(
     (data) => {
@@ -263,6 +267,9 @@ export async function PATCH(req: Request) {
   }
   if (parsed.data.geofenceMode !== undefined) {
     data.geofenceMode = parsed.data.geofenceMode;
+  }
+  if (parsed.data.overtimeMode !== undefined) {
+    data.overtimeMode = parsed.data.overtimeMode;
   }
 
   const company = await prisma.company.update({

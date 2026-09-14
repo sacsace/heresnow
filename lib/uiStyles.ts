@@ -236,6 +236,20 @@ export const cardActionBar = actionBar;
 /** Compact numeric/date field in dense layouts */
 export const inputCompact = `${input} !py-1.5 text-[0.875rem]`;
 
+/** Table toolbar input — h-9 to match segmented controls */
+export const inputToolbar = `${inputCompact} !h-9 !min-h-[2.25rem] !py-0 leading-normal`;
+
+/** Segmented control in table toolbar — fixed h-9 track */
+export const segmentedToolbarWrap =
+  "inline-flex h-9 items-center gap-1 rounded-xl bg-[var(--fill-secondary)] p-0.5";
+
+export const segmentedToolbarBtn = (active: boolean) =>
+  `inline-flex h-8 min-w-[4.5rem] shrink-0 items-center justify-center rounded-[0.5rem] px-3 text-[0.8125rem] font-semibold transition-colors sm:min-w-[5.5rem] sm:text-[0.875rem] ${
+    active
+      ? "bg-white text-[var(--foreground)]"
+      : "text-[var(--apple-label-secondary)] hover:text-[var(--foreground)]"
+  }`;
+
 /** Table cell number input — fixed width (overrides input w-full) */
 export const inputNumberCell = `${inputCompact} !w-[6rem] min-w-[6rem] max-w-[6rem] shrink-0 tabular-nums`;
 

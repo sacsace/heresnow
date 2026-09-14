@@ -9,16 +9,8 @@ import { fromZonedTime } from "date-fns-tz";
 import { NextResponse } from "next/server";
 
 const DAY_PAD_MS = 36 * 60 * 60 * 1000;
-/** 기간 조회 상한 (영업일·주말 포함). 너무 큰 범위는 마커 과다로 가독성이 떨어진다. */
-const RANGE_MAX_DAYS = 31;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function diffDaysInclusive(from: string, to: string): number {
-  const a = new Date(`${from}T00:00:00Z`);
-  const b = new Date(`${to}T00:00:00Z`);
-  return Math.floor((b.getTime() - a.getTime()) / 86_400_000) + 1;
-}
 
 export async function GET(req: Request) {
   try {
@@ -60,17 +52,6 @@ export async function GET(req: Request) {
       if (fromParam > toParam) {
         return NextResponse.json(
           { error: "INVALID_RANGE", message: "시작일이 종료일보다 늦을 수 없습니다." },
-          { status: 400 }
-        );
-      }
-      const days = diffDaysInclusive(fromParam, toParam);
-      if (days > RANGE_MAX_DAYS) {
-        return NextResponse.json(
-          {
-            error: "RANGE_TOO_LARGE",
-            message: `기간은 최대 ${RANGE_MAX_DAYS}일까지 조회할 수 있습니다.`,
-            maxDays: RANGE_MAX_DAYS,
-          },
           { status: 400 }
         );
       }

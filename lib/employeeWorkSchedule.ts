@@ -110,7 +110,7 @@ export function employeeScheduleSummary(
     return {
       workScheduleType: "COMPANY",
       shiftCode: null,
-      label: locale === "en" ? "Company default" : "회사 기본",
+      label: locale === "en" ? "Company Default" : "회사 기본",
     };
   }
   if (type === "SHIFT" && isShiftCode(employee.shiftCode)) {

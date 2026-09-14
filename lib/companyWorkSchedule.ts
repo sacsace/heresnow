@@ -132,6 +132,91 @@ function nextCalendarDayStr(dayStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+function addCalendarDays(dayStr: string, offset: number): string {
+  const d = new Date(`${dayStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
+/** 퇴근 후 재출근 — 정규 출근 N분 전부터 허용 */
+export const EARLY_CHECK_IN_BEFORE_START_MS = 60 * 60 * 1000;
+
+/**
+ * 퇴근 시각 이후 다음 정규 출근 시각(근무 요일만).
+ * 당일·익일 스케줄을 순회하며 checkout 이후 첫 출근 시각을 반환한다.
+ */
+export function nextScheduledWorkStartAfter(
+  after: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule
+): Date | null {
+  const tz = timeZone.trim() || "UTC";
+  const workDays = parseWorkDays(schedule.workDays);
+  const startDay = calendarDayInTz(after, tz);
+
+  for (let offset = 0; offset <= 14; offset++) {
+    const dayStr = addCalendarDays(startDay, offset);
+    let probe: Date;
+    try {
+      probe = fromZonedTime(`${dayStr} 12:00:00`, tz);
+    } catch {
+      probe = fromZonedTime(`${dayStr} 12:00:00`, "UTC");
+    }
+    const weekday = localWeekday(probe, tz);
+    if (!workDays.has(weekday)) continue;
+
+    const { startMin, startStr } = resolveWorkWindowForWeekday(weekday, schedule);
+    if (startMin == null) continue;
+
+    let startAt: Date;
+    try {
+      startAt = fromZonedTime(`${dayStr} ${startStr}:00`, tz);
+    } catch {
+      startAt = fromZonedTime(`${dayStr} ${startStr}:00`, "UTC");
+    }
+
+    if (startAt.getTime() > after.getTime()) {
+      return startAt;
+    }
+  }
+  return null;
+}
+
+/** 정규 출근 leadMs 전부터 재출근 가능한지 */
+export function isEarlyCheckInWindowOpen(
+  now: Date,
+  afterCheckout: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule,
+  leadMs = EARLY_CHECK_IN_BEFORE_START_MS
+): boolean {
+  const nextStart = nextScheduledWorkStartAfter(afterCheckout, timeZone, schedule);
+  if (!nextStart) return false;
+  return now.getTime() >= nextStart.getTime() - leadMs;
+}
+
+/** COOLDOWN 중 다음 출근 가능 시각 — min(퇴근+4h, 다음 출근−60분) 중 미래 시각 */
+export function resolveNextCheckInAfterCooldown(
+  now: Date,
+  checkoutAt: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule | null | undefined,
+  fourHourMs: number,
+  leadMs = EARLY_CHECK_IN_BEFORE_START_MS
+): Date {
+  const fourHourAt = new Date(checkoutAt.getTime() + fourHourMs);
+  if (!schedule) return fourHourAt;
+
+  const nextStart = nextScheduledWorkStartAfter(checkoutAt, timeZone, schedule);
+  const candidates = [fourHourAt];
+  if (nextStart) {
+    candidates.push(new Date(nextStart.getTime() - leadMs));
+  }
+  const future = candidates.filter((candidate) => candidate.getTime() > now.getTime());
+  if (future.length === 0) return fourHourAt;
+  return new Date(Math.min(...future.map((candidate) => candidate.getTime())));
+}
+
 /**
  * 출근 시각·회사 스케줄 기준 해당 근무의 정규 퇴근 시각(절대 시각).
  * 야간 근무(end <= start)는 출근일 다음 날 end 시각.
@@ -345,4 +430,14 @@ export function isCheckOutEarly(
   schedule: CompanyWorkSchedule
 ): boolean {
   return evaluateCheckOutWorkFlags(checkOutAt, checkInAt, timeZone, schedule).isEarlyLeave;
+}
+
+/** "지금 퇴근하면 초과 근무인가?" */
+export function isCheckOutOvertime(
+  checkOutAt: Date,
+  checkInAt: Date,
+  timeZone: string,
+  schedule: CompanyWorkSchedule
+): boolean {
+  return evaluateCheckOutWorkFlags(checkOutAt, checkInAt, timeZone, schedule).isOvertime;
 }

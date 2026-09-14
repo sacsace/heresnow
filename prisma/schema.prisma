@@ -36,6 +36,18 @@ enum ExceptionStatus {
   REJECTED
 }
 
+enum WorkRequestType {
+  EARLY_LEAVE
+  OVERTIME
+}
+
+enum OvertimeMode {
+  /// 퇴근 시 초과 근무 분 자동 반영
+  AUTO
+  /// 관리자 승인 후 초과 근무로 반영
+  AFTER_APPROVAL
+}
+
 enum BillingRequestStatus {
   PENDING
   APPROVED
@@ -189,6 +201,8 @@ model Company {
   shiftPresets         Json?
   /// true면 자유 출퇴근 모드(조퇴/재출근 승인 절차 없이 기록)
   freePunchEnabled     Boolean  @default(false)
+  /// 정규 근무표 기준 초과 근무 반영 방식 (자유 출퇴근은 항상 자동)
+  overtimeMode         OvertimeMode @default(AUTO)
   /// 자유 출퇴근 기준 총 근무시간(분). 초과분은 추가 근무로 계산
   freePunchRequiredMinutes Int   @default(540)
   /// 근무지 반경 정책: OFF | WARN | BLOCK
@@ -223,6 +237,7 @@ model Company {
   departments          Department[]
   attendanceRecords    AttendanceRecord[]
   attendanceExceptions AttendanceException[]
+  workRequests         WorkRequest[]
   approvalLogs         ApprovalLog[]
   billingRequests      BillingRequest[]
   paymentOrders        PaymentOrder[]
@@ -263,6 +278,8 @@ model User {
   employee       Employee?
   approvalLogs   ApprovalLog[] @relation("ApproverUser")
   resolvedBillingRequests BillingRequest[] @relation("BillingResolver")
+  resolvedWorkRequests    WorkRequest[]    @relation("WorkRequestResolver")
+  assignedWorkRequests    WorkRequest[]    @relation("WorkRequestAssignedApprover")
   passkeys      UserPasskeyCredential[]
 }
 
@@ -310,12 +327,44 @@ model Employee {
   workStartTime      String?
   workEndTime        String?
   workScheduleByDay  Json?
+  /// 팀장 — 근태 신청 승인권자 후보
+  isTeamLeader       Boolean  @default(false)
   createdAt DateTime @default(now())
 
   attendanceRecords AttendanceRecord[]
+  workRequests      WorkRequest[]
 
   @@index([companyId])
   @@index([departmentId])
+}
+
+/// 조기 퇴근·초과 근무 사전 신청
+model WorkRequest {
+  id             String           @id @default(cuid())
+  companyId      String
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type           WorkRequestType
+  /// 회사 타임존 기준 근무일 YYYY-MM-DD
+  workDate       String
+  reason         String
+  /// OVERTIME: 예상 추가 근무 분
+  extraMinutes   Int?
+  status                 ExceptionStatus  @default(PENDING)
+  /// 신청 시 선택한 승인권자
+  assignedApproverUserId String?
+  assignedApprover       User?            @relation("WorkRequestAssignedApprover", fields: [assignedApproverUserId], references: [id], onDelete: SetNull)
+  createdAt              DateTime         @default(now())
+  resolvedAt             DateTime?
+  resolverUserId         String?
+  resolver               User?            @relation("WorkRequestResolver", fields: [resolverUserId], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, type, workDate])
+  @@index([companyId, status])
+  @@index([employeeId])
+  @@index([companyId, type, status])
+  @@index([assignedApproverUserId])
 }
 
 model Site {
