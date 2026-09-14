@@ -41,6 +41,55 @@ export function isFaceMatch(stored: number[], probe: number[], threshold = FACE_
   return euclideanDistance(stored, probe) < threshold;
 }
 
+/** 유클리드 거리 → 인식률 % (0=불일치, threshold=0%, distance=0→100%) */
+export function distanceToConfidencePercent(
+  distance: number,
+  threshold = FACE_MATCH_THRESHOLD
+): number {
+  if (!Number.isFinite(distance)) return 0;
+  const raw = (1 - distance / threshold) * 100;
+  return Math.round(Math.max(0, Math.min(100, raw)));
+}
+
+/** 여러 descriptor 중 probe와 최소 거리 */
+export function bestProbeDistance(descriptors: number[][], probe: number[]): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (const stored of descriptors) {
+    const d = euclideanDistance(stored, probe);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+export type MultiFaceDescriptorCandidate = {
+  id: string;
+  descriptors: number[][];
+};
+
+/** 후보별 다중 descriptor — 각 후보의 최소 거리로 1:N 식별 */
+export function identifySingleFaceMatchMulti<T extends MultiFaceDescriptorCandidate>(
+  candidates: T[],
+  probe: number[],
+  threshold = FACE_MATCH_THRESHOLD,
+  minGap = FACE_IDENTIFY_MIN_GAP
+): FaceIdentifyResult<T> | null {
+  const matches: { candidate: T; distance: number }[] = [];
+  for (const candidate of candidates) {
+    if (candidate.descriptors.length === 0) continue;
+    const distance = bestProbeDistance(candidate.descriptors, probe);
+    if (distance < threshold) {
+      matches.push({ candidate, distance });
+    }
+  }
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => a.distance - b.distance);
+  const best = matches[0]!;
+  if (matches.length > 1 && best.distance + minGap > matches[1]!.distance) {
+    return null;
+  }
+  return { match: best.candidate, distance: best.distance };
+}
+
 /** 1:N 식별 시 1·2위 거리 차이가 이보다 작으면 동일인으로 확정하지 않음 */
 export const FACE_IDENTIFY_MIN_GAP = 0.08;
 

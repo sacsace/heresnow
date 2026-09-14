@@ -4,8 +4,13 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import { findConflictingFaceEmployee } from "@/lib/faceEnrollGuard";
+import {
+  loadEmployeeFaceCredentials,
+  matchFaceCredentials,
+  syncEmployeeFaceFields,
+} from "@/lib/faceCredentials";
 import { isValidFacePreviewUrl } from "@/lib/facePreviewValidation";
-import { FACE_DESCRIPTOR_LENGTH, isFaceMatch, parseFaceDescriptor } from "@/lib/faceMatch";
+import { FACE_DESCRIPTOR_LENGTH, parseFaceDescriptor } from "@/lib/faceMatch";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -13,6 +18,10 @@ import { z } from "zod";
 const enrollSchema = z.object({
   descriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH),
   previewUrl: z.string().max(1_000_000).optional(),
+});
+
+const deleteSchema = z.object({
+  id: z.string().min(1),
 });
 
 export async function GET() {
@@ -27,8 +36,16 @@ export async function GET() {
     where: { id: session.user.employeeId, companyId: session.user.companyId },
     select: {
       faceEnrolledAt: true,
-      facePreviewUrl: true,
       company: { select: { faceRecognitionEnabled: true } },
+      faceCredentials: {
+        select: {
+          id: true,
+          previewUrl: true,
+          createdAt: true,
+          lastUsedAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
   if (!emp) {
@@ -38,8 +55,14 @@ export async function GET() {
   return NextResponse.json({
     enrolled: emp.faceEnrolledAt != null,
     enrolledAt: emp.faceEnrolledAt?.toISOString() ?? null,
-    hasPreview: emp.facePreviewUrl != null,
+    hasPreview: emp.faceCredentials.some((c) => c.previewUrl != null),
     faceRecognitionEnabled: emp.company.faceRecognitionEnabled,
+    credentials: emp.faceCredentials.map((c) => ({
+      id: c.id,
+      createdAt: c.createdAt.toISOString(),
+      lastUsedAt: c.lastUsedAt?.toISOString() ?? null,
+      hasPreview: c.previewUrl != null,
+    })),
   });
 }
 
@@ -102,19 +125,66 @@ export async function POST(req: Request) {
     );
   }
 
-  await prisma.employee.update({
-    where: { id: session.user.employeeId },
+  const created = await prisma.employeeFaceCredential.create({
     data: {
-      faceDescriptor: descriptor,
-      faceEnrolledAt: new Date(),
-      ...(previewUrl != null ? { facePreviewUrl: previewUrl } : {}),
+      employeeId: session.user.employeeId,
+      descriptor,
+      ...(previewUrl != null ? { previewUrl } : {}),
     },
+    select: { id: true, createdAt: true },
   });
 
-  return NextResponse.json({ ok: true, enrolled: true });
+  await syncEmployeeFaceFields(session.user.employeeId);
+
+  return NextResponse.json({
+    ok: true,
+    enrolled: true,
+    credential: {
+      id: created.id,
+      createdAt: created.createdAt.toISOString(),
+      hasPreview: previewUrl != null,
+    },
+  });
 }
 
-/** 출근 시 본인 확인 (descriptor만 검증, 저장하지 않음) */
+export async function DELETE(req: Request) {
+  const session = await auth();
+  const seatDenied = await seatLoginForbiddenResponse(session);
+  if (seatDenied) return seatDenied;
+  if (!session?.user?.employeeId || !session.user.companyId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const disabled = await assertFaceRecognitionEnabled(session.user.companyId);
+  if (disabled) return disabled;
+
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = deleteSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const cred = await prisma.employeeFaceCredential.findFirst({
+    where: { id: parsed.data.id, employeeId: session.user.employeeId },
+    select: { id: true },
+  });
+  if (!cred) {
+    return NextResponse.json({ error: "등록된 안면을 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  await prisma.employeeFaceCredential.delete({ where: { id: cred.id } });
+  await syncEmployeeFaceFields(session.user.employeeId);
+
+  return NextResponse.json({ ok: true });
+}
+
+/** 본인 확인 (descriptor 검증, 저장하지 않음) — 인식률 % 포함 */
 export async function PUT(req: Request) {
   const session = await auth();
   const seatDenied = await seatLoginForbiddenResponse(session);
@@ -145,23 +215,45 @@ export async function PUT(req: Request) {
 
   const emp = await prisma.employee.findFirst({
     where: { id: session.user.employeeId, companyId: session.user.companyId },
-    select: { faceDescriptor: true, faceEnrolledAt: true },
+    select: { faceEnrolledAt: true },
   });
   if (!emp?.faceEnrolledAt) {
     return NextResponse.json({ error: "먼저 안면을 등록해 주세요." }, { status: 400 });
   }
 
-  const stored = parseFaceDescriptor(emp.faceDescriptor);
-  if (!stored) {
+  const credentials = await loadEmployeeFaceCredentials(session.user.employeeId);
+  if (credentials.length === 0) {
     return NextResponse.json({ error: "등록된 안면 정보가 없습니다. 다시 등록해 주세요." }, { status: 400 });
   }
 
-  if (!isFaceMatch(stored, probe)) {
+  const result = matchFaceCredentials(credentials, probe);
+
+  if (!result.matched) {
     return NextResponse.json(
-      { error: "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다.", matched: false },
+      {
+        error: "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다.",
+        matched: false,
+        confidencePercent: result.confidencePercent,
+        distance: result.distance,
+      },
       { status: 403 }
     );
   }
 
-  return NextResponse.json({ ok: true, matched: true });
+  if (result.credentialId) {
+    void prisma.employeeFaceCredential
+      .update({
+        where: { id: result.credentialId },
+        data: { lastUsedAt: new Date() },
+      })
+      .catch(() => {});
+  }
+
+  return NextResponse.json({
+    ok: true,
+    matched: true,
+    confidencePercent: result.confidencePercent,
+    distance: result.distance,
+    matchedCredentialId: result.credentialId,
+  });
 }

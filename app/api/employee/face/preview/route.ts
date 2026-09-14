@@ -15,6 +15,7 @@ const PREVIEW_WINDOW_MS = 15 * 60_000;
 
 const bodySchema = z.object({
   password: z.string().min(1).max(200),
+  credentialId: z.string().min(1).optional(),
 });
 
 export async function POST(req: Request) {
@@ -65,14 +66,29 @@ export async function POST(req: Request) {
 
   const emp = await prisma.employee.findFirst({
     where: { id: session.user.employeeId, companyId: session.user.companyId },
-    select: { facePreviewUrl: true, faceEnrolledAt: true },
+    select: { faceEnrolledAt: true },
   });
   if (!emp?.faceEnrolledAt) {
     return NextResponse.json({ error: "NOT_ENROLLED" }, { status: 400 });
   }
-  if (!emp.facePreviewUrl) {
+
+  const cred = parsed.data.credentialId
+    ? await prisma.employeeFaceCredential.findFirst({
+        where: { id: parsed.data.credentialId, employeeId: session.user.employeeId },
+        select: { previewUrl: true },
+      })
+    : await prisma.employeeFaceCredential.findFirst({
+        where: {
+          employeeId: session.user.employeeId,
+          previewUrl: { not: null },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { previewUrl: true },
+      });
+
+  if (!cred?.previewUrl) {
     return NextResponse.json({ error: "NO_PREVIEW" }, { status: 404 });
   }
 
-  return NextResponse.json({ previewUrl: emp.facePreviewUrl });
+  return NextResponse.json({ previewUrl: cred.previewUrl });
 }

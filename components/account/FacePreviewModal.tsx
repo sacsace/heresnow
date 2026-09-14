@@ -18,9 +18,10 @@ type Props = {
   open: boolean;
   onClose: () => void;
   hasPreview: boolean;
+  credentialId?: string | null;
 };
 
-export function FacePreviewModal({ open, onClose, hasPreview }: Props) {
+export function FacePreviewModal({ open, onClose, hasPreview, credentialId }: Props) {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
   const [password, setPassword] = useState("");
@@ -69,7 +70,10 @@ export function FacePreviewModal({ open, onClose, hasPreview }: Props) {
       const r = await fetch("/api/employee/face/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({
+          password,
+          ...(credentialId ? { credentialId } : {}),
+        }),
       });
       const j = (await r.json().catch(() => ({}))) as {
         error?: string;

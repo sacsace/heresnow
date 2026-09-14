@@ -22,11 +22,8 @@ import {
 } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { formatInTimeZone } from "date-fns-tz";
-import {
-  FACE_DESCRIPTOR_LENGTH,
-  isFaceMatch,
-  parseFaceDescriptor,
-} from "@/lib/faceMatch";
+import { matchFaceCredentials } from "@/lib/faceCredentials";
+import { FACE_DESCRIPTOR_LENGTH, parseFaceDescriptor } from "@/lib/faceMatch";
 import {
   enqueueMvsAttendanceIfEnabled,
   faceVerifiedForAttendance,
@@ -231,14 +228,18 @@ export async function POST(req: Request) {
       );
     }
     const probe = parseFaceDescriptor(faceDescriptor);
-    const stored = parseFaceDescriptor(employee.faceDescriptor);
-    if (!probe || !stored) {
+    if (!probe) {
       return NextResponse.json(
         { error: "안면 인식 정보가 없습니다. 다시 인식해 주세요." },
         { status: 400 }
       );
     }
-    if (!isFaceMatch(stored, probe)) {
+    const credentials = await prisma.employeeFaceCredential.findMany({
+      where: { employeeId: employee.id },
+      select: { id: true, descriptor: true },
+    });
+    const match = matchFaceCredentials(credentials, probe);
+    if (!match.matched) {
       return NextResponse.json(
         {
           error:
@@ -248,6 +249,14 @@ export async function POST(req: Request) {
         },
         { status: 403 }
       );
+    }
+    if (match.credentialId) {
+      void prisma.employeeFaceCredential
+        .update({
+          where: { id: match.credentialId },
+          data: { lastUsedAt: new Date() },
+        })
+        .catch(() => {});
     }
     faceMatched = true;
   }

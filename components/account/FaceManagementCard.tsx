@@ -7,7 +7,6 @@ import {
   bannerInfo,
   bannerSuccess,
   btnActionEqual,
-  btnActionRow,
   btnPrimary,
   btnSecondary,
   card,
@@ -18,21 +17,31 @@ import {
 } from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
 
+type FaceCredentialItem = {
+  id: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  hasPreview: boolean;
+};
+
 type FaceStatus = {
   enrolled: boolean;
   enrolledAt: string | null;
   hasPreview: boolean;
   faceRecognitionEnabled: boolean;
+  credentials: FaceCredentialItem[];
 };
 
 export function FaceManagementCard() {
   const { t } = useI18n();
   const [status, setStatus] = useState<FaceStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [reEnrolling, setReEnrolling] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
   const [testingFace, setTestingFace] = useState(false);
+  const [previewCredentialId, setPreviewCredentialId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -46,13 +55,16 @@ export function FaceManagementCard() {
         setLoading(false);
         return;
       }
-      const j = (await r.json().catch(() => ({}))) as Partial<FaceStatus>;
+      const j = (await r.json().catch(() => ({}))) as Partial<FaceStatus> & {
+        credentials?: FaceCredentialItem[];
+      };
       if (r.ok) {
         setStatus({
           enrolled: Boolean(j.enrolled),
           enrolledAt: j.enrolledAt ?? null,
           hasPreview: Boolean(j.hasPreview),
           faceRecognitionEnabled: Boolean(j.faceRecognitionEnabled),
+          credentials: Array.isArray(j.credentials) ? j.credentials : [],
         });
       } else {
         setError(t("account.faceLoadFail"));
@@ -68,23 +80,40 @@ export function FaceManagementCard() {
     void load();
   }, [load]);
 
-  // employeeId 없는 사용자(예: 플랫폼 SUPER_ADMIN) 또는 인증 없음 → 섹션 자체 비표시
+  async function deleteCredential(id: string) {
+    if (!window.confirm(t("account.faceDeleteConfirm"))) return;
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const r = await fetch("/api/employee/face", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!r.ok) {
+        setError(t("account.faceDeleteFail"));
+        return;
+      }
+      setSuccess(t("account.faceDeleted"));
+      await load();
+    } catch {
+      setError(t("account.faceDeleteFail"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function formatTestResult(matched: boolean, confidencePercent: number): string {
+    const key = matched ? "account.faceTestOkPercent" : "account.faceTestFailPercent";
+    return t(key).replace("{percent}", String(confidencePercent));
+  }
+
   if (!loading && status === null && !error) {
     return null;
   }
 
-  const enrolledLabel = status?.enrolled
-    ? t("account.faceStatusEnrolled")
-    : t("account.faceStatusNotEnrolled");
-  const enrolledAt = status?.enrolledAt
-    ? new Date(status.enrolledAt).toLocaleString(undefined, {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
+  const credentials = status?.credentials ?? [];
 
   return (
     <section className={card}>
@@ -99,47 +128,79 @@ export function FaceManagementCard() {
       <div className={`${cardBody} space-y-4`}>
         {loading ? (
           <p className={hint}>{t("common.loading")}</p>
-        ) : error ? (
+        ) : error && !status ? (
           <p className={errorText}>{error}</p>
         ) : status && !status.faceRecognitionEnabled ? (
           <p className={bannerInfo}>{t("account.faceDisabledNote")}</p>
         ) : status ? (
           <>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <div>
-                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-[var(--apple-label-secondary)]">
-                  {t("account.faceTitle")}
-                </p>
-                <p
-                  className={`mt-1 text-[0.9375rem] font-semibold ${
-                    status.enrolled
-                      ? "text-[var(--apple-green-dark)]"
-                      : "text-[var(--apple-orange-dark)]"
-                  }`}
-                >
-                  {enrolledLabel}
-                </p>
+            {error ? <p className={errorText}>{error}</p> : null}
+            {success ? <p className={bannerSuccess}>{success}</p> : null}
+
+            {credentials.length === 0 ? (
+              <p className={hint}>{t("account.faceNone")}</p>
+            ) : (
+              <div className="space-y-2">
+                {credentials.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] px-3 py-2.5"
+                  >
+                    <p className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
+                      {t("account.faceCredentialLabel").replace("{n}", String(index + 1))}
+                    </p>
+                    <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
+                      {t("account.faceCredentialCreated").replace(
+                        "{time}",
+                        new Date(item.createdAt).toLocaleString()
+                      )}
+                    </p>
+                    {item.lastUsedAt ? (
+                      <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
+                        {t("account.faceCredentialLastUsed").replace(
+                          "{time}",
+                          new Date(item.lastUsedAt).toLocaleString()
+                        )}
+                      </p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {item.hasPreview ? (
+                        <button
+                          type="button"
+                          className={`${btnSecondary} h-8 px-3 text-[0.75rem]`}
+                          onClick={() => {
+                            setError(null);
+                            setSuccess(null);
+                            setPreviewCredentialId(item.id);
+                            setPreviewOpen(true);
+                          }}
+                          disabled={busy}
+                        >
+                          {t("account.faceViewButton")}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={`${btnSecondary} h-8 px-3 text-[0.75rem]`}
+                        onClick={() => void deleteCredential(item.id)}
+                        disabled={busy}
+                      >
+                        {t("account.faceDelete")}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              {enrolledAt && (
-                <div>
-                  <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-[var(--apple-label-secondary)]">
-                    {t("account.faceEnrolledAtLabel")}
-                  </p>
-                  <p className="mt-1 text-[0.875rem] text-[var(--foreground)]">{enrolledAt}</p>
-                </div>
-              )}
-            </div>
+            )}
 
-            {success && <p className={bannerSuccess}>{success}</p>}
-
-            {reEnrolling ? (
+            {enrolling ? (
               <div className="space-y-3">
                 <FaceCapture
                   mode="enroll"
                   profileKind="login"
                   onEnrolled={() => {
-                    setReEnrolling(false);
-                    setSuccess(t("account.faceReEnrollOk"));
+                    setEnrolling(false);
+                    setSuccess(t("account.faceEnrollOk"));
                     void load();
                   }}
                   onError={(msg) => setError(msg)}
@@ -148,7 +209,7 @@ export function FaceManagementCard() {
                   type="button"
                   className={`${btnSecondary} ${btnActionEqual}`}
                   onClick={() => {
-                    setReEnrolling(false);
+                    setEnrolling(false);
                     setError(null);
                   }}
                 >
@@ -160,22 +221,28 @@ export function FaceManagementCard() {
                 <FaceCapture
                   mode="verify"
                   profileKind="login"
+                  verifyOnClientOnly
                   verifyTitle={t("account.faceTestButton")}
-                  verifyLead={t("login.faceVerifyLead")}
+                  verifyLead={t("account.faceTestLead")}
                   onVerified={async (descriptor) => {
                     const r = await fetch("/api/employee/face", {
                       method: "PUT",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ descriptor }),
                     });
+                    const j = (await r.json().catch(() => ({}))) as {
+                      confidencePercent?: number;
+                    };
+                    const percent =
+                      typeof j.confidencePercent === "number" ? j.confidencePercent : 0;
                     if (r.ok) {
                       setTestingFace(false);
                       setError(null);
-                      setSuccess(t("account.faceTestOk"));
+                      setSuccess(formatTestResult(true, percent));
                       return true;
                     }
                     setSuccess(null);
-                    setError(t("account.faceTestFail"));
+                    setError(formatTestResult(false, percent));
                     return false;
                   }}
                   onError={(msg) => setError(msg)}
@@ -192,44 +259,33 @@ export function FaceManagementCard() {
                 </button>
               </div>
             ) : (
-              <div className={btnActionRow}>
-                {status.enrolled && (
-                  <>
-                    <button
-                      type="button"
-                      className={`${btnSecondary} ${btnActionEqual}`}
-                      onClick={() => {
-                        setError(null);
-                        setSuccess(null);
-                        setPreviewOpen(true);
-                      }}
-                    >
-                      {t("account.faceViewButton")}
-                    </button>
-                    <button
-                      type="button"
-                      className={`${btnSecondary} ${btnActionEqual}`}
-                      onClick={() => {
-                        setError(null);
-                        setSuccess(null);
-                        setTestingFace(true);
-                      }}
-                    >
-                      {t("account.faceTestButton")}
-                    </button>
-                  </>
-                )}
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                {credentials.length > 0 ? (
+                  <button
+                    type="button"
+                    className={`${btnSecondary} ${btnActionEqual} sm:max-w-xs`}
+                    onClick={() => {
+                      setError(null);
+                      setSuccess(null);
+                      setTestingFace(true);
+                    }}
+                    disabled={busy}
+                  >
+                    {t("account.faceTestButton")}
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  className={`${btnPrimary} ${btnActionEqual}`}
+                  className={`${btnPrimary} ${btnActionEqual} sm:max-w-xs`}
                   onClick={() => {
                     setError(null);
                     setSuccess(null);
-                    setReEnrolling(true);
+                    setEnrolling(true);
                   }}
+                  disabled={busy}
                 >
-                  {status.enrolled
-                    ? t("account.faceReEnrollButton")
+                  {credentials.length > 0
+                    ? t("account.faceAddButton")
                     : t("account.faceEnrollFirstButton")}
                 </button>
               </div>
@@ -240,8 +296,16 @@ export function FaceManagementCard() {
 
       <FacePreviewModal
         open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        hasPreview={Boolean(status?.hasPreview)}
+        onClose={() => {
+          setPreviewOpen(false);
+          setPreviewCredentialId(null);
+        }}
+        hasPreview={Boolean(
+          previewCredentialId
+            ? credentials.find((c) => c.id === previewCredentialId)?.hasPreview
+            : status?.hasPreview
+        )}
+        credentialId={previewCredentialId}
       />
     </section>
   );

@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client";
 import {
-  euclideanDistance,
+  bestProbeDistance,
   FACE_IDENTIFY_MIN_GAP_LOGIN,
   FACE_MATCH_THRESHOLD_LOGIN,
   FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT,
@@ -41,17 +41,16 @@ type ScoredCandidate = {
   distance: number;
 };
 
-/** 1:N — 전 후보 거리 비교 */
+/** 1:N — 직원별 다중 credential 중 최소 거리로 비교 */
 export function pickFaceLoginMatch(
-  employees: Array<{ id: string; faceDescriptor: unknown }>,
+  employees: Array<{ id: string; descriptors: number[][] }>,
   probe: number[]
 ): { employeeId: string } | FaceLoginPickFailure {
   const scored: ScoredCandidate[] = [];
 
   for (const emp of employees) {
-    const stored = parseFaceDescriptor(emp.faceDescriptor);
-    if (!stored) continue;
-    scored.push({ employeeId: emp.id, distance: euclideanDistance(stored, probe) });
+    if (emp.descriptors.length === 0) continue;
+    scored.push({ employeeId: emp.id, distance: bestProbeDistance(emp.descriptors, probe) });
   }
 
   if (scored.length === 0) {
@@ -97,7 +96,7 @@ export async function matchFaceLoginUser(
     },
     select: {
       id: true,
-      faceDescriptor: true,
+      faceCredentials: { select: { descriptor: true } },
       user: {
         select: {
           id: true,
@@ -109,7 +108,14 @@ export async function matchFaceLoginUser(
     },
   });
 
-  const picked = pickFaceLoginMatch(employees, probe);
+  const candidates = employees.map((emp) => ({
+    id: emp.id,
+    descriptors: emp.faceCredentials
+      .map((c) => parseFaceDescriptor(c.descriptor))
+      .filter((d): d is number[] => d != null),
+  }));
+
+  const picked = pickFaceLoginMatch(candidates, probe);
   if ("reason" in picked) return picked;
 
   const emp = employees.find((e) => e.id === picked.employeeId);

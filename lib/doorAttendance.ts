@@ -13,7 +13,7 @@ import {
   FACE_DESCRIPTOR_LENGTH,
   FACE_IDENTIFY_MIN_GAP_DOOR,
   FACE_MATCH_THRESHOLD_DOOR,
-  identifySingleFaceMatchParsed,
+  identifySingleFaceMatchMulti,
   parseFaceDescriptor,
 } from "@/lib/faceMatch";
 import type { AttendanceType, Role } from "@prisma/client";
@@ -40,7 +40,7 @@ export type DoorPunchEligibility = {
 type CachedDoorEmployee = {
   id: string;
   name: string;
-  descriptor: number[];
+  descriptors: number[][];
 };
 
 const DOOR_FACE_CACHE_TTL_MS = 60_000;
@@ -65,18 +65,20 @@ async function getDoorEmployeesForMatch(companyId: string): Promise<CachedDoorEm
     select: {
       id: true,
       name: true,
-      faceDescriptor: true,
+      faceCredentials: { select: { descriptor: true } },
     },
   });
 
   const normalizedEmployees = employees
     .map((employee) => {
-      const descriptor = parseFaceDescriptor(employee.faceDescriptor);
-      if (!descriptor) return null;
+      const descriptors = employee.faceCredentials
+        .map((cred) => parseFaceDescriptor(cred.descriptor))
+        .filter((d): d is number[] => d != null);
+      if (descriptors.length === 0) return null;
       return {
         id: employee.id,
         name: employee.name,
-        descriptor,
+        descriptors,
       };
     })
     .filter((employee): employee is CachedDoorEmployee => Boolean(employee));
@@ -222,7 +224,7 @@ export async function matchFaceDoorEmployee(
 ): Promise<{ id: string; name: string } | null> {
   const employees = await getDoorEmployeesForMatch(companyId);
 
-  const identified = identifySingleFaceMatchParsed(
+  const identified = identifySingleFaceMatchMulti(
     employees,
     probe,
     FACE_MATCH_THRESHOLD_DOOR,

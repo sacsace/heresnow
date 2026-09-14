@@ -358,9 +358,23 @@ model Employee {
   attendanceRecords AttendanceRecord[]
   workRequests      WorkRequest[]
   checkInReminderLogs CheckInReminderLog[]
+  faceCredentials   EmployeeFaceCredential[]
 
   @@index([companyId])
   @@index([departmentId])
+}
+
+/// 직원당 다중 안면 등록 (패스키와 동일하게 추가·삭제)
+model EmployeeFaceCredential {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  descriptor  Json
+  previewUrl  String?
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([employeeId])
 }
 
 /// Web Push 구독 (휴대폰·PWA 출근 알림)
