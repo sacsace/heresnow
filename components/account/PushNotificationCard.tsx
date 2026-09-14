@@ -18,7 +18,7 @@ import {
   removePushSubscriptionFromServer,
   syncPushSubscriptionToServer,
 } from "@/lib/pushClient";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type PushStatus = {
   configured: boolean;
@@ -36,15 +36,24 @@ const DEFAULT_STATUS: PushStatus = {
 
 export function PushNotificationCard() {
   const { t, locale } = useI18n();
+  const [mounted, setMounted] = useState(false);
+  const [supported, setSupported] = useState(false);
+  const [iosNeedsHomeScreen, setIosNeedsHomeScreen] = useState(false);
+  const [permission, setPermission] = useState<NotificationPermission>("default");
   const [status, setStatus] = useState<PushStatus>(DEFAULT_STATUS);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const supported = useMemo(() => isPushSupported(), []);
-  const iosNeedsHomeScreen = useMemo(() => needsIosHomeScreenForPush(), []);
-  const permission =
-    typeof Notification !== "undefined" ? Notification.permission : "default";
+
+  useEffect(() => {
+    setMounted(true);
+    setSupported(isPushSupported());
+    setIosNeedsHomeScreen(needsIosHomeScreenForPush());
+    if (typeof Notification !== "undefined") {
+      setPermission(Notification.permission);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,8 +90,9 @@ export function PushNotificationCard() {
   }, [t]);
 
   useEffect(() => {
+    if (!mounted) return;
     void load();
-  }, [load]);
+  }, [mounted, load]);
 
   async function setPushEnabled(next: boolean) {
     if (busy) return;
@@ -144,19 +154,22 @@ export function PushNotificationCard() {
     }
   }
 
-  const statusHint = iosNeedsHomeScreen
-    ? t("account.pushIosEnableBlocked")
-    : !status.dbReady
-      ? t("account.pushDbNotReady")
-      : !status.configured
-        ? t("account.pushNotConfigured")
-        : status.subscribed
-          ? t("account.pushStatusOn")
-          : permission === "denied"
-            ? t("account.pushPermissionDenied")
-            : t("account.pushStatusOff");
+  const statusHint = !mounted || loading
+    ? t("account.pushLoading")
+    : iosNeedsHomeScreen
+      ? t("account.pushIosEnableBlocked")
+      : !status.dbReady
+        ? t("account.pushDbNotReady")
+        : !status.configured
+          ? t("account.pushNotConfigured")
+          : status.subscribed
+            ? t("account.pushStatusOn")
+            : permission === "denied"
+              ? t("account.pushPermissionDenied")
+              : t("account.pushStatusOff");
 
   const toggleDisabled =
+    !mounted ||
     loading ||
     busy ||
     iosNeedsHomeScreen ||
@@ -164,50 +177,45 @@ export function PushNotificationCard() {
     !status.dbReady ||
     permission === "denied";
 
-  if (!supported && !iosNeedsHomeScreen) {
-    return (
-      <section className={card}>
-        <div className={cardHeader}>
-          <h2 className="text-base font-semibold text-[var(--foreground)]">{t("account.pushTitle")}</h2>
-        </div>
-        <div className={cardBody}>
-          <p className={hint}>{t("account.pushNotSupported")}</p>
-        </div>
-      </section>
-    );
-  }
+  const showUnsupported = mounted && !supported && !iosNeedsHomeScreen;
 
   return (
     <section className={card}>
       <div className={cardHeader}>
-        <h2 className="text-base font-semibold text-[var(--foreground)]">{t("account.pushTitle")}</h2>
-        <p className="mt-1 text-sm text-[var(--apple-label-secondary)]">{t("account.pushLead")}</p>
+        <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">{t("account.pushTitle")}</p>
+        <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">{t("account.pushLead")}</p>
       </div>
       <div className={`${cardBody} space-y-3`}>
-        <IosPushInstallGuide />
+        {showUnsupported ? (
+          <p className={hint}>{t("account.pushNotSupported")}</p>
+        ) : (
+          <>
+            <IosPushInstallGuide />
 
-        <div className="flex items-start justify-between gap-4 rounded-xl bg-[var(--fill-tertiary)] px-4 py-3.5 sm:items-center">
-          <div className="min-w-0 flex-1">
-            <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">
-              {t("account.pushToggleLabel")}
-            </p>
-            <p className="mt-0.5 text-[0.8125rem] leading-snug text-[var(--apple-label-secondary)]">
-              {loading ? t("account.pushLoading") : statusHint}
-            </p>
-          </div>
-          <ToggleSwitch
-            checked={status.subscribed}
-            disabled={toggleDisabled}
-            ariaLabel={t("account.pushToggleLabel")}
-            onChange={(next) => void setPushEnabled(next)}
-          />
-        </div>
+            <div className="flex items-start justify-between gap-4 rounded-xl bg-[var(--fill-tertiary)] px-4 py-3.5 sm:items-center">
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">
+                  {t("account.pushToggleLabel")}
+                </p>
+                <p className="mt-0.5 text-[0.8125rem] leading-snug text-[var(--apple-label-secondary)]">
+                  {statusHint}
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={status.subscribed}
+                disabled={toggleDisabled || showUnsupported}
+                ariaLabel={t("account.pushToggleLabel")}
+                onChange={(next) => void setPushEnabled(next)}
+              />
+            </div>
 
-        {error ? <p className={errorText}>{error}</p> : null}
-        {success ? <div className={bannerSuccess}>{success}</div> : null}
-        {!loading && status.configured && !iosNeedsHomeScreen && permission !== "denied" ? (
-          <div className={bannerInfo}>{t("account.pushToggleHint")}</div>
-        ) : null}
+            {error ? <p className={errorText}>{error}</p> : null}
+            {success ? <div className={bannerSuccess}>{success}</div> : null}
+            {mounted && !loading && status.configured && !iosNeedsHomeScreen && permission !== "denied" ? (
+              <div className={bannerInfo}>{t("account.pushToggleHint")}</div>
+            ) : null}
+          </>
+        )}
       </div>
     </section>
   );

@@ -3,6 +3,7 @@
 import { useI18n } from "@/components/LanguageProvider";
 import { isInAppBrowser, needsIosHomeScreenForPush } from "@/lib/pwaPlatform";
 import { bannerInfo } from "@/lib/uiStyles";
+import { useEffect, useState } from "react";
 
 type Props = {
   /** card: 계정 설정, inline: 출퇴근 배너 */
@@ -12,8 +13,13 @@ type Props = {
 
 export function IosPushInstallGuide({ variant = "card", className = "" }: Props) {
   const { t } = useI18n();
+  const [show, setShow] = useState(false);
 
-  if (!needsIosHomeScreenForPush()) return null;
+  useEffect(() => {
+    setShow(needsIosHomeScreenForPush());
+  }, []);
+
+  if (!show) return null;
 
   const steps = [
     t("account.pushIosStep1"),

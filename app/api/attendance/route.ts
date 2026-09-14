@@ -36,6 +36,7 @@ import { acquireAttendanceEmployeeLock } from "@/lib/attendanceLock";
 import { mapSiteRow, resolvePunchSiteContext } from "@/lib/attendanceSiteContext";
 import {
   evaluateCheckoutOvertimeFlags,
+  overtimeCalculationDisabled,
   overtimeRequiresApproval,
 } from "@/lib/overtimePolicy";
 import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
@@ -396,12 +397,16 @@ export async function POST(req: Request) {
             freePunchEnabled,
           })
       : evaluateAttendanceWorkFlags(recordTimestamp, tz, type, effectiveSchedule);
-  const normalizedWorkFlags =
+  let normalizedWorkFlags =
     freePunchEnabled && type === "CHECK_IN"
       ? { ...workFlags, isLate: false, lateMinutes: 0 }
       : staleCheckOutNoOvertime && type === "CHECK_OUT"
         ? { ...workFlags, isOvertime: false, overtimeMinutes: 0 }
         : workFlags;
+
+  if (type === "CHECK_OUT" && overtimeCalculationDisabled(company.overtimeMode)) {
+    normalizedWorkFlags = { ...normalizedWorkFlags, isOvertime: false, overtimeMinutes: 0 };
+  }
 
   const siteId = siteCtx.siteId;
   const distanceFromSite = siteCtx.distanceFromSite;

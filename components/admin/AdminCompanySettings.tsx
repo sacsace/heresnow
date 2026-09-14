@@ -50,7 +50,7 @@ function buildDayScheduleState(
   return out;
 }
 
-type OvertimeMode = "AUTO" | "AFTER_APPROVAL";
+type OvertimeMode = "AUTO" | "AFTER_APPROVAL" | "OFF";
 
 type Settings = {
   timezone: string;
@@ -120,7 +120,12 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
       faceRecognitionEnabled: Boolean(s.faceRecognitionEnabled),
       freePunchEnabled: Boolean(s.freePunchEnabled),
       freePunchRequiredWorkTime: s.freePunchRequiredWorkTime ?? "09:00",
-      overtimeMode: s.overtimeMode === "AFTER_APPROVAL" ? "AFTER_APPROVAL" : "AUTO",
+      overtimeMode:
+        s.overtimeMode === "AFTER_APPROVAL"
+          ? "AFTER_APPROVAL"
+          : s.overtimeMode === "OFF"
+            ? "OFF"
+            : "AUTO",
       geofenceMode: typeof s.geofenceMode === "string" ? s.geofenceMode : "OFF",
       workStartTime: s.workStartTime ?? "09:00",
       workEndTime: s.workEndTime ?? "18:00",
@@ -232,14 +237,33 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
 
   const timezoneOptions = timezoneOptionsForSelect(settings?.timezone ?? timezone);
 
+  function renderSaveWorkButton() {
+    if (!settings?.canEdit) return null;
+    return (
+      <button
+        type="button"
+        disabled={saving || loading}
+        onClick={() => void saveWorkSchedule()}
+        className={btnPrimary}
+      >
+        {saving ? t("common.processing") : t("admin.settingsSaveWork")}
+      </button>
+    );
+  }
+
   return (
     <section>
       <p className={sectionLabel}>{t("admin.settingsTitle")}</p>
       <div className={groupedCard}>
         <div className="px-5 py-4 sm:px-6 sm:py-5">
-          <p className="text-[0.9375rem] leading-relaxed text-[var(--apple-label-secondary)]">
-            {t("admin.settingsLead")}
-          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <p className="min-w-0 flex-1 text-[0.9375rem] leading-relaxed text-[var(--apple-label-secondary)]">
+              {t("admin.settingsLead")}
+            </p>
+            {!loading && settings?.canEdit ? (
+              <div className="shrink-0 sm:pt-0.5">{renderSaveWorkButton()}</div>
+            ) : null}
+          </div>
 
           {loading && (
             <p className="mt-4 text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
@@ -297,7 +321,7 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
                   <section className="rounded-xl border border-[var(--separator)] bg-white">
                     <div className="border-b border-[var(--separator)] px-3.5 py-3 sm:px-4">
                       <p className="text-[0.875rem] font-semibold text-[var(--foreground)]">
-                        {t("admin.settingsWorkTypeTitle")}
+                        {t("admin.settingsWorkHoursCardTitle")}
                       </p>
                     </div>
                     <div className="p-3.5 sm:p-4">
@@ -374,6 +398,24 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
                           </span>
                           <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
                             {t("admin.settingsOvertimeModeAfterApprovalHint")}
+                          </span>
+                        </span>
+                      </label>
+                      <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3">
+                        <input
+                          type="radio"
+                          name="overtimeMode"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--apple-blue)]"
+                          checked={settings.overtimeMode === "OFF"}
+                          disabled={!settings.canEdit || saving}
+                          onChange={() => void patch({ overtimeMode: "OFF" })}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
+                            {t("admin.settingsOvertimeModeOff")}
+                          </span>
+                          <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
+                            {t("admin.settingsOvertimeModeOffHint")}
                           </span>
                         </span>
                       </label>
@@ -529,16 +571,7 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
                   <li>{t("admin.settingsWorkRuleHoliday")}</li>
                 </ul>
 
-                {settings.canEdit && (
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void saveWorkSchedule()}
-                    className={`mt-4 ${btnPrimary}`}
-                  >
-                    {saving ? t("common.processing") : t("admin.settingsSaveWork")}
-                  </button>
-                )}
+                {settings.canEdit ? <div className="mt-4">{renderSaveWorkButton()}</div> : null}
               </div>
             </div>
           )}

@@ -46,6 +46,8 @@ enum OvertimeMode {
   AUTO
   /// 관리자 승인 후 초과 근무로 반영
   AFTER_APPROVAL
+  /// 초과 근무 미계산
+  OFF
 }
 
 enum BillingRequestStatus {

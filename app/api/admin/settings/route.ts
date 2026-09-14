@@ -11,8 +11,9 @@ import {
 } from "@/lib/companyWorkSchedule";
 import { parseHHmm } from "@/lib/attendanceRules";
 import { normalizeShiftPresets, type ShiftPresetsMap } from "@/lib/shiftPresets";
+import { normalizeOvertimeMode } from "@/lib/overtimePolicy";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { OvertimeMode, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -182,7 +183,7 @@ const patchSchema = z
       .record(z.enum(["A", "B", "C"]), shiftPresetSchema)
       .optional(),
     geofenceMode: z.enum(["OFF", "WARN", "BLOCK"]).optional(),
-    overtimeMode: z.enum(["AUTO", "AFTER_APPROVAL"]).optional(),
+    overtimeMode: z.enum(["AUTO", "AFTER_APPROVAL", "OFF"]).optional(),
   })
   .refine(
     (data) => {
@@ -269,7 +270,7 @@ export async function PATCH(req: Request) {
     data.geofenceMode = parsed.data.geofenceMode;
   }
   if (parsed.data.overtimeMode !== undefined) {
-    data.overtimeMode = parsed.data.overtimeMode;
+    data.overtimeMode = normalizeOvertimeMode(parsed.data.overtimeMode) as OvertimeMode;
   }
 
   const company = await prisma.company.update({

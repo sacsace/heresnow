@@ -788,6 +788,7 @@ export const ko = {
     settingsReadOnly: "설정 변경은 회사 관리자·HR만 가능합니다.",
     settingsSaved: "저장되었습니다.",
     settingsWorkTypeTitle: "근무 형태",
+    settingsWorkHoursCardTitle: "근무 시간",
     settingsWorkTitle: "근무 시간·요일",
     settingsWorkLead: "회사 타임존 기준으로 지각·조퇴·초과근무·휴일근무를 자동 판정합니다.",
     settingsFreePunch: "자유 출퇴근",
@@ -805,8 +806,11 @@ export const ko = {
     settingsOvertimeModeAfterApproval: "승인 후 계산",
     settingsOvertimeModeAfterApprovalHint:
       "정규 퇴근 시각 이후 60분까지는 OT 없이 자동 퇴근됩니다. 60분 이후 퇴근 시 사유 입력과 관리자 승인 후 초과 근무로 반영됩니다.",
+    settingsOvertimeModeOff: "계산 안함",
+    settingsOvertimeModeOffHint:
+      "정규 퇴근 시각 이후 퇴근해도 초과 근무로 기록하지 않습니다. 자유 출퇴근 모드에서도 추가 근무 시간은 계산하지 않습니다.",
     settingsOvertimeModeNote:
-      "자유 출퇴근 모드가 켜져 있으면 초과 근무는 항상 자동 계산됩니다.",
+      "자유 출퇴근 모드가 켜져 있으면 초과 근무는 자동 계산됩니다. 「계산 안함」을 선택하면 적용되지 않습니다.",
     settingsTimezone: "시간대 (타임존)",
     settingsTimezoneHint:
       "기본은 인도 표준시(IST, Asia/Kolkata)입니다. 출퇴근·오늘 현황·월간 통계·지각/조퇴 판정에 사용됩니다.",
@@ -2010,13 +2014,14 @@ export const en = {
     settingsLead: "Configure your company’s attendance, work location, and integration settings.",
     settingsFaceRecognition: "Require face verification at check-in",
     settingsFaceOnHint:
-      "When enabled, employees must enroll their face and complete face verification when checking in.",
+      "When enabled, employees must register their facial data and verify their identity using face verification at check-in.",
     settingsFaceOffHint: "Off: check-in uses GPS (and optional photo) only.",
     settingsLoadFail: "Could not load settings.",
     settingsSaveFail: "Could not save settings.",
     settingsReadOnly: "Only company admin or HR can change these settings.",
     settingsSaved: "Saved.",
     settingsWorkTypeTitle: "Attendance Rules",
+    settingsWorkHoursCardTitle: "Working Hours",
     settingsWorkTitle: "Work hours & days",
     settingsWorkLead:
       "Late arrivals, early departures, overtime, and holiday work are determined using the company time zone.",
@@ -2025,33 +2030,36 @@ export const en = {
       "When enabled, employees may check in and out at any time without prior approval.",
     settingsFreePunchOffHint:
       "Off: default rules such as early-leave reason and re-check-in approval are applied.",
-    settingsFreePunchRequiredWorkTime: "Standard Daily Work Hours",
+    settingsFreePunchRequiredWorkTime: "Standard Daily Working Hours",
     settingsFreePunchRequiredWorkTimeHint:
       "Example: If this is set to 08:00, only time worked beyond eight hours is counted as overtime.",
-    settingsOvertimeModeTitle: "Overtime calculation",
+    settingsOvertimeModeTitle: "Overtime Calculation",
     settingsOvertimeModeAuto: "Automatic",
     settingsOvertimeModeAutoHint:
-      "Check-out after the scheduled end time is counted as overtime without approval.",
-    settingsOvertimeModeAfterApproval: "After approval",
+      "Time worked beyond the scheduled end time is automatically counted as overtime without approval.",
+    settingsOvertimeModeAfterApproval: "Approval Required",
     settingsOvertimeModeAfterApprovalHint:
-      "Check-out within 60 minutes after the scheduled end time is recorded without overtime. After 60 minutes, a reason and manager approval are required.",
+      "If an employee checks out within 60 minutes after the scheduled end time, no overtime is recorded. For later check-outs, a reason and manager approval are required for overtime to be counted.",
+    settingsOvertimeModeOff: "Do Not Calculate",
+    settingsOvertimeModeOffHint:
+      "Overtime is not calculated, including when flexible check-in and check-out is enabled.",
     settingsOvertimeModeNote:
-      "When flexible check-in/out is enabled, overtime is always calculated automatically.",
-    settingsTimezone: "Time zone",
+      "When flexible check-in and check-out is enabled, overtime is calculated automatically unless “Do Not Calculate” is selected.",
+    settingsTimezone: "Time Zone",
     settingsTimezoneHint:
-      "The default time zone is India Standard Time (IST, Asia/Kolkata). This time zone is used for attendance records, today’s overview, monthly statistics, and late-arrival and early-departure rules.",
+      "The default time zone is India Standard Time (IST, Asia/Kolkata). The selected time zone applies to attendance records, today’s overview, monthly statistics, and late-arrival and early-departure calculations.",
     settingsWorkStart: "Scheduled Start Time",
     settingsWorkEnd: "Scheduled End Time",
     settingsWorkDays: "Work Schedule",
-    settingsSaveWork: "Save work schedule",
+    settingsSaveWork: "Save Settings",
     settingsWorkRuleLate: "Checking in after the scheduled start time is marked as late.",
     settingsWorkRuleEarly: "Checking out before the scheduled end time is marked as an early departure.",
     settingsWorkRuleOvertime:
       "Time worked after the scheduled end time on a workday is counted as overtime.",
     settingsWorkRuleHoliday: "Any attendance recorded on a non-working day is classified as holiday work.",
-    settingsGeofenceMode: "Worksite Radius Policy",
+    settingsGeofenceMode: "Worksite Location Policy",
     settingsGeofenceOff: "Log only (no block)",
-    settingsGeofenceWarn: "Warn and Allow After Confirmation",
+    settingsGeofenceWarn: "Show Warning and Allow After Confirmation",
     settingsGeofenceBlock: "Block outside radius",
     settingsGeofenceHint:
       "When an employee checks in or out beyond a worksite’s allowed radius, the action is either flagged or blocked according to the selected policy. Business-trip check-ins are exempt.",
