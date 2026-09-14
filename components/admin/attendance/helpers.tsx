@@ -79,6 +79,26 @@ export function formatAttendanceDate(date: string, locale = "ko-KR") {
   });
 }
 
+export function locationSubtitleText(p: AttendancePunchSummary, t?: T): string | undefined {
+  if (p.isBusinessTrip && p.businessTripLocation) {
+    return p.businessTripLocation;
+  }
+  if (p.site?.name) {
+    const distance = Math.round(p.distanceFromSite);
+    const distanceText = t
+      ? t("admin.attendanceLocationDistance").replace("{m}", String(distance))
+      : `약 ${distance}m`;
+    const outsideText =
+      p.outsideGeofence && t
+        ? t("admin.attendanceOutsideGeofence")
+        : p.outsideGeofence
+          ? "반경 밖"
+          : "";
+    return [p.site.name, distanceText, outsideText].filter(Boolean).join(" · ");
+  }
+  return undefined;
+}
+
 export function locationLabel(p: AttendancePunchSummary, t?: T) {
   if (p.isBusinessTrip && p.businessTripLocation) {
     return p.businessTripLocation;

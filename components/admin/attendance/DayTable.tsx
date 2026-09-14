@@ -8,6 +8,7 @@ import {
   formatShortDate,
   formatWorkDuration,
   locationLabel,
+  locationSubtitleText,
   workMinutesOf,
 } from "@/components/admin/attendance/helpers";
 import { useI18n } from "@/components/LanguageProvider";
@@ -261,7 +262,7 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
                       lat={r.checkIn.latitude}
                       lng={r.checkIn.longitude}
                       label={mapLabel(r.employeeName, "checkIn")}
-                      subtitle={locationLabel(r.checkIn, t) ?? undefined}
+                      subtitle={locationSubtitleText(r.checkIn, t)}
                       noKeyFallback="modal"
                     />
                   ) : r.checkOut ? (
@@ -269,7 +270,7 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
                       lat={r.checkOut.latitude}
                       lng={r.checkOut.longitude}
                       label={mapLabel(r.employeeName, "checkOut")}
-                      subtitle={locationLabel(r.checkOut, t) ?? undefined}
+                      subtitle={locationSubtitleText(r.checkOut, t)}
                       noKeyFallback="modal"
                     />
                   ) : (
