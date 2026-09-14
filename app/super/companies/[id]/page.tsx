@@ -4,6 +4,7 @@ import { AdminCompanySettings } from "@/components/admin/AdminCompanySettings";
 import { AdminTodayOverview } from "@/components/admin/AdminTodayOverview";
 import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceOverview";
 import { SuperCompanyAttendanceStats } from "@/components/super/SuperCompanyAttendanceStats";
+import { SuperCompanyEmployeeAttendance } from "@/components/super/SuperCompanyEmployeeAttendance";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
 import { isStrongPassword } from "@/lib/passwordPolicy";
@@ -79,7 +80,7 @@ export default function SuperCompanyUsersPage() {
   const [roleError, setRoleError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"users" | "dashboard" | "stats">("users");
+  const [tab, setTab] = useState<"users" | "dashboard" | "stats" | "byEmployee">("users");
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -294,13 +295,15 @@ export default function SuperCompanyUsersPage() {
         aria-label={t("super.companyUsersTitle")}
         className="flex w-full gap-1 overflow-x-auto rounded-xl bg-[var(--fill-secondary)] p-1 sm:w-auto sm:self-start sm:overflow-visible"
       >
-        {(["users", "dashboard", "stats"] as const).map((tabKey) => {
+        {(["users", "dashboard", "stats", "byEmployee"] as const).map((tabKey) => {
           const labelKey =
             tabKey === "users"
               ? "super.tabUsers"
               : tabKey === "dashboard"
                 ? "super.tabDashboard"
-                : "super.tabStats";
+                : tabKey === "stats"
+                  ? "super.tabStats"
+                  : "super.tabByEmployee";
           const active = tab === tabKey;
           return (
             <button
@@ -330,6 +333,8 @@ export default function SuperCompanyUsersPage() {
       )}
 
       {tab === "stats" && <SuperCompanyAttendanceStats companyId={id} />}
+
+      {tab === "byEmployee" && <SuperCompanyEmployeeAttendance companyId={id} />}
 
       {tab === "users" && (
       <>

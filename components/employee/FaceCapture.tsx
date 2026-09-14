@@ -17,6 +17,7 @@ import {
   extractFaceDescriptor,
   extractFaceDetection,
   loadFaceModels,
+  LOGIN_FACE_EXTRACT_OPTIONS,
   type FaceExtractOptions,
 } from "@/lib/faceRecognitionClient";
 import { useI18n } from "@/components/LanguageProvider";
@@ -67,6 +68,7 @@ const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
 const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 3;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
+const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.14;
 
 const KIOSK_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "kiosk",
@@ -319,7 +321,11 @@ export function FaceCapture({
           }
         }
         const extractOpts =
-          profileKindRef.current === "kiosk" ? KIOSK_EXTRACT_OPTIONS : undefined;
+          profileKindRef.current === "kiosk"
+            ? KIOSK_EXTRACT_OPTIONS
+            : profileKindRef.current === "login"
+              ? LOGIN_FACE_EXTRACT_OPTIONS
+              : undefined;
         const desc = await extractFaceDescriptor(v, extractOpts);
         if (!desc) {
           if (!opts?.silentNoFace) {
@@ -428,7 +434,11 @@ export function FaceCapture({
           // 출입문 단말: 얼굴 존재 확인 + descriptor 추출을 1회 추론으로 처리
           extracted = await extractFaceDetection(
             v,
-            kind === "kiosk" ? KIOSK_EXTRACT_OPTIONS : undefined
+            kind === "kiosk"
+              ? KIOSK_EXTRACT_OPTIONS
+              : kind === "login"
+                ? LOGIN_FACE_EXTRACT_OPTIONS
+                : undefined
           );
           faceVisible = !!extracted;
         } else {
@@ -482,7 +492,11 @@ export function FaceCapture({
           qualityBufferRef.current = [];
           if (!averaged) return;
           const spread = descriptorSpread(sampled, averaged);
-          if (spread > HIGH_ACCURACY_MAX_SPREAD) {
+          const maxSpread =
+            profileKindRef.current === "login"
+              ? HIGH_ACCURACY_MAX_SPREAD_LOGIN
+              : HIGH_ACCURACY_MAX_SPREAD;
+          if (spread > maxSpread) {
             setStatus(tRef.current("employee.faceStabilizing"));
             return;
           }

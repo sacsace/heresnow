@@ -1,5 +1,10 @@
 import type { Role } from "@prisma/client";
-import { identifySingleFaceMatch, parseFaceDescriptor } from "@/lib/faceMatch";
+import {
+  FACE_IDENTIFY_MIN_GAP_LOGIN,
+  FACE_MATCH_THRESHOLD_LOGIN,
+  identifySingleFaceMatch,
+  parseFaceDescriptor,
+} from "@/lib/faceMatch";
 import { prisma } from "@/lib/prisma";
 
 export function parseProbeDescriptor(raw: unknown): number[] | null {
@@ -48,7 +53,12 @@ export async function matchFaceLoginUser(
     },
   });
 
-  const identified = identifySingleFaceMatch(employees, probe);
+  const identified = identifySingleFaceMatch(
+    employees,
+    probe,
+    FACE_MATCH_THRESHOLD_LOGIN,
+    FACE_IDENTIFY_MIN_GAP_LOGIN
+  );
   if (!identified) return null;
 
   const emp = identified.match;

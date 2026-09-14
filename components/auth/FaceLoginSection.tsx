@@ -153,7 +153,9 @@ export function FaceLoginSection({
           mode="verify"
           autoVerify
           verifyOnClientOnly
-          fastScan
+          highAccuracyScan
+          scanWhenFaceVisible
+          profileKind="login"
           disabled={disabled}
           verifyTitle={t("login.faceVerifyTitle")}
           verifyLead={t("login.faceVerifyLead")}

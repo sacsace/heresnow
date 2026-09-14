@@ -1,6 +1,6 @@
 /** 안면 인식용 기기·브라우저 프로필 (클라이언트 전용) */
 
-export type FaceProfileKind = "default" | "kiosk";
+export type FaceProfileKind = "default" | "login" | "kiosk";
 
 export type FaceDeviceProfile = {
   /** iOS/iPadOS WebKit — WebGL fp16 이슈로 WASM 우선 */
@@ -56,6 +56,16 @@ export function getFaceDeviceProfile(kind: FaceProfileKind = "default"): FaceDev
       // 단말 모드: 속도/정확도 균형. 입력 해상도는 유지하고 confidence 기준을 더 엄격히.
       detectorInputSize: 320,
       detectorScoreThreshold: 0.62,
+      likelyInAppBrowser: isLikelyInAppBrowser(),
+      isMobile: mobile,
+    };
+  }
+
+  if (kind === "login") {
+    return {
+      preferWasmBackend: ios,
+      detectorInputSize: 320,
+      detectorScoreThreshold: 0.58,
       likelyInAppBrowser: isLikelyInAppBrowser(),
       isMobile: mobile,
     };

@@ -14,13 +14,16 @@ import {
 import { useI18n } from "@/components/LanguageProvider";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
 import { statusBadge } from "@/lib/statusBadge";
-import { table, tableHead, tableWrap, td, th, trDivider } from "@/lib/uiStyles";
+import { btnDestructive, table, tableHead, tableWrap, td, th, trDivider } from "@/lib/uiStyles";
 import { useMemo, useState } from "react";
 
 type Props = {
   rows: AdminAttendanceDayRow[];
   showEmployee?: boolean;
   dateLocale?: string;
+  showDelete?: boolean;
+  deletingDayId?: string | null;
+  onDeleteDay?: (row: AdminAttendanceDayRow) => void;
 };
 
 type SortKey =
@@ -94,7 +97,14 @@ function compareRows(
   }
 }
 
-export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Props) {
+export function AttendanceDayTable({
+  rows,
+  showEmployee = true,
+  dateLocale,
+  showDelete = false,
+  deletingDayId = null,
+  onDeleteDay,
+}: Props) {
   const { t, locale } = useI18n();
   const dl = dateLocale ?? (locale === "en" ? "en-US" : "ko-KR");
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -172,6 +182,7 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
             {sortableTh("status", t("admin.attendanceColStatus"))}
             {sortableTh("flags", t("admin.attendanceColFlags"))}
             <th className={th}>{t("admin.attendanceColMap")}</th>
+            {showDelete ? <th className={th}>{t("super.attendanceColDelete")}</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -277,6 +288,24 @@ export function AttendanceDayTable({ rows, showEmployee = true, dateLocale }: Pr
                     "—"
                   )}
                 </td>
+                {showDelete ? (
+                  <td className={td}>
+                    {r.checkIn || r.checkOut ? (
+                      <button
+                        type="button"
+                        className={btnDestructive}
+                        disabled={deletingDayId === r.id}
+                        onClick={() => onDeleteDay?.(r)}
+                      >
+                        {deletingDayId === r.id
+                          ? t("common.processing")
+                          : t("super.attendanceDeleteDay")}
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                ) : null}
               </tr>
             );
           })}

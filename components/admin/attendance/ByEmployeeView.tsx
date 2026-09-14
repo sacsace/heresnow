@@ -10,9 +10,18 @@ import { useMemo } from "react";
 type Props = {
   rows: AdminAttendanceDayRow[];
   dateLocale?: string;
+  showDelete?: boolean;
+  deletingDayId?: string | null;
+  onDeleteDay?: (row: AdminAttendanceDayRow) => void;
 };
 
-export function AttendanceByEmployeeView({ rows, dateLocale }: Props) {
+export function AttendanceByEmployeeView({
+  rows,
+  dateLocale,
+  showDelete,
+  deletingDayId,
+  onDeleteDay,
+}: Props) {
   const { t } = useI18n();
   const groups = useMemo(() => groupRowsByEmployee(rows), [rows]);
 
@@ -32,7 +41,14 @@ export function AttendanceByEmployeeView({ rows, dateLocale }: Props) {
                 {t("admin.attendanceByEmpHoliday")}
               </p>
             </div>
-            <AttendanceDayTable rows={employeeRows} showEmployee={false} dateLocale={dateLocale} />
+            <AttendanceDayTable
+              rows={employeeRows}
+              showEmployee={false}
+              dateLocale={dateLocale}
+              showDelete={showDelete}
+              deletingDayId={deletingDayId}
+              onDeleteDay={onDeleteDay}
+            />
           </section>
         );
       })}

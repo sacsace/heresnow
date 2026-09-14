@@ -1,8 +1,11 @@
-/** face-api.js 유클리드 거리 기준 (낮을수록 동일인) */
-export const FACE_MATCH_THRESHOLD = 0.58;
+/** face-api.js 유클리드 거리 기준 (낮을수록 동일인) — 1:1 출퇴근 검증 */
+export const FACE_MATCH_THRESHOLD = 0.48;
+
+/** 로그인 1:N 식별 — 오탐 방지를 위해 더 엄격 */
+export const FACE_MATCH_THRESHOLD_LOGIN = 0.42;
 
 /** 출입문 단말 — 고정 카메라·다중 프레임 평균과 함께 사용 */
-export const FACE_MATCH_THRESHOLD_DOOR = 0.5;
+export const FACE_MATCH_THRESHOLD_DOOR = 0.45;
 
 export const FACE_DESCRIPTOR_LENGTH = 128;
 
@@ -36,9 +39,12 @@ export function isFaceMatch(stored: number[], probe: number[], threshold = FACE_
 }
 
 /** 1:N 식별 시 1·2위 거리 차이가 이보다 작으면 동일인으로 확정하지 않음 */
-export const FACE_IDENTIFY_MIN_GAP = 0.06;
+export const FACE_IDENTIFY_MIN_GAP = 0.08;
 
-export const FACE_IDENTIFY_MIN_GAP_DOOR = 0.1;
+/** 로그인 1:N — 동명/유사 얼굴 오탐 방지 */
+export const FACE_IDENTIFY_MIN_GAP_LOGIN = 0.1;
+
+export const FACE_IDENTIFY_MIN_GAP_DOOR = 0.12;
 
 export type FaceIdentifyCandidate = {
   id: string;

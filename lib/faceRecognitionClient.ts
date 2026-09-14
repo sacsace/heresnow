@@ -17,6 +17,13 @@ export type FaceExtractOptions = {
   minFaceAreaRatio?: number;
 };
 
+/** 로그인·1:N 식별 — 저품질 프레임으로 인한 오탐 방지 */
+export const LOGIN_FACE_EXTRACT_OPTIONS: FaceExtractOptions = {
+  profileKind: "login",
+  minDetectionScore: 0.58,
+  minFaceAreaRatio: 0.06,
+};
+
 export type FaceDetectionResult = {
   descriptor: Float32Array;
   detectionScore: number;
