@@ -2,8 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
-import { listWorkRequestApproverOptions } from "@/lib/workRequestApprovers";
+import { calendarDayInTz } from "@/lib/attendancePunchRules";
+import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
+import { prisma } from "@/lib/prisma";
 import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
+import { listWorkRequestApproverOptions } from "@/lib/workRequestApprovers";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -14,10 +17,16 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const approvers = await listWorkRequestApproverOptions(
-    session.user.companyId,
-    session.user.id
-  );
+  const [approvers, company] = await Promise.all([
+    listWorkRequestApproverOptions(session.user.companyId, session.user.id),
+    prisma.company.findUnique({
+      where: { id: session.user.companyId },
+      select: { timezone: true },
+    }),
+  ]);
 
-  return NextResponse.json({ approvers });
+  const tz = company?.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
+  const todayWorkDate = calendarDayInTz(new Date(), tz);
+
+  return NextResponse.json({ approvers, todayWorkDate });
 }

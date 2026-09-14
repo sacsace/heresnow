@@ -27,6 +27,13 @@ type Props = {
   onCancel?: () => void;
 };
 
+/** `<input type="date">` — 브라우저 로컬 오늘 (API 응답 전 즉시 표시용) */
+function localTodayDateInputValue(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function WorkRequestApplyForm({
   overtimeApplicationEnabled = true,
   onSubmitted,
@@ -36,7 +43,7 @@ export function WorkRequestApplyForm({
   const [requestType, setRequestType] = useState<WorkRequestType>(
     overtimeApplicationEnabled ? "OVERTIME" : "EARLY_LEAVE"
   );
-  const [workDate, setWorkDate] = useState("");
+  const [workDate, setWorkDate] = useState(localTodayDateInputValue);
   const [reason, setReason] = useState("");
   const [extraMinutes, setExtraMinutes] = useState("");
   const [assignedApproverUserId, setAssignedApproverUserId] = useState("");
@@ -51,10 +58,16 @@ export function WorkRequestApplyForm({
   const loadApprovers = useCallback(async () => {
     setApproversLoading(true);
     const r = await fetch("/api/employee/work-request-approvers");
-    const j = (await r.json().catch(() => ({}))) as { approvers?: ApproverOption[] };
+    const j = (await r.json().catch(() => ({}))) as {
+      approvers?: ApproverOption[];
+      todayWorkDate?: string;
+    };
     if (r.ok) {
       const list = j.approvers ?? [];
       setApprovers(list);
+      if (typeof j.todayWorkDate === "string" && j.todayWorkDate) {
+        setWorkDate(j.todayWorkDate);
+      }
       setAssignedApproverUserId((prev) =>
         prev && list.some((a) => a.userId === prev) ? prev : ""
       );
