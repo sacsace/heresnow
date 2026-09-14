@@ -10,6 +10,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
+        staySignedIn: { label: "Stay signed in", type: "text" },
       },
       authorize: async (credentials) => {
         const { authorizeCredentials } = await import("@/lib/authorizeCredentials");
@@ -21,6 +22,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: "Face Login",
       credentials: {
         loginToken: { label: "Login Token", type: "text" },
+        staySignedIn: { label: "Stay signed in", type: "text" },
       },
       authorize: async (credentials) => {
         const { authorizeFaceLogin } = await import("@/lib/authorizeFaceLogin");
@@ -32,6 +34,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: "Passkey Login",
       credentials: {
         loginToken: { label: "Login Token", type: "text" },
+        staySignedIn: { label: "Stay signed in", type: "text" },
       },
       authorize: async (credentials) => {
         const { authorizePasskeyLogin } = await import("@/lib/authorizePasskeyLogin");

@@ -3,6 +3,7 @@
 import { FaceCapture } from "@/components/employee/FaceCapture";
 import { authError, authFieldGroup, authHint, authInput, authLabel } from "@/components/auth/authStyles";
 import { useI18n } from "@/components/LanguageProvider";
+import { staySignedInCredentialValue } from "@/lib/clientPlatform";
 import { signIn } from "next-auth/react";
 import { useCallback, useRef, useState } from "react";
 
@@ -107,6 +108,7 @@ export function FaceLoginSection({
         const res = await withTimeout(
           signIn("face-login", {
             loginToken,
+            staySignedIn: staySignedInCredentialValue(),
             redirect: false,
             callbackUrl,
           }),

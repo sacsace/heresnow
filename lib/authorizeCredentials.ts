@@ -1,9 +1,12 @@
 import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { parseStaySignedIn } from "@/lib/sessionDuration";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 
-export async function authorizeCredentials(credentials: Partial<Record<"email" | "password", unknown>>) {
+export async function authorizeCredentials(
+  credentials: Partial<Record<"email" | "password" | "staySignedIn", unknown>>
+) {
   const email = credentials?.email as string | undefined;
   const password = credentials?.password as string | undefined;
   if (!email || !password) return null;
@@ -38,5 +41,6 @@ export async function authorizeCredentials(credentials: Partial<Record<"email" |
     companyId: user.companyId,
     employeeId: user.employee?.id ?? null,
     sessionNonce,
+    staySignedIn: parseStaySignedIn(credentials.staySignedIn),
   };
 }

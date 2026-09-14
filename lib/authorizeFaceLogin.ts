@@ -1,10 +1,11 @@
 import type { Role } from "@prisma/client";
 import { consumeFaceLoginToken } from "@/lib/faceLoginToken";
+import { parseStaySignedIn } from "@/lib/sessionDuration";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 
 export async function authorizeFaceLogin(
-  credentials: Partial<Record<"loginToken", unknown>>
+  credentials: Partial<Record<"loginToken" | "staySignedIn", unknown>>
 ) {
   const token = String(credentials?.loginToken ?? "").trim();
   if (!token) return null;
@@ -44,5 +45,6 @@ export async function authorizeFaceLogin(
     companyId: user.companyId,
     employeeId: user.employee.id,
     sessionNonce,
+    staySignedIn: parseStaySignedIn(credentials.staySignedIn),
   };
 }

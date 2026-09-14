@@ -15,7 +15,7 @@ export function Providers({
   initialLocale: Locale;
 }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchInterval={30 * 60} refetchOnWindowFocus>
       <LanguageProvider initialLocale={initialLocale}>
         {children}
         <PushServiceWorkerRegistrar />

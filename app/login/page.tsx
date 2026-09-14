@@ -22,6 +22,7 @@ import {
 } from "@/components/auth/authStyles";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { useI18n } from "@/components/LanguageProvider";
+import { staySignedInCredentialValue } from "@/lib/clientPlatform";
 import { prefetchFaceRecognition } from "@/lib/faceRecognitionClient";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { signIn } from "next-auth/react";
@@ -218,6 +219,7 @@ function LoginForm() {
       const signInRes = await withTimeout(
         signIn("passkey-login", {
           loginToken: verifyJson.loginToken,
+          staySignedIn: staySignedInCredentialValue(),
           redirect: false,
           callbackUrl,
         }),
@@ -261,6 +263,7 @@ function LoginForm() {
         signIn("credentials", {
           email: normalizedEmail,
           password,
+          staySignedIn: staySignedInCredentialValue(),
           redirect: false,
           callbackUrl,
         }),

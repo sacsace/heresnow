@@ -2,6 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import { authButtonPrimary, authError, authFieldGroup, authInput, authLabel } from "@/components/auth/authStyles";
+import { staySignedInCredentialValue } from "@/lib/clientPlatform";
 import { signIn } from "next-auth/react";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { useMemo, useState } from "react";
@@ -79,6 +80,7 @@ export function PasskeyLoginSection({
 
       const signInRes = await signIn("passkey-login", {
         loginToken: verifyJson.loginToken,
+        staySignedIn: staySignedInCredentialValue(),
         redirect: false,
         callbackUrl,
       });

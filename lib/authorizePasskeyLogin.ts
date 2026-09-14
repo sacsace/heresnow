@@ -1,10 +1,11 @@
 import type { Role } from "@prisma/client";
 import { verifyPasskeyLoginToken } from "@/lib/passkeyLoginToken";
+import { parseStaySignedIn } from "@/lib/sessionDuration";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 
 export async function authorizePasskeyLogin(
-  credentials: Partial<Record<"loginToken", unknown>>
+  credentials: Partial<Record<"loginToken" | "staySignedIn", unknown>>
 ) {
   const token = String(credentials?.loginToken ?? "").trim();
   if (!token) return null;
@@ -44,6 +45,7 @@ export async function authorizePasskeyLogin(
     companyId: user.companyId,
     employeeId: user.employee?.id ?? null,
     sessionNonce,
+    staySignedIn: parseStaySignedIn(credentials.staySignedIn),
   };
 }
 

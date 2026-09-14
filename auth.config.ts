@@ -1,12 +1,24 @@
 import type { NextAuthConfig } from "next-auth";
 import type { Role } from "@prisma/client";
+import {
+  applySessionExpiry,
+  parseStaySignedIn,
+  SESSION_MAX_AGE_MOBILE_SEC,
+  SESSION_UPDATE_AGE_SEC,
+  sessionMaxAgeSec,
+} from "@/lib/sessionDuration";
 
 export const authConfig = {
   providers: [],
   /** 프로덕션에서는 리버스 프록시 뒤일 때만 AUTH_TRUST_HOST=true 로 명시적으로 허용 */
   trustHost: process.env.NODE_ENV === "development" || process.env.AUTH_TRUST_HOST === "true",
   pages: { signIn: "/login" },
-  session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
+  session: {
+    strategy: "jwt",
+    /** 쿠키 상한 — 실제 만료는 JWT exp + sessionMaxAge(모바일/데스크톱) */
+    maxAge: SESSION_MAX_AGE_MOBILE_SEC,
+    updateAge: SESSION_UPDATE_AGE_SEC,
+  },
   logger: {
     error(error) {
       const authErr = error as { type?: string; name?: string };
@@ -56,12 +68,18 @@ export const authConfig = {
       if (!allowed) return "/login?error=SeatLimit";
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.role = (user as { role: Role }).role;
         token.companyId = (user as { companyId: string | null }).companyId;
         token.employeeId = (user as { employeeId: string | null }).employeeId;
         token.sessionNonce = (user as { sessionNonce?: string | null }).sessionNonce ?? null;
+        applySessionExpiry(
+          token,
+          sessionMaxAgeSec(parseStaySignedIn((user as { staySignedIn?: unknown }).staySignedIn))
+        );
+      } else if (trigger === "update" && typeof token.sessionMaxAge === "number") {
+        applySessionExpiry(token, token.sessionMaxAge);
       }
 
       const runtime = (globalThis as { EdgeRuntime?: string }).EdgeRuntime;
