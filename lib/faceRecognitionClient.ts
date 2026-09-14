@@ -29,6 +29,17 @@ export type FaceDetectionResult = {
   detectionScore: number;
 };
 
+export type FaceEnrollmentExtract = {
+  descriptor: Float32Array;
+  detectionScore: number;
+  faceCount: number;
+  box: { x: number; y: number; width: number; height: number };
+  yaw: number;
+  pitch: number;
+  brightness: number;
+  areaRatio: number;
+};
+
 let faceApiMod: FaceApiModule | null = null;
 let modelsReady = false;
 let loadPromise: Promise<void> | null = null;
@@ -275,6 +286,122 @@ export async function extractFaceDescriptor(
 
 export function descriptorToArray(d: Float32Array): number[] {
   return Array.from(d);
+}
+
+function averagePoints(points: Array<{ x: number; y: number }>): { x: number; y: number } {
+  if (points.length === 0) return { x: 0, y: 0 };
+  let sx = 0;
+  let sy = 0;
+  for (const p of points) {
+    sx += p.x;
+    sy += p.y;
+  }
+  return { x: sx / points.length, y: sy / points.length };
+}
+
+/** landmark 기반 대략적 yaw/pitch (degree) */
+export function estimateHeadPoseFromLandmarks(landmarks: {
+  getNose: () => Array<{ x: number; y: number }>;
+  getLeftEye: () => Array<{ x: number; y: number }>;
+  getRightEye: () => Array<{ x: number; y: number }>;
+}): { yaw: number; pitch: number } {
+  const nose = landmarks.getNose();
+  const noseTip = nose[Math.min(3, nose.length - 1)] ?? nose[0];
+  if (!noseTip) return { yaw: 0, pitch: 0 };
+  const le = averagePoints(landmarks.getLeftEye());
+  const re = averagePoints(landmarks.getRightEye());
+  const eyeCenter = { x: (le.x + re.x) / 2, y: (le.y + re.y) / 2 };
+  const faceWidth = Math.abs(re.x - le.x) || 1;
+  const yaw = ((noseTip.x - eyeCenter.x) / faceWidth) * 85;
+  const pitch = ((noseTip.y - eyeCenter.y) / faceWidth) * 55;
+  return { yaw, pitch };
+}
+
+function sampleFaceBrightness(
+  input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+  box: { x: number; y: number; width: number; height: number }
+): number {
+  if (typeof document === "undefined") return 0.5;
+  const { width, height } = frameDimensions(input);
+  if (width <= 0 || height <= 0) return 0.5;
+
+  const canvas = document.createElement("canvas");
+  const w = 48;
+  const h = 48;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return 0.5;
+
+  const sx = Math.max(0, box.x);
+  const sy = Math.max(0, box.y);
+  const sw = Math.min(box.width, width - sx);
+  const sh = Math.min(box.height, height - sy);
+  if (sw <= 0 || sh <= 0) return 0.5;
+
+  ctx.drawImage(input, sx, sy, sw, sh, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h).data;
+  let sum = 0;
+  const pixels = w * h;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]!;
+    const g = data[i + 1]!;
+    const b = data[i + 2]!;
+    sum += (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  }
+  return sum / pixels;
+}
+
+/** 등록용 — 얼굴 수·pose·밝기 포함 추출 (품질 필터는 enrollment 모듈에서) */
+export async function extractEnrollmentFrame(
+  input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+  options?: FaceExtractOptions
+): Promise<FaceEnrollmentExtract | null> {
+  await loadFaceModels();
+  const faceapi = getFaceApi();
+  const kind = options?.profileKind ?? "login";
+
+  const allFaces = await faceapi.detectAllFaces(input, detectorOptions(faceapi, kind));
+  const faceCount = allFaces.length;
+  if (faceCount !== 1) {
+    if (faceCount === 0) return null;
+    return {
+      descriptor: new Float32Array(FACE_DESCRIPTOR_LENGTH),
+      detectionScore: 0,
+      faceCount,
+      box: { x: 0, y: 0, width: 0, height: 0 },
+      yaw: 0,
+      pitch: 0,
+      brightness: 0.5,
+      areaRatio: 0,
+    };
+  }
+
+  const result = await faceapi
+    .detectSingleFace(input, detectorOptions(faceapi, kind))
+    .withFaceLandmarks(true)
+    .withFaceDescriptor();
+
+  if (!result?.descriptor || result.descriptor.length !== FACE_DESCRIPTOR_LENGTH) {
+    return null;
+  }
+
+  const { width, height } = frameDimensions(input);
+  const box = result.detection.box;
+  const areaRatio = width > 0 && height > 0 ? (box.width * box.height) / (width * height) : 0;
+  const { yaw, pitch } = estimateHeadPoseFromLandmarks(result.landmarks);
+  const brightness = sampleFaceBrightness(input, box);
+
+  return {
+    descriptor: result.descriptor,
+    detectionScore: result.detection.score,
+    faceCount: 1,
+    box: { x: box.x, y: box.y, width: box.width, height: box.height },
+    yaw,
+    pitch,
+    brightness,
+    areaRatio,
+  };
 }
 
 export { getFaceDeviceProfile, type FaceProfileKind };

@@ -11,7 +11,11 @@ import {
   type FaceProfileKind,
 } from "@/lib/faceDeviceProfile";
 import { captureVideoFrameAsJpegDataUrl } from "@/lib/facePreviewCapture";
-import { averageFaceDescriptors } from "@/lib/faceMatch";
+import {
+  averageFaceDescriptors,
+  computeCaptureQualityPercent,
+  descriptorSpread,
+} from "@/lib/faceMatch";
 import {
   descriptorToArray,
   detectFaceInFrame,
@@ -55,6 +59,12 @@ type Props = {
   /** false: 실패 후에도 얼굴을 프레임에 유지한 채 재시도 (로그인) */
   blockRetryUntilFaceAbsent?: boolean;
   verifyRetryLabel?: string;
+  /** login 등록 — 정면·좌·우 다각도 자동 캡처 + 인식률 % 표시 */
+  multiAngleEnroll?: boolean;
+  /** 추가 등록 시 기존 안면과 일치율 표시 */
+  enrollCompareExisting?: boolean;
+  enrollTitle?: string;
+  enrollLead?: string;
   onEnrolled?: () => void;
   onVerified?: (descriptor: number[]) => boolean | void | Promise<boolean | void>;
   onError?: (message: string) => void;
@@ -73,27 +83,16 @@ const HIGH_ACCURACY_FRAME_COUNT = 2;
 const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 3;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
 const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.22;
+const ENROLL_ANGLE_COUNT = 3;
+const ENROLL_FRAMES_PER_ANGLE = 3;
+const ENROLL_MIN_QUALITY_PERCENT = 50;
+const ENROLL_STEP_PAUSE_MS = 900;
 
 const KIOSK_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "kiosk",
   minDetectionScore: 0.62,
   minFaceAreaRatio: 0.08,
 };
-
-function descriptorSpread(descriptors: number[][], averaged: number[]): number {
-  let max = 0;
-  for (const d of descriptors) {
-    if (d.length !== averaged.length) continue;
-    let sum = 0;
-    for (let i = 0; i < d.length; i++) {
-      const diff = d[i]! - averaged[i]!;
-      sum += diff * diff;
-    }
-    const dist = Math.sqrt(sum);
-    if (dist > max) max = dist;
-  }
-  return max;
-}
 
 async function openCamera(profileKind: FaceProfileKind = "default"): Promise<MediaStream> {
   const profile = getFaceDeviceProfile(profileKind);
@@ -127,10 +126,16 @@ export function FaceCapture({
   highAccuracyScan = false,
   blockRetryUntilFaceAbsent = true,
   verifyRetryLabel,
+  multiAngleEnroll: multiAngleEnrollProp,
+  enrollCompareExisting = false,
+  enrollTitle,
+  enrollLead,
   onEnrolled,
   onVerified,
   onError,
 }: Props) {
+  const multiAngleEnroll =
+    multiAngleEnrollProp ?? (mode === "enroll" && profileKind === "login");
   const { t } = useI18n();
   const tRef = useRef(t);
   tRef.current = t;
@@ -171,8 +176,23 @@ export function FaceCapture({
   const [autoScanDone, setAutoScanDone] = useState(false);
   const [previewReady, setPreviewReady] = useState(false);
   const [faceInFrame, setFaceInFrame] = useState(false);
+  const [enrollStep, setEnrollStep] = useState(0);
+  const [enrollQualityPct, setEnrollQualityPct] = useState(0);
+  const [enrollMatchPct, setEnrollMatchPct] = useState<number | null>(null);
+  const [enrollSubmitting, setEnrollSubmitting] = useState(false);
+  const [enrollFrameCount, setEnrollFrameCount] = useState(0);
+  const [enrollDone, setEnrollDone] = useState(false);
+
+  const enrollStepRef = useRef(0);
+  const enrollStepBufferRef = useRef<number[][]>([]);
+  const enrollAllSamplesRef = useRef<number[][]>([]);
+  const enrollPausedUntilRef = useRef(0);
+  const enrollCompareExistingRef = useRef(enrollCompareExisting);
+  enrollCompareExistingRef.current = enrollCompareExisting;
+  enrollStepRef.current = enrollStep;
 
   const autoVerifyActive = mode === "verify" && autoVerify;
+  const multiAngleEnrollActive = mode === "enroll" && multiAngleEnroll;
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
@@ -295,6 +315,47 @@ export function FaceCapture({
     setStatus(null);
   }, [autoVerifyActive, disabled]);
 
+  const submitEnrollment = useCallback(
+    async (samples: number[][]): Promise<boolean> => {
+      const arr = averageFaceDescriptors(samples);
+      if (!arr) return false;
+      const v = videoRef.current;
+      const previewUrl = v ? captureVideoFrameAsJpegDataUrl(v) : null;
+      setEnrollSubmitting(true);
+      try {
+        const r = await fetch("/api/employee/face", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            descriptor: arr,
+            ...(previewUrl ? { previewUrl } : {}),
+          }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const msg =
+            typeof j.error === "string" ? j.error : tRef.current("employee.faceEnrollFail");
+          setStatus(msg);
+          onErrorRef.current?.(msg);
+          return false;
+        }
+        setStatus(tRef.current("employee.faceEnrollOk"));
+        scanStoppedRef.current = true;
+        setEnrollDone(true);
+        onEnrolledRef.current?.();
+        return true;
+      } catch {
+        const msg = tRef.current("employee.faceEnrollFail");
+        setStatus(msg);
+        onErrorRef.current?.(msg);
+        return false;
+      } finally {
+        setEnrollSubmitting(false);
+      }
+    },
+    []
+  );
+
   const finishClientVerify = useCallback(
     async (arr: number[]): Promise<boolean> => {
       const verified = await onVerifiedRef.current?.(arr);
@@ -337,6 +398,12 @@ export function FaceCapture({
               ? LOGIN_FACE_EXTRACT_OPTIONS
               : undefined;
         let arr: number[] | null = null;
+        if (mode === "enroll" && multiAngleEnroll) {
+          const msg = tRef.current("employee.faceEnrollUseAuto");
+          setStatus(msg);
+          onErrorRef.current?.(msg);
+          return false;
+        }
         if (mode === "enroll" && profileKindRef.current === "login") {
           const samples: number[][] = [];
           for (let i = 0; i < 3; i += 1) {
@@ -367,27 +434,7 @@ export function FaceCapture({
         }
 
         if (mode === "enroll") {
-          const previewUrl = captureVideoFrameAsJpegDataUrl(v);
-          const r = await fetch("/api/employee/face", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              descriptor: arr,
-              ...(previewUrl ? { previewUrl } : {}),
-            }),
-          });
-          const j = await r.json().catch(() => ({}));
-          if (!r.ok) {
-            const msg =
-              typeof j.error === "string" ? j.error : tRef.current("employee.faceEnrollFail");
-            setStatus(msg);
-            onErrorRef.current?.(msg);
-            return false;
-          }
-          setStatus(tRef.current("employee.faceEnrollOk"));
-          scanStoppedRef.current = true;
-          onEnrolledRef.current?.();
-          return true;
+          return submitEnrollment([arr]);
         }
 
         if (verifyOnClientOnly) {
@@ -426,8 +473,161 @@ export function FaceCapture({
         setBusy(false);
       }
     },
-    [disabled, mode, ready, verifyOnClientOnly, finishClientVerify]
+    [disabled, mode, ready, verifyOnClientOnly, finishClientVerify, multiAngleEnroll, submitEnrollment]
   );
+
+  useEffect(() => {
+    if (!multiAngleEnrollActive || !ready || disabled || cameraError) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const schedule = (ms: number) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void tick(), ms);
+    };
+
+    async function completeEnrollStep(stepSamples: number[]) {
+      enrollAllSamplesRef.current.push(...stepSamples);
+      enrollStepBufferRef.current = [];
+      setEnrollFrameCount(0);
+
+      if (enrollCompareExistingRef.current && enrollAllSamplesRef.current.length > 0) {
+        const partial = averageFaceDescriptors(enrollAllSamplesRef.current);
+        if (partial) {
+          try {
+            const r = await fetch("/api/employee/face", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ descriptor: partial }),
+            });
+            const j = (await r.json().catch(() => ({}))) as { confidencePercent?: number };
+            if (!cancelled && typeof j.confidencePercent === "number") {
+              setEnrollMatchPct(Math.round(j.confidencePercent));
+            }
+          } catch {
+            /* optional */
+          }
+        }
+      }
+
+      const nextStep = enrollStepRef.current + 1;
+      if (nextStep >= ENROLL_ANGLE_COUNT) {
+        scanStoppedRef.current = true;
+        setEnrollDone(true);
+        setStatus(tRef.current("employee.faceEnrollSaving"));
+        await submitEnrollment(enrollAllSamplesRef.current);
+        return;
+      }
+
+      enrollStepRef.current = nextStep;
+      setEnrollStep(nextStep);
+      setStatus(tRef.current("employee.faceEnrollStepDone"));
+      enrollPausedUntilRef.current = Date.now() + ENROLL_STEP_PAUSE_MS;
+      schedule(ENROLL_STEP_PAUSE_MS);
+    }
+
+    async function tick() {
+      if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError || enrollSubmitting) {
+        return;
+      }
+      if (Date.now() < enrollPausedUntilRef.current) {
+        schedule(enrollPausedUntilRef.current - Date.now());
+        return;
+      }
+
+      const v = videoRef.current;
+      if (!v || busyRef.current) {
+        schedule(AUTO_SCAN_INTERVAL_MS);
+        return;
+      }
+
+      busyRef.current = true;
+      try {
+        const extracted = await extractFaceDetection(v, LOGIN_FACE_EXTRACT_OPTIONS);
+        if (cancelled || scanStoppedRef.current) return;
+
+        if (!extracted) {
+          faceInFrameRef.current = false;
+          setFaceInFrame(false);
+          setEnrollQualityPct(0);
+          setStatus(tRef.current("employee.faceScanIdle"));
+          schedule(AUTO_SCAN_INTERVAL_MS_IDLE);
+          return;
+        }
+
+        faceInFrameRef.current = true;
+        setFaceInFrame(true);
+        const sample = descriptorToArray(extracted.descriptor);
+        enrollStepBufferRef.current.push(sample);
+        setEnrollFrameCount(enrollStepBufferRef.current.length);
+
+        const quality = computeCaptureQualityPercent(
+          extracted.detectionScore,
+          enrollStepBufferRef.current,
+          HIGH_ACCURACY_MAX_SPREAD_LOGIN
+        );
+        setEnrollQualityPct(quality);
+
+        if (enrollStepBufferRef.current.length < ENROLL_FRAMES_PER_ANGLE) {
+          setStatus(
+            tRef.current("employee.faceEnrollQuality").replace("{percent}", String(quality))
+          );
+          schedule(fastScan ? AUTO_SCAN_INTERVAL_MS_FAST : AUTO_SCAN_INTERVAL_MS);
+          return;
+        }
+
+        const averaged = averageFaceDescriptors(enrollStepBufferRef.current);
+        if (!averaged) {
+          enrollStepBufferRef.current = [];
+          schedule(AUTO_SCAN_INTERVAL_MS);
+          return;
+        }
+
+        const spread = descriptorSpread(enrollStepBufferRef.current, averaged);
+        if (spread > HIGH_ACCURACY_MAX_SPREAD_LOGIN || quality < ENROLL_MIN_QUALITY_PERCENT) {
+          enrollStepBufferRef.current = enrollStepBufferRef.current.slice(-1);
+          setStatus(tRef.current("employee.faceStabilizing"));
+          schedule(AUTO_SCAN_INTERVAL_MS);
+          return;
+        }
+
+        await completeEnrollStep([...enrollStepBufferRef.current]);
+      } finally {
+        busyRef.current = false;
+      }
+    }
+
+    schedule(AUTO_SCAN_INITIAL_DELAY_MS);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    multiAngleEnrollActive,
+    ready,
+    disabled,
+    cameraError,
+    fastScan,
+    submitEnrollment,
+    enrollSubmitting,
+  ]);
+
+  useEffect(() => {
+    if (!multiAngleEnrollActive) return;
+    enrollStepRef.current = 0;
+    enrollStepBufferRef.current = [];
+    enrollAllSamplesRef.current = [];
+    enrollPausedUntilRef.current = 0;
+    scanStoppedRef.current = false;
+    setEnrollStep(0);
+    setEnrollQualityPct(0);
+    setEnrollMatchPct(null);
+    setEnrollSubmitting(false);
+    setEnrollFrameCount(0);
+    setEnrollDone(false);
+  }, [multiAngleEnrollActive]);
 
   useEffect(() => {
     if (!autoVerifyActive || !ready || disabled || cameraError) return;
@@ -599,17 +799,33 @@ export function FaceCapture({
     finishClientVerify,
   ]);
 
+  const enrollStepLeadKeys = [
+    "employee.faceEnrollStepFront",
+    "employee.faceEnrollStepLeft",
+    "employee.faceEnrollStepRight",
+  ] as const;
+
   const title =
     mode === "enroll"
-      ? t("employee.faceEnrollTitle")
+      ? (enrollTitle ?? t("employee.faceEnrollTitle"))
       : (verifyTitle ?? t("employee.faceVerifyTitle"));
   const lead =
-    mode === "enroll" ? t("employee.faceEnrollLead") : (verifyLead ?? t("employee.faceVerifyLead"));
+    mode === "enroll"
+      ? multiAngleEnrollActive
+        ? t(enrollStepLeadKeys[enrollStep] ?? enrollStepLeadKeys[0])
+        : (enrollLead ?? t("employee.faceEnrollLead"))
+      : (verifyLead ?? t("employee.faceVerifyLead"));
   const buttonLabel =
     mode === "enroll"
       ? t("employee.faceEnrollButton")
       : (verifyButton ?? t("employee.faceVerifyButton"));
-  const showManualButton = mode === "enroll" || !autoVerify;
+  const showManualButton = (mode === "enroll" && !multiAngleEnroll) || !autoVerify;
+
+  function qualityColor(pct: number): string {
+    if (pct >= 60) return "text-[var(--apple-green-dark)]";
+    if (pct >= 40) return "text-[var(--apple-orange-dark)]";
+    return "text-[var(--apple-red)]";
+  }
 
   if (cameraErrorKind === "no_camera" && cameraError) {
     return (
@@ -625,6 +841,24 @@ export function FaceCapture({
     >
       <p className="text-sm font-semibold text-[var(--foreground)] sm:text-base">{title}</p>
       <p className="mt-1 text-xs leading-relaxed text-[var(--apple-label-secondary)] sm:text-sm">{lead}</p>
+
+      {multiAngleEnrollActive && !cameraError && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.75rem] font-medium text-[var(--apple-label-secondary)]">
+          <span>
+            {t("employee.faceEnrollStepProgress")
+              .replace("{current}", String(enrollStep + 1))
+              .replace("{total}", String(ENROLL_ANGLE_COUNT))}
+          </span>
+          <span className={qualityColor(enrollQualityPct)}>
+            {t("employee.faceEnrollQuality").replace("{percent}", String(enrollQualityPct))}
+          </span>
+          {enrollMatchPct != null ? (
+            <span className="text-[var(--apple-label-secondary)]">
+              {t("employee.faceEnrollMatchExisting").replace("{percent}", String(enrollMatchPct))}
+            </span>
+          ) : null}
+        </div>
+      )}
 
       {cameraError ? (
         <p className="mt-3 text-sm text-[var(--apple-red)]">{cameraError}</p>
@@ -668,6 +902,11 @@ export function FaceCapture({
               {t("employee.faceLoadingModels")}
             </div>
           )}
+          {multiAngleEnrollActive && ready && !cameraError && !enrollDone && (
+            <div className="pointer-events-none absolute inset-x-0 top-2 mx-auto w-fit rounded-full bg-black/60 px-3 py-1 text-center text-sm font-bold text-white">
+              {enrollQualityPct}%
+            </div>
+          )}
           {autoVerifyActive && ready && !cameraError && !autoScanDone && (
             <div className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit max-w-[90%] rounded-full bg-black/55 px-3 py-1 text-center text-[0.6875rem] font-medium text-white">
               {busy
@@ -675,6 +914,17 @@ export function FaceCapture({
                 : scanWhenFaceVisible && !faceInFrame
                   ? (scanIdleLabel ?? t("employee.faceScanIdle"))
                   : t("employee.faceScanning")}
+            </div>
+          )}
+          {multiAngleEnrollActive && ready && !cameraError && !enrollDone && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit max-w-[90%] rounded-full bg-black/55 px-3 py-1 text-center text-[0.6875rem] font-medium text-white">
+              {enrollSubmitting
+                ? t("employee.faceEnrollSaving")
+                : !faceInFrame
+                  ? t("employee.faceScanIdle")
+                  : enrollFrameCount < ENROLL_FRAMES_PER_ANGLE
+                    ? t("employee.faceStabilizing")
+                    : t("employee.faceScanning")}
             </div>
           )}
           {needsTap && phase !== "loading" && (

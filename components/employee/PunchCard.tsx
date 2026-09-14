@@ -2,6 +2,7 @@
 
 import { CheckInPushBanner } from "@/components/employee/CheckInPushBanner";
 import { FaceCapture } from "@/components/employee/FaceCapture";
+import { FaceEnrollmentCapture } from "@/components/employee/FaceEnrollmentCapture";
 import { loadFaceModels } from "@/lib/faceRecognitionClient";
 import { StaticMap } from "@/components/admin/StaticMap";
 import { AttendanceTrustHero } from "@/components/ui/AttendanceTrustHero";
@@ -698,8 +699,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
 
         {showFaceEnroll && (
           <div className="mt-4">
-            <FaceCapture
-              mode="enroll"
+            <FaceEnrollmentCapture
               disabled={busy}
               onEnrolled={() => {
                 setFaceEnrolled(true);

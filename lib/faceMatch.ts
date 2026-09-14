@@ -41,6 +41,37 @@ export function isFaceMatch(stored: number[], probe: number[], threshold = FACE_
   return euclideanDistance(stored, probe) < threshold;
 }
 
+/** 프레임 샘플들이 평균 descriptor에서 얼마나 흩어져 있는지 */
+export function descriptorSpread(descriptors: number[][], averaged: number[]): number {
+  let max = 0;
+  for (const d of descriptors) {
+    if (d.length !== averaged.length) continue;
+    let sum = 0;
+    for (let i = 0; i < d.length; i++) {
+      const diff = d[i]! - averaged[i]!;
+      sum += diff * diff;
+    }
+    const dist = Math.sqrt(sum);
+    if (dist > max) max = dist;
+  }
+  return max;
+}
+
+/** 캡처 품질 % — 감지 점수 + 프레임 간 안정성 */
+export function computeCaptureQualityPercent(
+  detectionScore: number,
+  frameSamples: number[][],
+  spreadThreshold = 0.22
+): number {
+  const detPct = Math.round(Math.max(0, Math.min(100, detectionScore * 100)));
+  if (frameSamples.length < 2) return detPct;
+  const avg = averageFaceDescriptors(frameSamples);
+  if (!avg) return detPct;
+  const spread = descriptorSpread(frameSamples, avg);
+  const stabilityPct = distanceToConfidencePercent(spread, spreadThreshold);
+  return Math.max(detPct, stabilityPct);
+}
+
 /** 유클리드 거리 → 인식률 % (0=불일치, threshold=0%, distance=0→100%) */
 export function distanceToConfidencePercent(
   distance: number,

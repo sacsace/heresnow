@@ -2,7 +2,9 @@
 
 import { FacePreviewModal } from "@/components/account/FacePreviewModal";
 import { FaceCapture } from "@/components/employee/FaceCapture";
+import { FaceEnrollmentCapture } from "@/components/employee/FaceEnrollmentCapture";
 import { useI18n } from "@/components/LanguageProvider";
+import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import {
   bannerInfo,
   bannerSuccess,
@@ -15,14 +17,57 @@ import {
   errorText,
   hint,
 } from "@/lib/uiStyles";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type FaceCredentialItem = {
   id: string;
   createdAt: string;
   lastUsedAt: string | null;
   hasPreview: boolean;
+  batchId?: string | null;
 };
+
+type FaceEnrollmentGroup = {
+  key: string;
+  batchId: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  hasPreview: boolean;
+  previewCredentialId: string | null;
+  sampleCount: number;
+};
+
+function groupFaceCredentials(items: FaceCredentialItem[]): FaceEnrollmentGroup[] {
+  const map = new Map<string, FaceEnrollmentGroup>();
+  for (const item of items) {
+    const key = item.batchId ?? item.id;
+    const existing = map.get(key);
+    if (existing) {
+      existing.sampleCount += 1;
+      if (item.hasPreview) {
+        existing.hasPreview = true;
+        existing.previewCredentialId = item.id;
+      }
+      if (
+        item.lastUsedAt &&
+        (!existing.lastUsedAt || item.lastUsedAt > existing.lastUsedAt)
+      ) {
+        existing.lastUsedAt = item.lastUsedAt;
+      }
+    } else {
+      map.set(key, {
+        key,
+        batchId: item.batchId ?? null,
+        createdAt: item.createdAt,
+        lastUsedAt: item.lastUsedAt,
+        hasPreview: item.hasPreview,
+        previewCredentialId: item.hasPreview ? item.id : null,
+        sampleCount: 1,
+      });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
 
 type FaceStatus = {
   enrolled: boolean;
@@ -43,6 +88,7 @@ export function FaceManagementCard() {
   const [testingFace, setTestingFace] = useState(false);
   const [previewCredentialId, setPreviewCredentialId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FaceEnrollmentGroup | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,8 +126,9 @@ export function FaceManagementCard() {
     void load();
   }, [load]);
 
-  async function deleteCredential(id: string) {
-    if (!window.confirm(t("account.faceDeleteConfirm"))) return;
+  async function confirmDeleteEnrollment() {
+    if (!deleteTarget) return;
+    const group = deleteTarget;
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -89,12 +136,15 @@ export function FaceManagementCard() {
       const r = await fetch("/api/employee/face", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify(
+          group.batchId ? { batchId: group.batchId } : { id: group.key }
+        ),
       });
       if (!r.ok) {
         setError(t("account.faceDeleteFail"));
         return;
       }
+      setDeleteTarget(null);
       setSuccess(t("account.faceDeleted"));
       await load();
     } catch {
@@ -109,11 +159,14 @@ export function FaceManagementCard() {
     return t(key).replace("{percent}", String(confidencePercent));
   }
 
+  const enrollmentGroups = useMemo(
+    () => groupFaceCredentials(status?.credentials ?? []),
+    [status?.credentials]
+  );
+
   if (!loading && status === null && !error) {
     return null;
   }
-
-  const credentials = status?.credentials ?? [];
 
   return (
     <section className={card}>
@@ -137,13 +190,13 @@ export function FaceManagementCard() {
             {error ? <p className={errorText}>{error}</p> : null}
             {success ? <p className={bannerSuccess}>{success}</p> : null}
 
-            {credentials.length === 0 ? (
+            {enrollmentGroups.length === 0 ? (
               <p className={hint}>{t("account.faceNone")}</p>
             ) : (
               <div className="space-y-2">
-                {credentials.map((item, index) => (
+                {enrollmentGroups.map((group, index) => (
                   <div
-                    key={item.id}
+                    key={group.key}
                     className="rounded-xl border border-[var(--separator)] bg-[var(--fill-tertiary)] px-3 py-2.5"
                   >
                     <p className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
@@ -152,26 +205,34 @@ export function FaceManagementCard() {
                     <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
                       {t("account.faceCredentialCreated").replace(
                         "{time}",
-                        new Date(item.createdAt).toLocaleString()
+                        new Date(group.createdAt).toLocaleString()
                       )}
                     </p>
-                    {item.lastUsedAt ? (
+                    {group.sampleCount > 1 ? (
+                      <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
+                        {t("account.faceCredentialSamples").replace(
+                          "{count}",
+                          String(group.sampleCount)
+                        )}
+                      </p>
+                    ) : null}
+                    {group.lastUsedAt ? (
                       <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-secondary)]">
                         {t("account.faceCredentialLastUsed").replace(
                           "{time}",
-                          new Date(item.lastUsedAt).toLocaleString()
+                          new Date(group.lastUsedAt).toLocaleString()
                         )}
                       </p>
                     ) : null}
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {item.hasPreview ? (
+                      {group.hasPreview && group.previewCredentialId ? (
                         <button
                           type="button"
                           className={`${btnSecondary} h-8 px-3 text-[0.75rem]`}
                           onClick={() => {
                             setError(null);
                             setSuccess(null);
-                            setPreviewCredentialId(item.id);
+                            setPreviewCredentialId(group.previewCredentialId);
                             setPreviewOpen(true);
                           }}
                           disabled={busy}
@@ -182,7 +243,7 @@ export function FaceManagementCard() {
                       <button
                         type="button"
                         className={`${btnSecondary} h-8 px-3 text-[0.75rem]`}
-                        onClick={() => void deleteCredential(item.id)}
+                        onClick={() => setDeleteTarget(group)}
                         disabled={busy}
                       >
                         {t("account.faceDelete")}
@@ -194,28 +255,19 @@ export function FaceManagementCard() {
             )}
 
             {enrolling ? (
-              <div className="space-y-3">
-                <FaceCapture
-                  mode="enroll"
-                  profileKind="login"
-                  onEnrolled={() => {
-                    setEnrolling(false);
-                    setSuccess(t("account.faceEnrollOk"));
-                    void load();
-                  }}
-                  onError={(msg) => setError(msg)}
-                />
-                <button
-                  type="button"
-                  className={`${btnSecondary} ${btnActionEqual}`}
-                  onClick={() => {
-                    setEnrolling(false);
-                    setError(null);
-                  }}
-                >
-                  {t("account.faceCancelReEnroll")}
-                </button>
-              </div>
+              <FaceEnrollmentCapture
+                title={t("account.faceEnrollCaptureTitle")}
+                onEnrolled={() => {
+                  setEnrolling(false);
+                  setSuccess(t("account.faceEnrollOk"));
+                  void load();
+                }}
+                onError={(msg) => setError(msg)}
+                onCancel={() => {
+                  setEnrolling(false);
+                  setError(null);
+                }}
+              />
             ) : testingFace ? (
               <div className="space-y-3">
                 <FaceCapture
@@ -260,7 +312,7 @@ export function FaceManagementCard() {
               </div>
             ) : (
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                {credentials.length > 0 ? (
+                {enrollmentGroups.length > 0 ? (
                   <button
                     type="button"
                     className={`${btnSecondary} ${btnActionEqual} sm:max-w-xs`}
@@ -284,7 +336,7 @@ export function FaceManagementCard() {
                   }}
                   disabled={busy}
                 >
-                  {credentials.length > 0
+                  {enrollmentGroups.length > 0
                     ? t("account.faceAddButton")
                     : t("account.faceEnrollFirstButton")}
                 </button>
@@ -302,10 +354,24 @@ export function FaceManagementCard() {
         }}
         hasPreview={Boolean(
           previewCredentialId
-            ? credentials.find((c) => c.id === previewCredentialId)?.hasPreview
+            ? status?.credentials.find((c) => c.id === previewCredentialId)?.hasPreview
             : status?.hasPreview
         )}
         credentialId={previewCredentialId}
+      />
+
+      <AppleConfirmDialog
+        open={deleteTarget != null}
+        title={t("account.faceDeleteConfirmTitle")}
+        message={t("account.faceDeleteConfirmMessage")}
+        confirmLabel={t("account.faceDeleteConfirmAction")}
+        cancelLabel={t("common.cancel")}
+        destructive
+        loading={busy}
+        onConfirm={() => void confirmDeleteEnrollment()}
+        onCancel={() => {
+          if (!busy) setDeleteTarget(null);
+        }}
       />
     </section>
   );
