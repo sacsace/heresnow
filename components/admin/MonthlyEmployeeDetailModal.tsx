@@ -147,57 +147,73 @@ export function MonthlyEmployeeDetailModal({
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-5 py-2 sm:px-6">
           {recordedDays.length === 0 ? (
             <p className={emptyStateCompact}>{t("admin.monthlyEmployeeDetailEmpty")}</p>
           ) : (
-            <ul className="divide-y divide-[var(--separator)]">
-              {recordedDays.map((d) => {
-                const st = dayStatus(d);
-                return (
-                  <li key={d.date} className="px-5 py-3 sm:px-6">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="font-medium text-[var(--foreground)]">
+            <table className="w-full border-collapse text-[0.8125rem]">
+              <thead>
+                <tr className="border-b border-[var(--separator)] text-[0.6875rem] font-medium uppercase tracking-wide text-[var(--apple-label-tertiary)]">
+                  <th className="py-2 pr-3 text-left font-medium normal-case tracking-normal">
+                    {t("admin.monthlyEmployeeColDate")}
+                  </th>
+                  <th className="w-[4.5rem] py-2 text-center font-medium normal-case tracking-normal">
+                    {t("admin.monthlyIn")}
+                  </th>
+                  <th className="w-[4.5rem] py-2 text-center font-medium normal-case tracking-normal">
+                    {t("admin.monthlyOut")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {recordedDays.map((d) => {
+                  const st = dayStatus(d);
+                  const rowTint =
+                    st === "partial"
+                      ? "bg-[var(--apple-orange)]/[0.06]"
+                      : st === "pending"
+                        ? "bg-[var(--apple-orange)]/[0.08]"
+                        : "";
+                  return (
+                    <tr
+                      key={d.date}
+                      className={`border-b border-[var(--separator)] last:border-b-0 ${rowTint}`}
+                      title={
+                        st === "complete"
+                          ? t("admin.monthlyLegendComplete")
+                          : st === "partial"
+                            ? t("admin.monthlyLegendPartial")
+                            : st === "pending"
+                              ? t("admin.monthlyPending")
+                              : undefined
+                      }
+                    >
+                      <td className="py-2.5 pr-3 font-medium text-[var(--foreground)]">
                         {formatDayDate(d.date, dl)}
-                      </span>
-                      {st === "complete" && (
-                        <span className="rounded-full bg-[var(--apple-green)]/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-[var(--apple-green-dark)]">
-                          {t("admin.monthlyLegendComplete")}
-                        </span>
-                      )}
-                      {st === "partial" && (
-                        <span className="rounded-full bg-[var(--apple-orange)]/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-[var(--apple-orange-dark)]">
-                          {t("admin.monthlyLegendPartial")}
-                        </span>
-                      )}
-                      {st === "pending" && (
-                        <span className="rounded-full bg-[var(--apple-orange)]/20 px-2 py-0.5 text-[0.6875rem] font-semibold text-[var(--apple-orange-dark)]">
-                          {t("admin.monthlyPending")}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[0.875rem]">
-                      <div>
-                        <span className="text-[0.75rem] text-[var(--apple-label-tertiary)]">
-                          {t("admin.monthlyIn")}
-                        </span>
-                        <p className="font-semibold tabular-nums text-[var(--foreground)]">
-                          {d.checkIn ?? "—"}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-[0.75rem] text-[var(--apple-label-tertiary)]">
-                          {t("admin.monthlyOut")}
-                        </span>
-                        <p className="font-semibold tabular-nums text-[var(--foreground)]">
-                          {d.checkOut ?? "—"}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                      </td>
+                      <td
+                        className={`py-2.5 text-center tabular-nums font-semibold ${
+                          d.checkIn
+                            ? "text-[var(--foreground)]"
+                            : "text-[var(--apple-orange-dark)]"
+                        }`}
+                      >
+                        {d.checkIn ?? "—"}
+                      </td>
+                      <td
+                        className={`py-2.5 text-center tabular-nums font-semibold ${
+                          d.checkOut
+                            ? "text-[var(--foreground)]"
+                            : "text-[var(--apple-orange-dark)]"
+                        }`}
+                      >
+                        {d.checkOut ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
 
