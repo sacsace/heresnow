@@ -13,11 +13,7 @@ export type LivenessResult = {
 };
 
 /** Returns NOT_IMPLEMENTED — wire a real liveness model here in a future phase. */
-export function checkLiveness(_input?: {
-  frameCount?: number;
-  /** Client hint only — never trusted for auth */
-  clientClaim?: boolean;
-}): LivenessResult {
+export function checkLiveness(): LivenessResult {
   return {
     status: "NOT_IMPLEMENTED",
     enforced: false,

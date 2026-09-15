@@ -1,4 +1,4 @@
-import { distanceToConfidencePercent, parseFaceDescriptor } from "@/lib/faceMatch";
+import { parseFaceDescriptor } from "@/lib/faceMatch";
 import { verifyEmployeeTemplates } from "@/lib/faceIdentityMatch";
 import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 import { prisma } from "@/lib/prisma";
