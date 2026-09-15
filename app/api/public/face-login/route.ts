@@ -88,7 +88,7 @@ export async function POST(req: Request) {
 
   try {
     const result = await matchFaceLoginUserMultiFrame(unique.slice(0, 8), company.companyId);
-    if ("reason" in result && !("user" in result)) {
+    if (!("user" in result)) {
       const status =
         result.reason === "ambiguous"
           ? 409
