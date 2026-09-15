@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminDayAttendanceMap } from "@/components/admin/AdminDayAttendanceMap";
+import { MonthlyEmployeeDetailModal } from "@/components/admin/MonthlyEmployeeDetailModal";
 import { useI18n } from "@/components/LanguageProvider";
 import type { MonthlyEmployeeRow } from "@/lib/adminMonthlyAttendance";
 import { btnIcon, groupedCard, link, pageSubtitle, sectionLabel } from "@/lib/uiStyles";
@@ -45,6 +46,7 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<MonthlyEmployeeRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,6 +81,7 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
   useEffect(() => {
     setSelectedDate(null);
     setMapOpen(false);
+    setSelectedEmployee(null);
   }, [year, month]);
 
   function shiftMonth(delta: number) {
@@ -240,7 +243,14 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
                       >
                         {rowIndex + 1}
                       </span>
-                      <span className="truncate font-medium">{row.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEmployee(row)}
+                        className="truncate text-left font-medium text-[var(--apple-blue)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-blue)]/40 rounded-sm"
+                        title={t("admin.monthlyEmployeeDetailOpen")}
+                      >
+                        {row.name}
+                      </button>
                     </div>
                   </td>
                   {row.days.map((d) => {
@@ -318,6 +328,13 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
           )}
         </div>
       </div>
+
+      <MonthlyEmployeeDetailModal
+        open={selectedEmployee != null}
+        onClose={() => setSelectedEmployee(null)}
+        employee={selectedEmployee}
+        monthLabel={monthLabel}
+      />
 
       {mapOpen && selectedDate && (
         <section className="mt-6 rounded-xl bg-[var(--fill-tertiary)] p-4 sm:p-5">
