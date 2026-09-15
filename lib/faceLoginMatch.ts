@@ -2,9 +2,9 @@ import type { Role } from "@prisma/client";
 import {
   confirmMultiFrameIdentity,
   identifyEmployeeAmongCandidates,
-  verifyEmployeeTemplates,
   type FaceIdentifyFail,
 } from "@/lib/faceIdentityMatch";
+import { matchFaceCredentials } from "@/lib/faceCredentials";
 import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 import { dedupeFaceProbes } from "@/lib/faceProbeDedupe";
 import { averageFaceDescriptors, parseFaceDescriptor } from "@/lib/faceMatch";
@@ -120,23 +120,15 @@ function mapLoginFailure(
   };
 }
 
-/** Final 1:1 check — same criteria as account 「인식 테스트」 */
+/** Final 1:1 check — identical to PUT /api/employee/face (account 「인식 테스트」) */
 function verifyLoginEmployee1to1(
   credentials: Array<{ id: string; descriptor: unknown }>,
   probe: number[]
 ): { ok: true; confidencePercent: number } | { ok: false; detail: FaceIdentifyFail["reason"] } {
-  const policy = resolveFaceIdentityPolicy();
-  const verify = verifyEmployeeTemplates(
-    credentials,
-    probe,
-    policy,
-    policy.loginMatchThreshold
-  );
+  const verify = matchFaceCredentials(credentials, probe);
   if (!verify.matched) {
-    return { ok: false, detail: verify.reason ?? "MATCH_THRESHOLD_FAILED" };
-  }
-  if (verify.confidencePercent < policy.loginMinConfidencePercent) {
-    return { ok: false, detail: "LOW_CONFIDENCE" };
+    const detail = (verify.reason ?? "MATCH_THRESHOLD_FAILED") as FaceIdentifyFail["reason"];
+    return { ok: false, detail };
   }
   return { ok: true, confidencePercent: verify.confidencePercent };
 }
@@ -160,8 +152,7 @@ export async function matchFaceLoginUser(
 
   const result = identifyEmployeeAmongCandidates(candidates, probe, policy, {
     purpose: "login",
-    thresholdOverride: policy.loginMatchThreshold,
-    minConfidencePercent: policy.loginMinConfidencePercent,
+    thresholdOverride: policy.matchThreshold,
   });
 
   if (result.status !== "PASS") {

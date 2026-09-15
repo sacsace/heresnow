@@ -2,12 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { createFaceLoginToken } from "@/lib/faceLoginToken";
-import {
-  matchFaceLoginUserMultiFrame,
-  parseProbeDescriptor,
-} from "@/lib/faceLoginMatch";
-import { dedupeFaceProbes } from "@/lib/faceProbeDedupe";
-import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
+import { matchFaceLoginUser, parseProbeDescriptor } from "@/lib/faceLoginMatch";
 import { getClientIp } from "@/lib/clientIp";
 import { resolveFaceLoginCompanyId } from "@/lib/resolveFaceLoginCompany";
 import { consumeRateLimit } from "@/lib/slidingWindowRateLimit";
@@ -18,19 +13,11 @@ import { z } from "zod";
 const FACE_LOGIN_MAX_ATTEMPTS = 120;
 const FACE_LOGIN_WINDOW_MS = 60_000;
 
-const descriptorSchema = z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH);
-
-const bodySchema = z
-  .object({
-    companyName: z.string().min(1),
-    /** @deprecated single frame — rejected; use faceDescriptors */
-    descriptor: descriptorSchema.optional(),
-    /** Multi-frame login — min 3 distinct frames required */
-    faceDescriptors: z.array(descriptorSchema).min(3).max(8).optional(),
-  })
-  .refine((d) => (d.faceDescriptors?.length ?? 0) >= 3, {
-    message: "faceDescriptors min 3 required",
-  });
+const bodySchema = z.object({
+  companyName: z.string().min(1),
+  /** Single-frame descriptor — same capture pattern as account 「인식 테스트」 */
+  descriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH),
+});
 
 export async function POST(req: Request) {
   const ip = getClientIp(req);
@@ -55,24 +42,12 @@ export async function POST(req: Request) {
 
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "invalid_descriptor", code: "MULTIFRAME_REQUIRED" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "invalid_descriptor" }, { status: 400 });
   }
 
-  const policy = resolveFaceIdentityPolicy();
-  const multiProbes =
-    parsed.data.faceDescriptors
-      ?.map((d) => parseProbeDescriptor(d))
-      .filter((d): d is number[] => d != null) ?? [];
-
-  const unique = dedupeFaceProbes(multiProbes);
-  if (unique.length < policy.multiFrameRequiredMatches) {
-    return NextResponse.json(
-      { error: "invalid_descriptor", code: "INSUFFICIENT_FRAME_DIVERSITY" },
-      { status: 400 }
-    );
+  const probe = parseProbeDescriptor(parsed.data.descriptor);
+  if (!probe) {
+    return NextResponse.json({ error: "invalid_descriptor" }, { status: 400 });
   }
 
   const company = await resolveFaceLoginCompanyId(parsed.data.companyName);
@@ -87,7 +62,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await matchFaceLoginUserMultiFrame(unique.slice(0, 8), company.companyId);
+    const result = await matchFaceLoginUser(probe, company.companyId);
     if (!("user" in result)) {
       const status =
         result.reason === "ambiguous"

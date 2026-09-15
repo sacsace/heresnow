@@ -201,7 +201,9 @@ export const ko = {
     modeFace: "안면 인식",
     modePasskey: "지문/기기",
     faceVerifyTitle: "안면 인식 로그인",
-    faceVerifyLead: "회사 이름 입력 후 카메라에 본인 얼굴을 맞추면 등록된 계정으로 로그인됩니다.",
+    faceVerifyLead:
+      "회사 이름 입력 후 카메라에 얼굴을 맞추고 아래 버튼을 누르세요. 계정 「인식 테스트」와 동일한 방식입니다.",
+    faceVerifyButton: "안면 인식으로 로그인",
     faceVerifyRetry: "로그인에 실패했습니다. 등록된 얼굴을 프레임에 맞춰 다시 시도해 주세요.",
     faceCompanyName: "회사 이름",
     faceCompanyHint:
@@ -1489,7 +1491,9 @@ export const en = {
     modeFace: "Face",
     modePasskey: "Biometric",
     faceVerifyTitle: "Face sign-in",
-    faceVerifyLead: "Enter your company name, then align your face to sign in to your enrolled account.",
+    faceVerifyLead:
+      "Enter your company name, align your face in the camera, then press the button below. Same flow as “Test recognition” in account settings.",
+    faceVerifyButton: "Sign in with face",
     faceVerifyRetry: "Sign-in failed. Align your enrolled face in the frame and try again.",
     faceCompanyName: "Company name",
     faceCompanyHint:

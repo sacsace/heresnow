@@ -245,9 +245,7 @@ export function identifyEmployeeAmongCandidates(
   }
 
   const confidencePercent = distanceToConfidencePercent(best.bestDistance, threshold);
-  const minConfidence =
-    context?.minConfidencePercent ??
-    (context?.purpose === "login" ? policy.loginMinConfidencePercent : undefined);
+  const minConfidence = context?.minConfidencePercent;
   if (minConfidence != null && confidencePercent < minConfidence) {
     const fail: FaceIdentifyFail = {
       status: "UNKNOWN",
