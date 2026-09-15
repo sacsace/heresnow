@@ -1,8 +1,5 @@
-import {
-  euclideanDistance,
-  FACE_ENROLL_CONFLICT_MAX_DISTANCE,
-  parseFaceDescriptor,
-} from "@/lib/faceMatch";
+import { euclideanDistance, parseFaceDescriptor } from "@/lib/faceMatch";
+import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 import { prisma } from "@/lib/prisma";
 
 /** 같은 회사에 이미 등록된 다른 직원 얼굴과 충돌하는지 (다중 credential 포함) */
@@ -27,7 +24,8 @@ export async function findConflictingFaceEmployee(
     for (const cred of other.faceCredentials) {
       const stored = parseFaceDescriptor(cred.descriptor);
       if (!stored) continue;
-      if (euclideanDistance(stored, probe) < FACE_ENROLL_CONFLICT_MAX_DISTANCE) {
+      const conflictMax = resolveFaceIdentityPolicy().enrollConflictMaxDistance;
+      if (euclideanDistance(stored, probe) < conflictMax) {
         return { id: other.id };
       }
     }

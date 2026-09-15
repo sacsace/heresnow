@@ -112,7 +112,7 @@ export function DoorTerminal() {
   );
 
   const handleVerified = useCallback(
-    async (descriptor: number[]) => {
+    async (descriptor: number[], context?: { frameDescriptors?: number[][] }) => {
       if (punchLockRef.current || busy) return false;
 
       punchLockRef.current = true;
@@ -121,10 +121,15 @@ export function DoorTerminal() {
       setMsg(null);
 
       try {
+        const frames = context?.frameDescriptors?.filter((f) => f.length > 0) ?? [];
         const r = await fetch("/api/door/punch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ faceDescriptor: descriptor }),
+          body: JSON.stringify(
+            frames.length >= 3
+              ? { faceDescriptors: frames.slice(0, 8) }
+              : { faceDescriptor: descriptor }
+          ),
         });
         const j = (await r.json().catch(() => ({}))) as {
           ok?: boolean;

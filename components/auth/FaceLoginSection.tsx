@@ -47,9 +47,15 @@ export function FaceLoginSection({
   }
 
   const handleVerified = useCallback(
-    async (descriptor: number[]) => {
+    async (descriptor: number[], context?: { frameDescriptors?: number[][] }) => {
       if (signInStartedRef.current || disabled || !trimmedCompany) return false;
       if (Date.now() < retryBlockedUntilRef.current) return false;
+
+      const frames = context?.frameDescriptors?.filter((f) => f.length > 0) ?? [];
+      if (frames.length < 3) {
+        onError(t("login.errorFaceCredentials"));
+        return false;
+      }
 
       signInStartedRef.current = true;
 
@@ -59,7 +65,7 @@ export function FaceLoginSection({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              descriptor,
+              faceDescriptors: frames.slice(0, 8),
               companyName: trimmedCompany,
             }),
           }),
@@ -161,6 +167,7 @@ export function FaceLoginSection({
           mode="verify"
           autoVerify
           verifyOnClientOnly
+          highAccuracyScan
           fastScan
           scanWhenFaceVisible
           blockRetryUntilFaceAbsent={false}

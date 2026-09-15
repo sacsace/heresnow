@@ -10,12 +10,11 @@ import {
 } from "@/lib/attendancePunchRules";
 import { acquireAttendanceEmployeeLock } from "@/lib/attendanceLock";
 import {
-  FACE_DESCRIPTOR_LENGTH,
-  FACE_IDENTIFY_MIN_GAP_DOOR,
-  FACE_MATCH_THRESHOLD_DOOR,
-  identifySingleFaceMatchMulti,
-  parseFaceDescriptor,
-} from "@/lib/faceMatch";
+  confirmMultiFrameIdentity,
+  identifyEmployeeAmongCandidates,
+} from "@/lib/faceIdentityMatch";
+import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
+import { FACE_DESCRIPTOR_LENGTH, parseFaceDescriptor } from "@/lib/faceMatch";
 import type { AttendanceType, Role } from "@prisma/client";
 
 /** 출입문 단말에서 출퇴근 기록 가능한 역할 */
@@ -223,15 +222,42 @@ export async function matchFaceDoorEmployee(
   companyId: string
 ): Promise<{ id: string; name: string } | null> {
   const employees = await getDoorEmployeesForMatch(companyId);
+  const policy = resolveFaceIdentityPolicy();
+  const candidates = employees.map((e) => ({
+    id: e.id,
+    name: e.name,
+    descriptors: e.descriptors,
+  }));
 
-  const identified = identifySingleFaceMatchMulti(
-    employees,
-    probe,
-    FACE_MATCH_THRESHOLD_DOOR,
-    FACE_IDENTIFY_MIN_GAP_DOOR
-  );
-  if (!identified) return null;
-  return { id: identified.match.id, name: identified.match.name };
+  const result = identifyEmployeeAmongCandidates(candidates, probe, policy, {
+    purpose: "door",
+    thresholdOverride: policy.doorMatchThreshold,
+  });
+  if (result.status !== "PASS") return null;
+  const emp = employees.find((e) => e.id === result.employeeId);
+  return emp ? { id: emp.id, name: emp.name } : null;
+}
+
+/** Multi-frame door identification — all frames must agree on same employee */
+export async function matchFaceDoorEmployeeMultiFrame(
+  probes: number[][],
+  companyId: string
+): Promise<{ id: string; name: string } | null> {
+  const employees = await getDoorEmployeesForMatch(companyId);
+  const policy = resolveFaceIdentityPolicy();
+  const candidates = employees.map((e) => ({
+    id: e.id,
+    name: e.name,
+    descriptors: e.descriptors,
+  }));
+
+  const mf = confirmMultiFrameIdentity(probes, candidates, policy, {
+    purpose: "door",
+    thresholdOverride: policy.doorMatchThreshold,
+  });
+  if (mf.status !== "PASS") return null;
+  const emp = employees.find((e) => e.id === mf.employeeId);
+  return emp ? { id: emp.id, name: emp.name } : null;
 }
 
 export function parseDoorFaceDescriptor(raw: unknown): number[] | null {

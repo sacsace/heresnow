@@ -21,6 +21,8 @@
     "db:studio": "prisma studio",
     "db:verify": "npx tsx scripts/db-verify.ts",
     "test:attendance-core": "tsx scripts/test-attendance-core.ts",
+    "test:face-identity": "tsx scripts/face-identity-security-tests.ts",
+    "face:calibrate": "tsx scripts/face-threshold-calibration.ts",
     "vapid:generate": "node scripts/generate-vapid-keys.mjs",
     "test:push:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/test-push-local.ps1"
   },

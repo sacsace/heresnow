@@ -1,17 +1,20 @@
-/** face-api.js 유클리드 거리 기준 (낮을수록 동일인) — 1:1 출퇴근 검증 */
-export const FACE_MATCH_THRESHOLD = 0.45;
+/**
+ * @deprecated Use resolveFaceIdentityPolicy() from @/lib/faceIdentityPolicy.
+ * Legacy constants kept for UI confidence display only — auth uses policy (default 0.42).
+ */
+export const FACE_MATCH_THRESHOLD = 0.42;
 
-/** 로그인 1:N — 1:1 테스트·출근과 동일 거리 기준 (+ pickFaceLoginMatch 모호성 검사) */
+/** @deprecated use policy.loginMatchThreshold */
 export const FACE_MATCH_THRESHOLD_LOGIN = FACE_MATCH_THRESHOLD;
 
-/** 로그인 — 이 거리 이하일 때만 2순위와 격차 검사 완화 */
+/** @deprecated removed — confident bypass disabled for security */
 export const FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT = 0.36;
 
-/** 출입문 단말 — 고정 카메라·다중 프레임 평균과 함께 사용 */
-export const FACE_MATCH_THRESHOLD_DOOR = 0.42;
+/** @deprecated use policy.doorMatchThreshold */
+export const FACE_MATCH_THRESHOLD_DOOR = 0.4;
 
-/** 다른 직원 계정에 동일 얼굴 등록 차단 */
-export const FACE_ENROLL_CONFLICT_MAX_DISTANCE = 0.42;
+/** @deprecated use policy.enrollConflictMaxDistance */
+export const FACE_ENROLL_CONFLICT_MAX_DISTANCE = 0.4;
 
 export const FACE_DESCRIPTOR_LENGTH = 128;
 

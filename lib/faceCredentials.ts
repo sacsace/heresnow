@@ -1,9 +1,6 @@
-import {
-  distanceToConfidencePercent,
-  euclideanDistance,
-  FACE_MATCH_THRESHOLD,
-  parseFaceDescriptor,
-} from "@/lib/faceMatch";
+import { distanceToConfidencePercent, parseFaceDescriptor } from "@/lib/faceMatch";
+import { verifyEmployeeTemplates } from "@/lib/faceIdentityMatch";
+import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
@@ -18,36 +15,30 @@ export type FaceMatchResult = {
   distance: number;
   confidencePercent: number;
   credentialId: string | null;
+  templateMatchCount?: number;
+  reason?: string;
 };
 
-/** 직원 credential 중 probe와 가장 가까운 매칭 */
+/** 직원 credential — template consistency + absolute threshold (1:1) */
 export function matchFaceCredentials(
   credentials: FaceCredentialRow[],
   probe: number[],
-  threshold = FACE_MATCH_THRESHOLD
+  threshold?: number
 ): FaceMatchResult {
-  let bestId: string | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (const cred of credentials) {
-    const stored = parseFaceDescriptor(cred.descriptor);
-    if (!stored) continue;
-    const distance = euclideanDistance(stored, probe);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestId = cred.id;
-    }
-  }
-
-  if (bestId == null) {
-    return { matched: false, distance: Number.POSITIVE_INFINITY, confidencePercent: 0, credentialId: null };
-  }
-
+  const policy = resolveFaceIdentityPolicy();
+  const result = verifyEmployeeTemplates(
+    credentials,
+    probe,
+    policy,
+    threshold ?? policy.matchThreshold
+  );
   return {
-    matched: bestDistance < threshold,
-    distance: bestDistance,
-    confidencePercent: distanceToConfidencePercent(bestDistance, threshold),
-    credentialId: bestId,
+    matched: result.matched,
+    distance: result.distance,
+    confidencePercent: result.confidencePercent,
+    credentialId: result.credentialId,
+    templateMatchCount: result.templateMatchCount,
+    reason: result.reason,
   };
 }
 

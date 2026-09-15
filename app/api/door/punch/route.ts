@@ -7,9 +7,11 @@ import {
   DOOR_PUNCHABLE_ROLES,
   getDoorPunchEligibility,
   matchFaceDoorEmployee,
+  matchFaceDoorEmployeeMultiFrame,
   parseDoorFaceDescriptor,
   FACE_DESCRIPTOR_LENGTH,
 } from "@/lib/doorAttendance";
+import { dedupeFaceProbes } from "@/lib/faceProbeDedupe";
 import { resolveDoorPunchTimeWindow, resolveDoorTerminalMode } from "@/lib/doorTerminalMode";
 import { doorApiForbidden } from "@/lib/requireDoorRole";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
@@ -20,9 +22,17 @@ import { AttendanceType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-const faceBodySchema = z.object({
-  faceDescriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH),
-});
+const descriptorSchema = z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH);
+
+const faceBodySchema = z
+  .object({
+    faceDescriptor: descriptorSchema.optional(),
+    /** Multi-frame confirmation — min 3 distinct frame descriptors */
+    faceDescriptors: z.array(descriptorSchema).min(3).max(8).optional(),
+  })
+  .refine((d) => d.faceDescriptor != null || (d.faceDescriptors?.length ?? 0) >= 3, {
+    message: "faceDescriptor or faceDescriptors required",
+  });
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -45,8 +55,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
 
-  const probe = parseDoorFaceDescriptor(parsed.data.faceDescriptor);
-  if (!probe) {
+  const multiProbes =
+    parsed.data.faceDescriptors
+      ?.map((d) => parseDoorFaceDescriptor(d))
+      .filter((d): d is number[] => d != null) ?? [];
+
+  const singleProbe = parsed.data.faceDescriptor
+    ? parseDoorFaceDescriptor(parsed.data.faceDescriptor)
+    : null;
+
+  if (multiProbes.length >= 3) {
+    const unique = dedupeFaceProbes(multiProbes);
+    if (unique.length < 3) {
+      return NextResponse.json(
+        { error: "invalid_face", code: "INSUFFICIENT_FRAME_DIVERSITY" },
+        { status: 400 }
+      );
+    }
+  } else if (!singleProbe) {
     return NextResponse.json({ error: "invalid_face" }, { status: 400 });
   }
 
@@ -56,20 +82,31 @@ export async function POST(req: Request) {
       select: {
         timezone: true,
         workStartTime: true,
-        workEndTime: true,
         workDays: true,
         workScheduleByDay: true,
         shiftPresets: true,
+        workEndTime: true,
       },
     }),
-    matchFaceDoorEmployee(probe, companyId),
+    multiProbes.length >= 3
+      ? matchFaceDoorEmployeeMultiFrame(
+          dedupeFaceProbes(multiProbes).slice(0, 8),
+          companyId
+        )
+      : matchFaceDoorEmployee(singleProbe!, companyId),
   ]);
 
   if (!company) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   if (!matchedEmployee) {
-    return NextResponse.json({ error: "face_not_matched", code: "FACE_NOT_MATCHED" }, { status: 404 });
+    return NextResponse.json(
+      {
+        error: "face_not_matched",
+        code: multiProbes.length >= 3 ? "FACE_AMBIGUOUS_OR_UNKNOWN" : "FACE_NOT_MATCHED",
+      },
+      { status: 404 }
+    );
   }
 
   const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
@@ -250,3 +287,4 @@ export async function POST(req: Request) {
     ...next,
   });
 }
+

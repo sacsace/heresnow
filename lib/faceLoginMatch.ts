@@ -1,12 +1,13 @@
 import type { Role } from "@prisma/client";
 import {
-  bestProbeDistance,
-  FACE_IDENTIFY_MIN_GAP_LOGIN,
-  FACE_IDENTIFY_MIN_RATIO_LOGIN,
-  FACE_MATCH_THRESHOLD_LOGIN,
-  FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT,
-  parseFaceDescriptor,
-} from "@/lib/faceMatch";
+  confirmMultiFrameIdentity,
+  identifyEmployeeAmongCandidates,
+  verifyEmployeeTemplates,
+  type FaceIdentifyFail,
+} from "@/lib/faceIdentityMatch";
+import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
+import { dedupeFaceProbes } from "@/lib/faceProbeDedupe";
+import { averageFaceDescriptors, parseFaceDescriptor } from "@/lib/faceMatch";
 import { prisma } from "@/lib/prisma";
 
 export function parseProbeDescriptor(raw: unknown): number[] | null {
@@ -31,66 +32,28 @@ export type FaceLoginUser = {
   employeeId: string;
 };
 
+export type FaceLoginApiError = "no_enrolled" | "no_match" | "ambiguous";
+
 export type FaceLoginPickFailure = {
-  reason: "no_enrolled" | "no_match" | "ambiguous";
+  reason: FaceLoginApiError;
   bestDistance?: number;
   secondDistance?: number;
+  confidencePercent?: number;
+  detail?: FaceIdentifyFail["reason"];
 };
 
-type ScoredCandidate = {
-  employeeId: string;
-  distance: number;
+type LoginCandidate = {
+  id: string;
+  descriptors: number[][];
+  user: {
+    id: string;
+    email: string;
+    role: Role;
+    companyId: string | null;
+  };
 };
 
-/** 1:N — 직원별 다중 credential 중 최소 거리로 비교 */
-export function pickFaceLoginMatch(
-  employees: Array<{ id: string; descriptors: number[][] }>,
-  probe: number[]
-): { employeeId: string } | FaceLoginPickFailure {
-  const scored: ScoredCandidate[] = [];
-
-  for (const emp of employees) {
-    if (emp.descriptors.length === 0) continue;
-    scored.push({ employeeId: emp.id, distance: bestProbeDistance(emp.descriptors, probe) });
-  }
-
-  if (scored.length === 0) {
-    return { reason: employees.length === 0 ? "no_enrolled" : "no_match" };
-  }
-
-  scored.sort((a, b) => a.distance - b.distance);
-  const best = scored[0]!;
-
-  if (best.distance >= FACE_MATCH_THRESHOLD_LOGIN) {
-    return { reason: "no_match", bestDistance: best.distance };
-  }
-
-  const closeMatches = scored.filter((s) => s.distance < FACE_MATCH_THRESHOLD_LOGIN);
-  if (closeMatches.length > 1) {
-    const second = closeMatches[1]!;
-    const gap = second.distance - best.distance;
-    const ratio = gap / Math.max(best.distance, 0.01);
-    const confident = best.distance <= FACE_MATCH_THRESHOLD_LOGIN_CONFIDENT;
-    const clearWinner = gap >= FACE_IDENTIFY_MIN_GAP_LOGIN && ratio >= FACE_IDENTIFY_MIN_RATIO_LOGIN;
-
-    // 여러 계정이 동시에 매칭되면 1·2위 격차가 충분할 때만 허용
-    if (!clearWinner && (!confident || gap < FACE_IDENTIFY_MIN_GAP_LOGIN * 0.75)) {
-      return {
-        reason: "ambiguous",
-        bestDistance: best.distance,
-        secondDistance: second.distance,
-      };
-    }
-  }
-
-  return { employeeId: best.employeeId };
-}
-
-/** 로그인 1:N — 해당 회사 직원만 검색 */
-export async function matchFaceLoginUser(
-  probe: number[],
-  companyId: string
-): Promise<{ user: FaceLoginUser } | FaceLoginPickFailure> {
+async function loadFaceLoginCandidates(companyId: string): Promise<LoginCandidate[]> {
   const employees = await prisma.employee.findMany({
     where: {
       companyId,
@@ -100,7 +63,7 @@ export async function matchFaceLoginUser(
     },
     select: {
       id: true,
-      faceCredentials: { select: { descriptor: true } },
+      faceCredentials: { select: { id: true, descriptor: true } },
       user: {
         select: {
           id: true,
@@ -112,26 +75,186 @@ export async function matchFaceLoginUser(
     },
   });
 
-  const candidates = employees.map((emp) => ({
-    id: emp.id,
-    descriptors: emp.faceCredentials
-      .map((c) => parseFaceDescriptor(c.descriptor))
-      .filter((d): d is number[] => d != null),
+  return employees
+    .map((emp) => ({
+      id: emp.id,
+      descriptors: emp.faceCredentials
+        .map((c) => parseFaceDescriptor(c.descriptor))
+        .filter((d): d is number[] => d != null),
+      user: {
+        id: emp.user.id,
+        email: emp.user.email,
+        role: emp.user.role as Role,
+        companyId: emp.user.companyId,
+      },
+    }))
+    .filter((e) => e.descriptors.length > 0);
+}
+
+function toLoginUser(candidate: LoginCandidate): FaceLoginUser {
+  return {
+    id: candidate.user.id,
+    email: candidate.user.email,
+    role: candidate.user.role,
+    companyId: candidate.user.companyId,
+    employeeId: candidate.id,
+  };
+}
+
+function mapLoginFailure(
+  result: FaceIdentifyFail,
+  confidencePercent?: number
+): FaceLoginPickFailure {
+  const apiReason: FaceLoginApiError =
+    result.status === "AMBIGUOUS" ||
+    result.reason === "IDENTITY_MARGIN_FAILED" ||
+    result.reason === "INCONSISTENT_FRAMES"
+      ? "ambiguous"
+      : "no_match";
+  return {
+    reason: apiReason,
+    bestDistance: result.debug.best?.distance,
+    secondDistance: result.debug.second?.distance,
+    confidencePercent,
+    detail: result.reason,
+  };
+}
+
+/** Final 1:1 check — same criteria as account 「인식 테스트」 */
+function verifyLoginEmployee1to1(
+  credentials: Array<{ id: string; descriptor: unknown }>,
+  probe: number[]
+): { ok: true; confidencePercent: number } | { ok: false; detail: FaceIdentifyFail["reason"] } {
+  const policy = resolveFaceIdentityPolicy();
+  const verify = verifyEmployeeTemplates(
+    credentials,
+    probe,
+    policy,
+    policy.loginMatchThreshold
+  );
+  if (!verify.matched) {
+    return { ok: false, detail: verify.reason ?? "MATCH_THRESHOLD_FAILED" };
+  }
+  if (verify.confidencePercent < policy.loginMinConfidencePercent) {
+    return { ok: false, detail: "LOW_CONFIDENCE" };
+  }
+  return { ok: true, confidencePercent: verify.confidencePercent };
+}
+
+/** 로그인 1:N — single frame (legacy); still enforces confidence + 1:1 */
+export async function matchFaceLoginUser(
+  probe: number[],
+  companyId: string
+): Promise<{ user: FaceLoginUser; confidencePercent: number } | FaceLoginPickFailure> {
+  const policy = resolveFaceIdentityPolicy();
+  const loaded = await loadFaceLoginCandidates(companyId);
+
+  if (loaded.length === 0) {
+    return { reason: "no_enrolled" };
+  }
+
+  const candidates = loaded.map((e) => ({
+    id: e.id,
+    descriptors: e.descriptors,
   }));
 
-  const picked = pickFaceLoginMatch(candidates, probe);
-  if ("reason" in picked) return picked;
+  const result = identifyEmployeeAmongCandidates(candidates, probe, policy, {
+    purpose: "login",
+    thresholdOverride: policy.loginMatchThreshold,
+    minConfidencePercent: policy.loginMinConfidencePercent,
+  });
 
-  const emp = employees.find((e) => e.id === picked.employeeId);
-  if (!emp) return { reason: "no_match" };
+  if (result.status !== "PASS") {
+    return mapLoginFailure(result);
+  }
 
-  return {
-    user: {
-      id: emp.user.id,
-      email: emp.user.email,
-      role: emp.user.role as Role,
-      companyId: emp.user.companyId,
-      employeeId: emp.id,
-    },
-  };
+  const matched = loaded.find((e) => e.id === result.employeeId);
+  if (!matched) {
+    return { reason: "no_match", bestDistance: result.distance };
+  }
+
+  const employee = await prisma.employee.findFirst({
+    where: { id: matched.id, companyId },
+    select: { faceCredentials: { select: { id: true, descriptor: true } } },
+  });
+  if (!employee) {
+    return { reason: "no_match", bestDistance: result.distance };
+  }
+
+  const verify = verifyLoginEmployee1to1(employee.faceCredentials, probe);
+  if (!verify.ok) {
+    return {
+      reason: "no_match",
+      bestDistance: result.distance,
+      confidencePercent: result.confidencePercent,
+      detail: verify.detail,
+    };
+  }
+
+  return { user: toLoginUser(matched), confidencePercent: verify.confidencePercent };
+}
+
+/** 로그인 — multi-frame + 1:1 averaged probe verification (required for public login) */
+export async function matchFaceLoginUserMultiFrame(
+  probes: number[][],
+  companyId: string
+): Promise<{ user: FaceLoginUser; confidencePercent: number } | FaceLoginPickFailure> {
+  const policy = resolveFaceIdentityPolicy();
+  const unique = dedupeFaceProbes(probes);
+  if (unique.length < policy.multiFrameRequiredMatches) {
+    return { reason: "no_match", detail: "MULTIFRAME_FAILED" };
+  }
+
+  const loaded = await loadFaceLoginCandidates(companyId);
+  if (loaded.length === 0) {
+    return { reason: "no_enrolled" };
+  }
+
+  const candidates = loaded.map((e) => ({
+    id: e.id,
+    descriptors: e.descriptors,
+  }));
+
+  const mf = confirmMultiFrameIdentity(unique, candidates, policy, {
+    purpose: "login",
+    thresholdOverride: policy.loginMatchThreshold,
+    minConfidencePercent: policy.loginMinConfidencePercent,
+  });
+
+  if (mf.status !== "PASS") {
+    return {
+      reason: mf.status === "AMBIGUOUS" ? "ambiguous" : "no_match",
+      detail: mf.reason,
+      confidencePercent: 0,
+    };
+  }
+
+  const matched = loaded.find((e) => e.id === mf.employeeId);
+  if (!matched) {
+    return { reason: "no_match", detail: "UNKNOWN" };
+  }
+
+  const averaged = averageFaceDescriptors(unique);
+  if (!averaged) {
+    return { reason: "no_match", detail: "INVALID_PROBE" };
+  }
+
+  const employee = await prisma.employee.findFirst({
+    where: { id: matched.id, companyId },
+    select: { faceCredentials: { select: { id: true, descriptor: true } } },
+  });
+  if (!employee) {
+    return { reason: "no_match", detail: "UNKNOWN" };
+  }
+
+  const verify = verifyLoginEmployee1to1(employee.faceCredentials, averaged);
+  if (!verify.ok) {
+    return {
+      reason: "no_match",
+      confidencePercent: 0,
+      detail: verify.detail,
+    };
+  }
+
+  return { user: toLoginUser(matched), confidencePercent: verify.confidencePercent };
 }

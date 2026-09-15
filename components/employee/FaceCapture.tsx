@@ -65,7 +65,10 @@ type Props = {
   enrollTitle?: string;
   enrollLead?: string;
   onEnrolled?: () => void;
-  onVerified?: (descriptor: number[]) => boolean | void | Promise<boolean | void>;
+  onVerified?: (
+    descriptor: number[],
+    context?: { frameDescriptors?: number[][] }
+  ) => boolean | void | Promise<boolean | void>;
   onError?: (message: string) => void;
 };
 
@@ -80,7 +83,8 @@ const AUTO_SCAN_INTERVAL_MS_IDLE = 500;
 const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const AUTO_SCAN_INITIAL_DELAY_MS_FAST = 50;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
-const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 3;
+const HIGH_ACCURACY_FRAME_COUNT_LOGIN = 5;
+const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 5;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
 const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.17;
 const ENROLL_ANGLE_COUNT = 3;
@@ -357,8 +361,8 @@ export function FaceCapture({
   );
 
   const finishClientVerify = useCallback(
-    async (arr: number[]): Promise<boolean> => {
-      const verified = await onVerifiedRef.current?.(arr);
+    async (arr: number[], frameDescriptors?: number[][]): Promise<boolean> => {
+      const verified = await onVerifiedRef.current?.(arr, { frameDescriptors });
       if (verified === false) {
         setStatus(verifyRetryLabelRef.current ?? tRef.current("employee.faceVerifyRetry"));
         if (scanWhenFaceVisible && blockRetryUntilFaceAbsentRef.current) {
@@ -702,7 +706,9 @@ export function FaceCapture({
           const requiredFrames =
             profileKindRef.current === "kiosk"
               ? HIGH_ACCURACY_FRAME_COUNT_KIOSK
-              : HIGH_ACCURACY_FRAME_COUNT;
+              : profileKindRef.current === "login"
+                ? HIGH_ACCURACY_FRAME_COUNT_LOGIN
+                : HIGH_ACCURACY_FRAME_COUNT;
           if (qualityBufferRef.current.length < requiredFrames) {
             setStatus(tRef.current("employee.faceStabilizing"));
             return;
@@ -725,7 +731,7 @@ export function FaceCapture({
           busyRef.current = true;
           setBusy(true);
           try {
-            await finishClientVerify(averaged);
+            await finishClientVerify(averaged, sampled);
           } finally {
             busyRef.current = false;
             setBusy(false);

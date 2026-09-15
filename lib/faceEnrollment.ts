@@ -1,4 +1,5 @@
-import { euclideanDistance, FACE_MATCH_THRESHOLD } from "@/lib/faceMatch";
+import { euclideanDistance } from "@/lib/faceMatch";
+import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 
 /** 등록에 필요한 유효 샘플 수 */
 export const ENROLLMENT_SAMPLE_TARGET = 5;
@@ -6,7 +7,10 @@ export const ENROLLMENT_SAMPLE_TARGET = 5;
 export const ENROLLMENT_CAPTURE_COOLDOWN_MS = 900;
 export const ENROLLMENT_ANALYSIS_INTERVAL_MS = 125;
 
-export const ENROLLMENT_SAME_PERSON_MAX_DISTANCE = FACE_MATCH_THRESHOLD;
+/** Same-person enrollment gate — from face identity policy (env FACE_ENROLL_SAME_PERSON_MAX) */
+export function enrollmentSamePersonMaxDistance(): number {
+  return resolveFaceIdentityPolicy().enrollmentSamePersonMaxDistance;
+}
 export const ENROLLMENT_DUPLICATE_MAX_DISTANCE = 0.18;
 export const ENROLLMENT_FRONT_VARIATION_MIN_DISTANCE = 0.12;
 
@@ -247,7 +251,7 @@ export function validateEnrollmentCapture(
   const storedPose = effectivePose ?? poseType;
 
   if (referenceDescriptor) {
-    if (euclideanDistance(descriptor, referenceDescriptor) >= ENROLLMENT_SAME_PERSON_MAX_DISTANCE) {
+    if (euclideanDistance(descriptor, referenceDescriptor) >= enrollmentSamePersonMaxDistance()) {
       return { ok: false, reason: "WRONG_PERSON" };
     }
   }
@@ -294,7 +298,7 @@ export function validateEnrollmentBatch(samples: EnrollmentSample[]): string | n
   for (let i = 0; i < samples.length; i++) {
     for (let j = i + 1; j < samples.length; j++) {
       const d = euclideanDistance(samples[i]!.descriptor, samples[j]!.descriptor);
-      if (d >= ENROLLMENT_SAME_PERSON_MAX_DISTANCE + 0.08) {
+      if (d >= enrollmentSamePersonMaxDistance() + 0.08) {
         return "등록 샘플 간 동일인 검증에 실패했습니다.";
       }
     }

@@ -240,15 +240,18 @@ export async function POST(req: Request) {
     });
     const match = matchFaceCredentials(credentials, probe);
     if (!match.matched) {
-      return NextResponse.json(
-        {
-          error:
-            type === "CHECK_IN"
-              ? "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다."
-              : "등록된 얼굴과 일치하지 않습니다. 본인만 퇴근할 수 있습니다.",
-        },
-        { status: 403 }
-      );
+      const body: Record<string, unknown> = {
+        error:
+          type === "CHECK_IN"
+            ? "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다."
+            : "등록된 얼굴과 일치하지 않습니다. 본인만 퇴근할 수 있습니다.",
+        code: match.reason ?? "FACE_NOT_MATCHED",
+      };
+      if (process.env.NODE_ENV === "development") {
+        body.distance = match.distance;
+        body.templateMatchCount = match.templateMatchCount;
+      }
+      return NextResponse.json(body, { status: 403 });
     }
     if (match.credentialId) {
       void prisma.employeeFaceCredential
