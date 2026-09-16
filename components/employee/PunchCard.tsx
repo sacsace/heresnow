@@ -86,6 +86,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const { t, locale } = useI18n();
   const dateLocale = locale === "en" ? "en-US" : "ko-KR";
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const enrollSectionRef = useRef<HTMLDivElement>(null);
   const [checkInMode, setCheckInMode] = useState<"normal" | "businessTrip">("normal");
   const [businessTripLocation, setBusinessTripLocation] = useState("");
   const [businessTripReason, setBusinessTripReason] = useState("");
@@ -192,6 +193,41 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       setCheckOutFaceStarted(false);
     }
   }, [punchStatus?.canCheckOut]);
+
+  useEffect(() => {
+    const faceRequired = faceRecognitionEnabled !== false;
+    const faceStatusReady = faceRecognitionEnabled !== null && faceEnrolled !== null;
+    const needsEnroll =
+      faceRequired && faceStatusReady && faceEnrolled === false && !punchStatusLoading;
+    if (needsEnroll && checkOutFaceStarted) {
+      setCheckOutFaceStarted(false);
+    }
+  }, [
+    faceRecognitionEnabled,
+    faceEnrolled,
+    punchStatusLoading,
+    checkOutFaceStarted,
+  ]);
+
+  useEffect(() => {
+    const faceRequired = faceRecognitionEnabled !== false;
+    const faceStatusReady = faceRecognitionEnabled !== null && faceEnrolled !== null;
+    const needsEnroll =
+      faceRequired && faceStatusReady && faceEnrolled === false && !punchStatusLoading;
+    const canCheckInNow = Boolean(punchStatus?.canCheckIn);
+    const canCheckOutNow = Boolean(punchStatus?.canCheckOut);
+    if (!needsEnroll || canCheckInNow || !canCheckOutNow) return;
+    const timer = window.setTimeout(() => {
+      enrollSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [
+    faceRecognitionEnabled,
+    faceEnrolled,
+    punchStatusLoading,
+    punchStatus?.canCheckIn,
+    punchStatus?.canCheckOut,
+  ]);
 
   useEffect(() => {
     if (!photoFile) {
@@ -558,18 +594,18 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     faceStatusReady && (!faceRequired || faceEnrolled === true);
   const canCheckIn = Boolean(punchStatus?.canCheckIn);
   const canCheckOut = Boolean(punchStatus?.canCheckOut);
-  const showCheckIn = readyForPunch && canCheckIn && !punchStatusLoading;
-  /**
-   * 등록 단계는 readyForPunch 가 false 일 수밖에 없으므로(faceEnrolled !== true),
-   * showCheckIn 대신 canCheckIn + 상태 로드 완료 조건만으로 노출한다.
-   * (이전 로직은 등록되지 않은 사용자에게 등록 화면이 영영 보이지 않는 버그가 있었음)
-   */
-  const showFaceEnroll =
+  const needsFaceEnroll =
     faceRequired &&
     faceStatusReady &&
     faceEnrolled === false &&
-    canCheckIn &&
     !punchStatusLoading;
+  const showCheckIn = readyForPunch && canCheckIn && !punchStatusLoading;
+  /** 출근·퇴근 모두 안면 등록이 필요할 때 등록 UI를 노출한다. */
+  const showFaceEnroll = needsFaceEnroll;
+
+  function focusFaceEnroll() {
+    enrollSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   const checkInNotice = checkInBlockMessage();
   const checkInFaceDisabled =
     busy ||
@@ -698,9 +734,14 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         )}
 
         {showFaceEnroll && (
-          <div className="mt-4">
+          <div ref={enrollSectionRef} className="mt-4">
             <FaceEnrollmentCapture
               disabled={busy}
+              title={
+                canCheckOut && !canCheckIn
+                  ? t("employee.faceEnrollTitleCheckout")
+                  : undefined
+              }
               onEnrolled={() => {
                 setFaceEnrolled(true);
                 setMsg(t("employee.faceEnrollOk"));
@@ -937,7 +978,18 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
               </div>
             )}
             {faceRequired ? (
-              !checkOutFaceStarted ? (
+              needsFaceEnroll ? (
+                <button
+                  type="button"
+                  disabled={checkOutFaceDisabled}
+                  onClick={focusFaceEnroll}
+                  className={
+                    btnPrimary + " w-full min-h-[3rem] py-3.5 text-[1.0625rem] sm:min-h-[3.25rem]"
+                  }
+                >
+                  {t("employee.faceEnrollFirstForCheckout")}
+                </button>
+              ) : !checkOutFaceStarted ? (
                 <button
                   type="button"
                   disabled={checkOutFaceDisabled}

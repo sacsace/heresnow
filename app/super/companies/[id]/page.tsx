@@ -5,6 +5,7 @@ import { AdminTodayOverview } from "@/components/admin/AdminTodayOverview";
 import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceOverview";
 import { SuperCompanyAttendanceStats } from "@/components/super/SuperCompanyAttendanceStats";
 import { SuperCompanyEmployeeAttendance } from "@/components/super/SuperCompanyEmployeeAttendance";
+import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
 import { isStrongPassword } from "@/lib/passwordPolicy";
@@ -78,6 +79,7 @@ export default function SuperCompanyUsersPage() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RowUser | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [tab, setTab] = useState<"users" | "dashboard" | "stats" | "byEmployee">("users");
@@ -226,13 +228,14 @@ export default function SuperCompanyUsersPage() {
     }
   }
 
-  async function deleteUser(u: RowUser) {
-    if (typeof window !== "undefined") {
-      const ok = window.confirm(
-        `${u.email}\n\n${t("super.deleteUserConfirm")}`
-      );
-      if (!ok) return;
-    }
+  function requestDeleteUser(u: RowUser) {
+    setDeleteError(null);
+    setDeleteTarget(u);
+  }
+
+  async function confirmDeleteUser() {
+    const u = deleteTarget;
+    if (!u) return;
     setDeleteError(null);
     setDeletingId(u.id);
     const r = await fetch(`/api/super/companies/${id}/users/${u.id}`, {
@@ -244,6 +247,7 @@ export default function SuperCompanyUsersPage() {
       setDeleteError(typeof j.error === "string" ? j.error : t("super.deleteUserFail"));
       return;
     }
+    setDeleteTarget(null);
     setUsers((prev) => prev.filter((row) => row.id !== u.id));
     setCompany((prev) =>
       prev
@@ -502,7 +506,7 @@ export default function SuperCompanyUsersPage() {
                         type="button"
                         className={btnDestructive}
                         disabled={deletingId === u.id}
-                        onClick={() => void deleteUser(u)}
+                        onClick={() => requestDeleteUser(u)}
                         aria-label={`${t("super.deleteUserButton")} — ${u.email}`}
                       >
                         {deletingId === u.id
@@ -519,6 +523,25 @@ export default function SuperCompanyUsersPage() {
       </section>
       </>
       )}
+
+      <AppleConfirmDialog
+        open={deleteTarget !== null}
+        title={t("super.deleteUserConfirmTitle")}
+        message={
+          deleteTarget
+            ? t("super.deleteUserConfirmMessage").replace("{email}", deleteTarget.email)
+            : ""
+        }
+        confirmLabel={t("super.deleteUserButton")}
+        cancelLabel={t("common.cancel")}
+        destructive
+        loading={deletingId === deleteTarget?.id}
+        onConfirm={() => void confirmDeleteUser()}
+        onCancel={() => {
+          if (deletingId) return;
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

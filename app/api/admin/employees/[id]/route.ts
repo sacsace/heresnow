@@ -4,7 +4,12 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import { employeeScheduleSummary } from "@/lib/employeeWorkSchedule";
 import { normalizeWorkScheduleByDay } from "@/lib/companyWorkSchedule";
-import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  WEAK_PASSWORD_MESSAGE,
+  isStrongPassword,
+} from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import { isShiftCode } from "@/lib/employeeWorkSchedule";
 import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
@@ -151,7 +156,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const wantsPasswordChange = parsed.data.password !== undefined;
   if (wantsPasswordChange && !isStrongPassword(parsed.data.password!)) {
     return NextResponse.json(
-      { error: "WEAK_PASSWORD", message: "비밀번호는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다." },
+      { error: "WEAK_PASSWORD", message: WEAK_PASSWORD_MESSAGE },
       { status: 400 }
     );
   }

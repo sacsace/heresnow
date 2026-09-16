@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import { createCompanyEmployee } from "@/lib/employeeCreate";
 import { parseEmployeeBulkWorkbook, parseEmployeeRole } from "@/lib/employeeBulkExcel";
-import { MIN_PASSWORD_LENGTH, isStrongPassword } from "@/lib/passwordPolicy";
+import { MIN_PASSWORD_LENGTH, WEAK_PASSWORD_MESSAGE, isStrongPassword } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
 import { NextResponse } from "next/server";
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
       failures.push({
         row: row.rowNumber,
         email,
-        error: "비밀번호는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.",
+        error: WEAK_PASSWORD_MESSAGE,
       });
       continue;
     }

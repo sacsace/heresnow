@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { canAssignRole } from "@/lib/roleHierarchy";
-import { isStrongPassword } from "@/lib/passwordPolicy";
+import { WEAK_PASSWORD_MESSAGE, isStrongPassword } from "@/lib/passwordPolicy";
 import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -41,7 +41,7 @@ export async function createCompanyEmployee(
     return {
       ok: false,
       code: "WEAK_PASSWORD",
-      message: "비밀번호는 8자 이상, 영문 대/소문자, 숫자, 특수문자를 모두 포함해야 합니다.",
+      message: WEAK_PASSWORD_MESSAGE,
     };
   }
 
