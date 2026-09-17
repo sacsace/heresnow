@@ -1,6 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
+import { NavCountBadge } from "@/components/ui/NavCountBadge";
 import { sessionRoleLabel } from "@/lib/sessionDisplay";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -13,6 +14,7 @@ export type MobileNavItem = {
   label: string;
   exact?: boolean;
   disabled?: boolean;
+  badge?: number;
   /** 같은 section 값을 가진 항목 위에 섹션 제목 표시 */
   section?: string;
 };
@@ -132,7 +134,10 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
                         aria-disabled="true"
                         className="block cursor-not-allowed rounded-[0.625rem] px-3 py-2.5 text-[0.9375rem] font-medium text-[var(--apple-label-tertiary)] opacity-70"
                       >
-                        {it.label}
+                        <span className="inline-flex items-center gap-2">
+                          {it.label}
+                          {it.badge ? <NavCountBadge count={it.badge} /> : null}
+                        </span>
                       </span>
                     ) : (
                       <Link
@@ -145,7 +150,10 @@ export function MobileNavDrawer({ items, buttonClassName = "" }: Props) {
                             : "font-medium text-[var(--apple-label-secondary)] hover:bg-[var(--fill-tertiary)] hover:text-[var(--foreground)]"
                         }`}
                       >
-                        {it.label}
+                        <span className="inline-flex items-center gap-2">
+                          {it.label}
+                          {it.badge ? <NavCountBadge count={it.badge} /> : null}
+                        </span>
                       </Link>
                     )}
                   </li>

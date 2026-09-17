@@ -1,9 +1,11 @@
 "use client";
 
+import { usePendingReceivedApprovalsCount } from "@/components/approvals/usePendingReceivedApprovalsCount";
 import { AppHeaderActions } from "@/components/AppHeaderActions";
 import { AppLogo } from "@/components/AppLogo";
 import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import { useI18n } from "@/components/LanguageProvider";
+import { NavCountBadge } from "@/components/ui/NavCountBadge";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import Link from "next/link";
@@ -23,6 +25,7 @@ export function AdminChrome({
 }: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
+  const pendingReceivedCount = usePendingReceivedApprovalsCount();
   const [subscriptionAlertOpen, setSubscriptionAlertOpen] = useState(false);
   const navScrollRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRafRef = useRef<number | null>(null);
@@ -31,7 +34,7 @@ export function AdminChrome({
   const menuGroups = useMemo(() => {
     const expiryAllowed = new Set(["/admin", "/admin/billing", "/admin/settings", "/admin/account"]);
     const withExpiryGate = (
-      items: Array<{ href: string; label: string; exact?: boolean }>
+      items: Array<{ href: string; label: string; exact?: boolean; badge?: number }>
     ) =>
       items.map((item) => ({
         ...item,
@@ -60,6 +63,7 @@ export function AdminChrome({
           {
             href: "/admin/approvals",
             label: t("approvals.navTitle"),
+            badge: pendingReceivedCount,
           },
         ]),
       },
@@ -73,7 +77,7 @@ export function AdminChrome({
         ]),
       },
     ];
-  }, [subscriptionExpired, t]);
+  }, [pendingReceivedCount, subscriptionExpired, t]);
 
   const links = useMemo(() => menuGroups.flatMap((g) => g.items), [menuGroups]);
 
@@ -211,7 +215,12 @@ export function AdminChrome({
                         title={t("employee.subscriptionExpiredLead")}
                         className="relative inline-flex h-9 shrink-0 cursor-not-allowed items-center justify-center whitespace-nowrap rounded-[0.55rem] px-3 text-[0.75rem] font-semibold text-[var(--apple-label-tertiary)] opacity-70 xl:px-3.5 xl:text-[0.8125rem]"
                       >
-                        {link.label}
+                        <span className="inline-flex items-center gap-1.5">
+                          {link.label}
+                          {"badge" in link && link.badge ? (
+                            <NavCountBadge count={link.badge} />
+                          ) : null}
+                        </span>
                       </span>
                     ) : (
                       <Link
@@ -223,7 +232,12 @@ export function AdminChrome({
                             : "text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary)] hover:text-[var(--foreground)]"
                         }`}
                       >
-                        {link.label}
+                        <span className="inline-flex items-center gap-1.5">
+                          {link.label}
+                          {"badge" in link && link.badge ? (
+                            <NavCountBadge count={link.badge} />
+                          ) : null}
+                        </span>
                       </Link>
                     )
                   );

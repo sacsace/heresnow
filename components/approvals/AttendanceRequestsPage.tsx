@@ -1,36 +1,41 @@
 "use client";
 
-import {
-  AdminApprovalPanel,
-  type ReceivedView,
-} from "@/components/admin/AdminApprovalPanel";
+import { AdminApprovalPanel } from "@/components/admin/AdminApprovalPanel";
 import { MyWorkRequestsList } from "@/components/approvals/MyWorkRequestsList";
 import { WorkRequestApplyForm } from "@/components/approvals/WorkRequestApplyForm";
-import { useI18n } from "@/components/LanguageProvider";
-import { PageHeader } from "@/components/ui/PageHeader";
 import {
   defaultWorkRequestListFilters,
+  hasWorkRequestListFilters,
   type WorkRequestListFilters,
-  type WorkRequestTypeFilter,
 } from "@/components/approvals/workRequestFilters";
+import { useI18n } from "@/components/LanguageProvider";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { WORK_REQUEST_TYPES, workRequestTypeLabel } from "@/lib/workRequestTypes";
 import {
   btnPrimary,
-  inputToolbar,
+  btnSecondary,
+  cardBody,
+  groupedCard,
+  inputCompact,
   label,
   pageStack,
+  searchActions,
   searchFieldCol,
-  searchFieldWrap,
-  segmentedToolbarBtn,
-  segmentedToolbarWrap,
+  searchFiltersRow,
+  sectionLabel,
+  segmentedBtn,
+  segmentedWrap,
+  selectSm,
   tableToolbar,
   tableWrap,
 } from "@/lib/uiStyles";
+import type { WorkRequestTypeFilter } from "@/components/approvals/workRequestFilters";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Tab = "received" | "mine";
+type Tab = "mine" | "received";
 
 type Props = {
-  /** Admin chrome already shows page lead — hide duplicate subtitle */
+  /** AdminChrome(MVS)에서 제목·부제를 이미 표시할 때 중복 헤더 숨김 */
   hidePageLead?: boolean;
 };
 
@@ -38,7 +43,6 @@ export function AttendanceRequestsPage({ hidePageLead = false }: Props) {
   const { t, locale } = useI18n();
   const [canReceive, setCanReceive] = useState(false);
   const [tab, setTab] = useState<Tab>("mine");
-  const [receivedView, setReceivedView] = useState<ReceivedView>("pending");
   const [filters, setFilters] = useState<WorkRequestListFilters>(() => defaultWorkRequestListFilters());
   const [applying, setApplying] = useState(false);
   const [mineRefreshKey, setMineRefreshKey] = useState(0);
@@ -61,182 +65,177 @@ export function AttendanceRequestsPage({ hidePageLead = false }: Props) {
 
   useEffect(() => {
     setFilters(defaultWorkRequestListFilters());
-  }, [tab, receivedView]);
+  }, [tab]);
 
   const scopeTabs = useMemo(() => {
-    const list: Array<{ id: Tab; label: string }> = [{ id: "mine", label: t("approvals.tabMine") }];
+    const list: Array<{ id: Tab; label: string }> = [
+      { id: "mine", label: t("approvals.tabSubmitted") },
+    ];
     if (canReceive) {
-      list.unshift({ id: "received", label: t("approvals.tabReceived") });
+      list.push({ id: "received", label: t("approvals.tabReceived") });
     }
     return list;
   }, [canReceive, t]);
 
-  const searchPlaceholder =
-    tab === "received"
-      ? t("approvals.receivedSearchPlaceholder")
-      : t("approvals.mineSearchPlaceholder");
+  const dateLocale = locale === "en" ? "en-US" : "ko-KR";
+  const showReset = hasWorkRequestListFilters(filters);
+  const searchInputId = hidePageLead ? "approvals-search-admin" : "approvals-search-employee";
 
   const typeOptions = useMemo(
     (): Array<{ id: WorkRequestTypeFilter; label: string }> => [
       { id: "all", label: t("approvals.filterTypeAll") },
-      { id: "OVERTIME", label: t("approvals.workRequestTypeOvertime") },
-      { id: "EARLY_LEAVE", label: t("approvals.workRequestTypeEarlyLeave") },
+      ...WORK_REQUEST_TYPES.map((type) => ({
+        id: type,
+        label: workRequestTypeLabel(type, t),
+      })),
     ],
     [t]
   );
 
-  const dateLocale = locale === "en" ? "en-US" : "ko-KR";
+  const applyButton = (
+    <button type="button" className={btnPrimary} onClick={() => setApplying(true)}>
+      {t("approvals.applyButton")}
+    </button>
+  );
 
   return (
-    <div className={pageStack}>
-      <PageHeader
-        title={t("approvals.navTitle")}
-        subtitle={hidePageLead ? undefined : t("approvals.navLead")}
-        actions={
-          !applying ? (
-            <button type="button" className={btnPrimary} onClick={() => setApplying(true)}>
-              {t("approvals.applyButton")}
-            </button>
-          ) : undefined
-        }
-      />
+    <div className={`${pageStack} w-full min-w-0`}>
+      {!hidePageLead ? (
+        <PageHeader title={t("approvals.navTitle")} subtitle={t("approvals.navLead")} />
+      ) : null}
 
       {applying ? (
-        <WorkRequestApplyForm
-          overtimeApplicationEnabled={overtimeApplicationEnabled}
-          onSubmitted={() => {
-            setMineRefreshKey((k) => k + 1);
-            setApplying(false);
-            setTab("mine");
-          }}
-          onCancel={() => setApplying(false)}
-        />
-      ) : (
-        <div className={tableWrap}>
-          <div className={tableToolbar}>
-            <div className="flex flex-wrap items-end gap-2 sm:gap-3">
-              <div className={segmentedToolbarWrap} role="tablist" aria-label={t("approvals.navTitle")}>
-                {scopeTabs.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === item.id}
-                    className={segmentedToolbarBtn(tab === item.id)}
-                    onClick={() => setTab(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              {tab === "received" && canReceive ? (
-                <>
-                  <span
-                    className="hidden h-5 w-px shrink-0 bg-[var(--separator)] sm:inline-block"
-                    aria-hidden
-                  />
-                  <div
-                    className={segmentedToolbarWrap}
-                    role="group"
-                    aria-label={t("approvals.receivedFilterPending")}
-                  >
-                    <button
-                      type="button"
-                      className={segmentedToolbarBtn(receivedView === "pending")}
-                      aria-pressed={receivedView === "pending"}
-                      onClick={() => setReceivedView("pending")}
-                    >
-                      {t("approvals.receivedFilterPending")}
-                    </button>
-                    <button
-                      type="button"
-                      className={segmentedToolbarBtn(receivedView === "history")}
-                      aria-pressed={receivedView === "history"}
-                      onClick={() => setReceivedView("history")}
-                    >
-                      {t("approvals.receivedFilterHistory")}
-                    </button>
-                  </div>
-                </>
-              ) : null}
-
-              <span
-                className="hidden h-5 w-px shrink-0 bg-[var(--separator)] sm:inline-block"
-                aria-hidden
+        <section>
+          <p className={sectionLabel}>{t("approvals.applySectionTitle")}</p>
+          <div className={groupedCard}>
+            <div className={cardBody}>
+              <WorkRequestApplyForm
+                embedded
+                overtimeApplicationEnabled={overtimeApplicationEnabled}
+                onSubmitted={() => {
+                  setMineRefreshKey((k) => k + 1);
+                  setApplying(false);
+                  setTab("mine");
+                }}
+                onCancel={() => setApplying(false)}
               />
-
-              <div
-                className={segmentedToolbarWrap}
-                role="group"
-                aria-label={t("approvals.workRequestTypeLabel")}
-              >
-                {typeOptions.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={segmentedToolbarBtn(filters.typeFilter === item.id)}
-                    aria-pressed={filters.typeFilter === item.id}
-                    onClick={() => setFilters((prev) => ({ ...prev, typeFilter: item.id }))}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[8.75rem]`}>
-                <label className={label} htmlFor="approvals-date-from">
-                  {t("admin.attendanceDateFrom")}
-                </label>
-                <input
-                  id="approvals-date-from"
-                  type="date"
-                  lang={dateLocale}
-                  max={filters.dateTo || undefined}
-                  className={inputToolbar}
-                  value={filters.dateFrom}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[8.75rem]`}>
-                <label className={label} htmlFor="approvals-date-to">
-                  {t("admin.attendanceDateTo")}
-                </label>
-                <input
-                  id="approvals-date-to"
-                  type="date"
-                  lang={dateLocale}
-                  min={filters.dateFrom || undefined}
-                  className={inputToolbar}
-                  value={filters.dateTo}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
-                />
-              </div>
-
-              <div className={`${searchFieldWrap} min-w-[10rem] flex-1 sm:max-w-[16rem] sm:ml-auto`}>
-                <input
-                  type="search"
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, search: e.target.value }))
-                  }
-                  placeholder={searchPlaceholder}
-                  className={inputToolbar}
-                  aria-label={searchPlaceholder}
-                />
-              </div>
             </div>
           </div>
+        </section>
+      ) : (
+        <>
+          <div
+            className={`max-w-full overflow-x-auto ${segmentedWrap}`}
+            role="tablist"
+            aria-label={t("approvals.tabListLabel")}
+          >
+            {scopeTabs.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.id}
+                className={segmentedBtn(tab === item.id)}
+                onClick={() => setTab(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
-          {tab === "received" && canReceive ? (
-            <AdminApprovalPanel kind="all" view={receivedView} filters={filters} />
-          ) : (
-            <MyWorkRequestsList refreshKey={mineRefreshKey} filters={filters} />
-          )}
-        </div>
+          <div className={tableWrap}>
+            <div className={tableToolbar}>
+              <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className={`${searchFiltersRow} min-w-0 flex-1`}>
+                <div className={`${searchFieldCol} w-full sm:w-[9.5rem]`}>
+                  <label className={label} htmlFor={`${searchInputId}-type`}>
+                    {t("approvals.workRequestTypeLabel")}
+                  </label>
+                  <select
+                    id={`${searchInputId}-type`}
+                    className={`${selectSm} !h-9 !min-h-[2.25rem] !w-full !py-0`}
+                    value={filters.typeFilter}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        typeFilter: e.target.value as WorkRequestTypeFilter,
+                      }))
+                    }
+                  >
+                    {typeOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={`${searchFieldCol} w-full sm:flex-1 sm:min-w-[12rem] sm:max-w-[18rem]`}>
+                  <label className={label} htmlFor={searchInputId}>
+                    {t("approvals.searchLabel")}
+                  </label>
+                  <input
+                    id={searchInputId}
+                    type="search"
+                    value={filters.search}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                    placeholder={t("approvals.searchPlaceholder")}
+                    className={inputCompact}
+                    aria-label={t("approvals.searchPlaceholder")}
+                  />
+                </div>
+                <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[8.75rem]`}>
+                  <label className={label} htmlFor={`${searchInputId}-from`}>
+                    {t("admin.attendanceDateFrom")}
+                  </label>
+                  <input
+                    id={`${searchInputId}-from`}
+                    type="date"
+                    lang={dateLocale}
+                    max={filters.dateTo || undefined}
+                    className={inputCompact}
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
+                  />
+                </div>
+                <div className={`${searchFieldCol} w-[calc(50%-0.375rem)] sm:w-[8.75rem]`}>
+                  <label className={label} htmlFor={`${searchInputId}-to`}>
+                    {t("admin.attendanceDateTo")}
+                  </label>
+                  <input
+                    id={`${searchInputId}-to`}
+                    type="date"
+                    lang={dateLocale}
+                    min={filters.dateFrom || undefined}
+                    className={inputCompact}
+                    value={filters.dateTo}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
+                  />
+                </div>
+                {showReset ? (
+                  <div className={searchActions}>
+                    <button
+                      type="button"
+                      className={`${btnSecondary} h-9`}
+                      onClick={() => setFilters(defaultWorkRequestListFilters())}
+                    >
+                      {t("admin.attendanceSearchReset")}
+                    </button>
+                  </div>
+                ) : null}
+                </div>
+                <div className="flex shrink-0 justify-end lg:pl-4">
+                  {applyButton}
+                </div>
+              </div>
+            </div>
+
+            {tab === "received" && canReceive ? (
+              <AdminApprovalPanel kind="all" filters={filters} />
+            ) : (
+              <MyWorkRequestsList refreshKey={mineRefreshKey} filters={filters} />
+            )}
+          </div>
+        </>
       )}
     </div>
   );

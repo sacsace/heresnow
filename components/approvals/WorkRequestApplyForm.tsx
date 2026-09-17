@@ -1,6 +1,15 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
+import { AppleAlertDialog } from "@/components/ui/AppleAlertDialog";
+import {
+  addDaysToYmd,
+  vacationRangeIncludesDay,
+} from "@/lib/workRequestDates";
+import {
+  WORK_REQUEST_TYPES,
+  workRequestTypeLabel,
+} from "@/lib/workRequestTypes";
 import {
   bannerSuccess,
   bannerWarning,
@@ -12,7 +21,7 @@ import {
   select,
 } from "@/lib/uiStyles";
 import type { WorkRequestType } from "@prisma/client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type ApproverOption = {
   userId: string;
@@ -23,6 +32,8 @@ type ApproverOption = {
 
 type Props = {
   overtimeApplicationEnabled?: boolean;
+  /** groupedCard 내부 — 바깥 테두리·패딩 제거 */
+  embedded?: boolean;
   onSubmitted?: () => void;
   onCancel?: () => void;
 };
@@ -36,6 +47,7 @@ function localTodayDateInputValue(): string {
 
 export function WorkRequestApplyForm({
   overtimeApplicationEnabled = true,
+  embedded = false,
   onSubmitted,
   onCancel,
 }: Props) {
@@ -44,6 +56,7 @@ export function WorkRequestApplyForm({
     overtimeApplicationEnabled ? "OVERTIME" : "EARLY_LEAVE"
   );
   const [workDate, setWorkDate] = useState(localTodayDateInputValue);
+  const [workEndDate, setWorkEndDate] = useState(localTodayDateInputValue);
   const [reason, setReason] = useState("");
   const [extraMinutes, setExtraMinutes] = useState("");
   const [assignedApproverUserId, setAssignedApproverUserId] = useState("");
@@ -52,8 +65,19 @@ export function WorkRequestApplyForm({
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [todayWorkDate, setTodayWorkDate] = useState<string | null>(null);
+  const [sameDayVacationAlertOpen, setSameDayVacationAlertOpen] = useState(false);
 
   const isOvertime = requestType === "OVERTIME";
+  const isVacation = requestType === "VACATION";
+
+  const availableTypes = useMemo(
+    () =>
+      WORK_REQUEST_TYPES.filter(
+        (type) => type !== "OVERTIME" || overtimeApplicationEnabled
+      ),
+    [overtimeApplicationEnabled]
+  );
 
   const loadApprovers = useCallback(async () => {
     setApproversLoading(true);
@@ -66,7 +90,9 @@ export function WorkRequestApplyForm({
       const list = j.approvers ?? [];
       setApprovers(list);
       if (typeof j.todayWorkDate === "string" && j.todayWorkDate) {
+        setTodayWorkDate(j.todayWorkDate);
         setWorkDate(j.todayWorkDate);
+        setWorkEndDate(j.todayWorkDate);
       }
       setAssignedApproverUserId((prev) =>
         prev && list.some((a) => a.userId === prev) ? prev : ""
@@ -83,16 +109,61 @@ export function WorkRequestApplyForm({
   }, [loadApprovers]);
 
   useEffect(() => {
-    if (!overtimeApplicationEnabled && requestType === "OVERTIME") {
-      setRequestType("EARLY_LEAVE");
+    if (!availableTypes.includes(requestType)) {
+      setRequestType(availableTypes[0] ?? "EARLY_LEAVE");
     }
-  }, [overtimeApplicationEnabled, requestType]);
+  }, [availableTypes, requestType]);
+
+  const vacationMinStartDate = useMemo(() => {
+    const base = todayWorkDate ?? localTodayDateInputValue();
+    return addDaysToYmd(base, 1);
+  }, [todayWorkDate]);
+
+  useEffect(() => {
+    if (!isVacation) return;
+    setWorkDate((prev) => {
+      if (!prev || prev < vacationMinStartDate) return vacationMinStartDate;
+      return prev;
+    });
+  }, [isVacation, vacationMinStartDate]);
+
+  useEffect(() => {
+    if (!isVacation) return;
+    const minEnd = workDate >= vacationMinStartDate ? workDate : vacationMinStartDate;
+    setWorkEndDate((prev) => {
+      if (!prev || prev < minEnd) return minEnd;
+      return prev;
+    });
+  }, [isVacation, vacationMinStartDate, workDate]);
+
+  function isSameDayVacationRequest(start: string, end: string): boolean {
+    const today = todayWorkDate ?? localTodayDateInputValue();
+    return vacationRangeIncludesDay({ workDate: start, workEndDate: end, day: today });
+  }
 
   function approverLabel(option: ApproverOption) {
     if (option.isTeamLeader) {
       return t("approvals.approverOptionTeamLeader").replace("{name}", option.name);
     }
     return option.name;
+  }
+
+  function reasonPlaceholder(type: WorkRequestType) {
+    if (type === "OVERTIME") return t("employee.overtimeReasonPlaceholder");
+    if (type === "EARLY_LEAVE") return t("employee.earlyLeaveReasonPlaceholder");
+    if (type === "REMOTE_WORK") return t("approvals.remoteWorkReasonPlaceholder");
+    if (type === "VACATION") return t("approvals.vacationReasonPlaceholder");
+    if (type === "HALF_DAY_LEAVE") return t("approvals.halfDayReasonPlaceholder");
+    return t("approvals.workRequestReasonPlaceholder");
+  }
+
+  function formLead(type: WorkRequestType) {
+    if (type === "OVERTIME") return t("employee.overtimeRequestLead");
+    if (type === "EARLY_LEAVE") return t("employee.earlyLeaveRequestLead");
+    if (type === "REMOTE_WORK") return t("approvals.remoteWorkRequestLead");
+    if (type === "VACATION") return t("approvals.vacationRequestLead");
+    if (type === "HALF_DAY_LEAVE") return t("approvals.halfDayRequestLead");
+    return t("approvals.workRequestGenericLead");
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -102,6 +173,20 @@ export function WorkRequestApplyForm({
     if (!workDate.trim() || !reason.trim()) {
       setError(t("employee.workRequestRequired"));
       return;
+    }
+    if (isVacation) {
+      if (!workEndDate.trim()) {
+        setError(t("approvals.vacationEndDateRequired"));
+        return;
+      }
+      if (workEndDate < workDate) {
+        setError(t("approvals.vacationEndDateInvalid"));
+        return;
+      }
+      if (isSameDayVacationRequest(workDate.trim(), workEndDate.trim())) {
+        setSameDayVacationAlertOpen(true);
+        return;
+      }
     }
     if (isOvertime && !extraMinutes.trim()) {
       setError(t("employee.overtimeMinutesRequired"));
@@ -123,12 +208,15 @@ export function WorkRequestApplyForm({
           reason: reason.trim(),
           assignedApproverUserId,
           ...(isOvertime ? { extraMinutes: Number(extraMinutes) } : {}),
+          ...(isVacation ? { workEndDate: workEndDate.trim() } : {}),
         }),
       });
       const j = (await r.json().catch(() => ({}))) as { error?: string; code?: string };
       if (!r.ok) {
         if (j.code === "DUPLICATE_WORK_DATE") {
           setError(t("approvals.duplicateWorkDate"));
+        } else if (j.code === "VACATION_SAME_DAY_FORBIDDEN") {
+          setSameDayVacationAlertOpen(true);
         } else {
           setError(typeof j.error === "string" ? j.error : t("employee.workRequestSubmitFail"));
         }
@@ -144,50 +232,80 @@ export function WorkRequestApplyForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-[var(--separator)] bg-white p-4 sm:p-5">
+    <form
+      onSubmit={onSubmit}
+      className={
+        embedded
+          ? "space-y-4"
+          : "space-y-4 rounded-2xl border border-[var(--separator)] bg-white p-4 sm:p-5"
+      }
+    >
       <div>
         <p className={label}>{t("approvals.workRequestTypeLabel")}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <label
-            className={`inline-flex items-center gap-2 rounded-full bg-[var(--fill-secondary)] px-3 py-1.5 text-[0.8125rem] font-medium ${
-              overtimeApplicationEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-50"
-            }`}
-          >
-            <input
-              type="radio"
-              name="requestType"
-              className="accent-[var(--apple-blue)]"
-              checked={requestType === "OVERTIME"}
-              onChange={() => setRequestType("OVERTIME")}
-              disabled={submitting || !overtimeApplicationEnabled}
-            />
-            {t("approvals.workRequestTypeOvertime")}
-          </label>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[var(--fill-secondary)] px-3 py-1.5 text-[0.8125rem] font-medium">
-            <input
-              type="radio"
-              name="requestType"
-              className="accent-[var(--apple-blue)]"
-              checked={requestType === "EARLY_LEAVE"}
-              onChange={() => setRequestType("EARLY_LEAVE")}
-              disabled={submitting}
-            />
-            {t("approvals.workRequestTypeEarlyLeave")}
-          </label>
+          {availableTypes.map((type) => (
+            <label
+              key={type}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[var(--fill-secondary)] px-3 py-1.5 text-[0.8125rem] font-medium"
+            >
+              <input
+                type="radio"
+                name="requestType"
+                className="accent-[var(--apple-blue)]"
+                checked={requestType === type}
+                onChange={() => setRequestType(type)}
+                disabled={submitting}
+              />
+              {workRequestTypeLabel(type, t)}
+            </label>
+          ))}
         </div>
       </div>
 
-      <div>
-        <label className={label}>{t("employee.workRequestDateLabel")}</label>
-        <input
-          type="date"
-          className={`${input} mt-1.5`}
-          value={workDate}
-          onChange={(e) => setWorkDate(e.target.value)}
-          required
-          disabled={submitting}
-        />
-      </div>
+      {isVacation ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={label}>{t("approvals.vacationStartDateLabel")}</label>
+            <input
+              type="date"
+              className={`${input} mt-1.5`}
+              value={workDate}
+              min={vacationMinStartDate}
+              onChange={(e) => {
+                const next = e.target.value;
+                setWorkDate(next);
+                if (workEndDate < next) setWorkEndDate(next);
+              }}
+              required
+              disabled={submitting}
+            />
+          </div>
+          <div>
+            <label className={label}>{t("approvals.vacationEndDateLabel")}</label>
+            <input
+              type="date"
+              className={`${input} mt-1.5`}
+              value={workEndDate}
+              min={workDate}
+              onChange={(e) => setWorkEndDate(e.target.value)}
+              required
+              disabled={submitting}
+            />
+          </div>
+        </div>
+      ) : (
+        <div>
+          <label className={label}>{t("employee.workRequestDateLabel")}</label>
+          <input
+            type="date"
+            className={`${input} mt-1.5`}
+            value={workDate}
+            onChange={(e) => setWorkDate(e.target.value)}
+            required
+            disabled={submitting}
+          />
+        </div>
+      )}
 
       <div>
         <label className={label}>{t("approvals.approverSelectLabel")}</label>
@@ -239,11 +357,7 @@ export function WorkRequestApplyForm({
           rows={4}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder={
-            isOvertime
-              ? t("employee.overtimeReasonPlaceholder")
-              : t("employee.earlyLeaveReasonPlaceholder")
-          }
+          placeholder={reasonPlaceholder(requestType)}
           maxLength={2000}
           required
           disabled={submitting}
@@ -268,12 +382,17 @@ export function WorkRequestApplyForm({
         ) : null}
       </div>
       <p className={hint}>
-        {!overtimeApplicationEnabled
+        {!overtimeApplicationEnabled && requestType === "OVERTIME"
           ? t("employee.overtimeRequestDisabled")
-          : isOvertime
-            ? t("employee.overtimeRequestLead")
-            : t("employee.earlyLeaveRequestLead")}
+          : formLead(requestType)}
       </p>
+
+      <AppleAlertDialog
+        open={sameDayVacationAlertOpen}
+        title={t("approvals.vacationSameDayTitle")}
+        message={t("approvals.vacationSameDayMessage")}
+        onClose={() => setSameDayVacationAlertOpen(false)}
+      />
     </form>
   );
 }

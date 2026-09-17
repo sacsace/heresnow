@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageWorkRequests } from "@/lib/workRequestAccess";
-import { WorkRequestType } from "@prisma/client";
+import { parseWorkRequestTypeParam } from "@/lib/workRequestTypes";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -25,11 +25,7 @@ export async function GET(req: Request) {
   }
   if (!companyId) return NextResponse.json({ error: "No company" }, { status: 400 });
 
-  const typeParam = url.searchParams.get("type");
-  const type =
-    typeParam === "EARLY_LEAVE" || typeParam === "OVERTIME"
-      ? (typeParam as WorkRequestType)
-      : undefined;
+  const type = parseWorkRequestTypeParam(url.searchParams.get("type"));
 
   const items = await prisma.workRequest.findMany({
     where: {

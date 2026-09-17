@@ -19,6 +19,8 @@ import {
   td,
   th,
 } from "@/lib/uiStyles";
+import { formatWorkRequestDateRange } from "@/lib/workRequestDates";
+import { workRequestTypeLabel } from "@/lib/workRequestTypes";
 import type { WorkRequestType } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -26,6 +28,7 @@ type WorkRequestRow = {
   id: string;
   type: WorkRequestType;
   workDate: string;
+  workEndDate?: string | null;
   reason: string;
   extraMinutes: number | null;
   status: string;
@@ -60,9 +63,7 @@ export function MyWorkRequestsList({ refreshKey = 0, filters }: Props) {
   }, [load, refreshKey]);
 
   function typeLabel(type: WorkRequestType) {
-    return type === "OVERTIME"
-      ? t("approvals.workRequestTypeOvertime")
-      : t("approvals.workRequestTypeEarlyLeave");
+    return workRequestTypeLabel(type, t);
   }
 
   function statusLabel(status: string) {
@@ -79,7 +80,7 @@ export function MyWorkRequestsList({ refreshKey = 0, filters }: Props) {
         : undefined;
     return {
       typeLabel: typeLabel(item.type),
-      dateLabel: item.workDate,
+      dateLabel: formatWorkRequestDateRange(item.workDate, item.workEndDate),
       detail: extraDetail,
       reason: item.reason,
       status: item.status,
@@ -96,7 +97,7 @@ export function MyWorkRequestsList({ refreshKey = 0, filters }: Props) {
       items.filter((item) => {
         const searchText = [
           typeLabel(item.type),
-          item.workDate,
+          formatWorkRequestDateRange(item.workDate, item.workEndDate),
           item.reason,
           statusLabel(item.status),
           item.assignedApproverName ?? "",
@@ -105,6 +106,7 @@ export function MyWorkRequestsList({ refreshKey = 0, filters }: Props) {
           .toLowerCase();
         return matchesWorkRequestFilters({
           filterDate: item.workDate,
+          filterEndDate: item.workEndDate,
           requestType: item.type,
           searchText,
           filters,
@@ -153,7 +155,9 @@ export function MyWorkRequestsList({ refreshKey = 0, filters }: Props) {
                   </div>
                 ) : null}
               </td>
-              <td className={`${td} whitespace-nowrap tabular-nums`}>{item.workDate}</td>
+              <td className={`${td} whitespace-nowrap tabular-nums`}>
+                {formatWorkRequestDateRange(item.workDate, item.workEndDate)}
+              </td>
               <td className={`${td} whitespace-nowrap text-[0.875rem] text-[var(--apple-label-secondary)]`}>
                 {new Date(item.createdAt).toLocaleString(dateLocale)}
               </td>

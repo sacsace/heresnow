@@ -1,4 +1,7 @@
-export type WorkRequestTypeFilter = "all" | "OVERTIME" | "EARLY_LEAVE";
+import { workRequestRangeOverlapsFilter } from "@/lib/workRequestDates";
+import type { WorkRequestType } from "@prisma/client";
+
+export type WorkRequestTypeFilter = "all" | WorkRequestType;
 
 export type WorkRequestListFilters = {
   search: string;
@@ -42,16 +45,25 @@ export function toCalendarDay(value: string): string {
 
 export function matchesWorkRequestFilters(params: {
   filterDate: string;
-  requestType: "EARLY_LEAVE" | "OVERTIME";
+  filterEndDate?: string | null;
+  requestType: WorkRequestType;
   searchText: string;
   filters: WorkRequestListFilters;
 }): boolean {
-  const { filterDate, requestType, searchText, filters } = params;
+  const { filterDate, filterEndDate, requestType, searchText, filters } = params;
   const q = filters.search.trim().toLowerCase();
 
   if (filters.typeFilter !== "all" && requestType !== filters.typeFilter) return false;
-  if (filters.dateFrom && filterDate < filters.dateFrom) return false;
-  if (filters.dateTo && filterDate > filters.dateTo) return false;
+  if (
+    !workRequestRangeOverlapsFilter({
+      workDate: filterDate,
+      workEndDate: filterEndDate,
+      filterFrom: filters.dateFrom,
+      filterTo: filters.dateTo,
+    })
+  ) {
+    return false;
+  }
   if (q && !searchText.includes(q)) return false;
   return true;
 }
@@ -60,7 +72,7 @@ export function hasWorkRequestListFilters(filters: WorkRequestListFilters): bool
   const defaults = defaultWorkRequestListFilters();
   return (
     filters.search.trim().length > 0 ||
-    filters.typeFilter !== "all" ||
+    filters.typeFilter !== defaults.typeFilter ||
     filters.dateFrom !== defaults.dateFrom ||
     filters.dateTo !== defaults.dateTo
   );

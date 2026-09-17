@@ -440,9 +440,13 @@ export default function SuperCompanyUsersPage() {
                 users.map((u) => (
                   <tr key={u.id} className={tableRow}>
                     <td className={tdEmailCompactLg}>
-                      <span className="block truncate" title={u.email}>
+                      <Link
+                        href={`/super/companies/${id}/users/${u.id}`}
+                        className="block truncate text-[var(--apple-blue)] hover:underline"
+                        title={u.email}
+                      >
                         {u.email}
-                      </span>
+                      </Link>
                     </td>
                     <td className={tdNameCompactLg}>
                       {u.employee ? (

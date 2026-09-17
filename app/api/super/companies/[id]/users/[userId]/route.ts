@@ -2,7 +2,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import {
+  countFaceEnrollmentGroups,
+  MAX_FACE_ENROLLMENTS,
+} from "@/lib/faceEnrollmentGroups";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  WEAK_PASSWORD_MESSAGE,
+  isStrongPassword,
+} from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -17,10 +28,88 @@ const patchSchema = z
   .object({
     name: z.string().min(1).max(120).optional(),
     role: z.enum(COMPANY_ROLES).optional(),
+    password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH).optional(),
   })
-  .refine((d) => d.name !== undefined || d.role !== undefined, {
+  .refine((d) => d.name !== undefined || d.role !== undefined || d.password !== undefined, {
     message: "Provide at least one field to update",
   });
+
+export async function GET(
+  _req: Request,
+  ctx: { params: Promise<{ id: string; userId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id || session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id: companyId, userId } = await ctx.params;
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, companyId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      consentGivenAt: true,
+      createdAt: true,
+      employee: {
+        select: {
+          id: true,
+          name: true,
+          faceEnrolledAt: true,
+          faceCredentials: {
+            select: {
+              id: true,
+              previewUrl: true,
+              createdAt: true,
+              lastUsedAt: true,
+              enrollmentBatchId: true,
+            },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      },
+      company: { select: { faceRecognitionEnabled: true } },
+    },
+  });
+  if (!user) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const credentialItems =
+    user.employee?.faceCredentials.map((c) => ({
+      id: c.id,
+      createdAt: c.createdAt.toISOString(),
+      lastUsedAt: c.lastUsedAt?.toISOString() ?? null,
+      hasPreview: c.previewUrl != null,
+      batchId: c.enrollmentBatchId,
+    })) ?? [];
+
+  return NextResponse.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      consentGivenAt: user.consentGivenAt?.toISOString() ?? null,
+      createdAt: user.createdAt.toISOString(),
+      employee: user.employee
+        ? {
+            id: user.employee.id,
+            name: user.employee.name,
+            faceEnrolledAt: user.employee.faceEnrolledAt?.toISOString() ?? null,
+          }
+        : null,
+    },
+    face: {
+      enrolled: user.employee?.faceEnrolledAt != null,
+      faceRecognitionEnabled: user.company?.faceRecognitionEnabled ?? false,
+      enrollmentCount: countFaceEnrollmentGroups(credentialItems),
+      maxEnrollments: MAX_FACE_ENROLLMENTS,
+      credentials: credentialItems,
+    },
+  });
+}
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; userId: string }> }) {
   const session = await auth();
@@ -54,6 +143,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; u
     return NextResponse.json({ error: "Employee record not found" }, { status: 404 });
   }
 
+  if (parsed.data.password !== undefined && !isStrongPassword(parsed.data.password)) {
+    return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });
+  }
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       let updatedRole = user.role;
@@ -69,6 +162,23 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; u
             companyId,
             approverId: session.user.id,
             action: "USER_ROLE_CHANGE",
+            targetType: "User",
+            targetId: user.id,
+          },
+        });
+      }
+
+      if (parsed.data.password !== undefined) {
+        const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+        await tx.user.update({
+          where: { id: user.id },
+          data: { passwordHash },
+        });
+        await tx.approvalLog.create({
+          data: {
+            companyId,
+            approverId: session.user.id,
+            action: "USER_PASSWORD_RESET",
             targetType: "User",
             targetId: user.id,
           },

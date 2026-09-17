@@ -10,6 +10,7 @@ import {
   type WorkRequestListFilters,
 } from "@/components/approvals/workRequestFilters";
 import { useI18n } from "@/components/LanguageProvider";
+import { notifyPendingApprovalsChanged } from "@/lib/pendingApprovalsEvents";
 import { statusBadge } from "@/lib/statusBadge";
 import {
   btnSecondary,
@@ -22,14 +23,16 @@ import {
   td,
   th,
 } from "@/lib/uiStyles";
+import { formatWorkRequestDateRange } from "@/lib/workRequestDates";
+import { workRequestTypeLabel } from "@/lib/workRequestTypes";
+import type { WorkRequestType } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-export type ReceivedView = "pending" | "history";
 
 type WorkRequestRow = {
   id: string;
-  type: "EARLY_LEAVE" | "OVERTIME";
+  type: WorkRequestType;
   workDate: string;
+  workEndDate?: string | null;
   reason: string;
   extraMinutes: number | null;
   status: string;
@@ -74,17 +77,17 @@ type ListRow = {
   sortTime: number;
   searchText: string;
   filterDate: string;
-  requestType: "EARLY_LEAVE" | "OVERTIME";
+  filterEndDate?: string | null;
+  requestType: WorkRequestType;
   modalDetail: WorkRequestDetail;
 };
 
 type Props = {
   kind: "early-leave" | "overtime" | "all";
-  view: ReceivedView;
   filters: WorkRequestListFilters;
 };
 
-export function AdminApprovalPanel({ kind, view, filters }: Props) {
+export function AdminApprovalPanel({ kind, filters }: Props) {
   const { t, locale } = useI18n();
   const dateLocale = locale === "en" ? "en-US" : "ko-KR";
   const [requests, setRequests] = useState<WorkRequestRow[]>([]);
@@ -99,8 +102,7 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const status = view === "history" ? "resolved" : "pending";
-    const r = await fetch(`/api/admin/approvals?kind=${kind}&status=${status}`);
+    const r = await fetch(`/api/admin/approvals?kind=${kind}&status=all`);
     const j = await r.json().catch(() => ({}));
     if (r.ok) {
       setRequests((j as { requests?: WorkRequestRow[] }).requests ?? []);
@@ -110,7 +112,7 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
       setExceptions([]);
     }
     setLoading(false);
-  }, [kind, view]);
+  }, [kind]);
 
   useEffect(() => {
     void load();
@@ -122,7 +124,10 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action }),
     });
-    if (r.ok) await load();
+    if (r.ok) {
+      notifyPendingApprovalsChanged();
+      await load();
+    }
   }
 
   async function resolveException(id: string, action: "approve" | "reject") {
@@ -135,9 +140,7 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
   }
 
   function requestTypeLabel(type: WorkRequestRow["type"]) {
-    return type === "OVERTIME"
-      ? t("approvals.workRequestTypeOvertime")
-      : t("approvals.workRequestTypeEarlyLeave");
+    return workRequestTypeLabel(type, t);
   }
 
   function exceptionTypeLabel(row: ExceptionRow) {
@@ -176,13 +179,15 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
             ? formatWhen(item.resolvedAt)
             : formatWhen(item.createdAt);
 
-      const canApprove = view === "pending" && item.canApprove !== false;
+      const canApprove =
+        item.status === "PENDING" && item.canApprove !== false;
+      const dateLabel = formatWorkRequestDateRange(item.workDate, item.workEndDate);
       list.push({
         key: `w-${item.id}`,
         source: "advance",
         employeeName: item.employee.name,
         typeLabel,
-        dateLabel: item.workDate,
+        dateLabel,
         detail,
         reason: item.reason,
         status: item.status,
@@ -192,11 +197,12 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
         actionId: item.id,
         sortTime: new Date(item.resolvedAt ?? item.createdAt).getTime(),
         filterDate: item.workDate,
+        filterEndDate: item.workEndDate,
         requestType: item.type,
         searchText: [
           item.employee.name,
           typeLabel,
-          item.workDate,
+          dateLabel,
           item.reason,
           detail,
           statusLabel(item.status),
@@ -208,7 +214,7 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
           typeLabel,
           sourceLabel: t("approvals.receivedSourceAdvance"),
           employeeName: item.employee.name,
-          dateLabel: item.workDate,
+          dateLabel,
           detail: detail || undefined,
           reason: item.reason,
           status: item.status,
@@ -229,7 +235,7 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
         .join(" · ");
       const processedLabel = x.resolvedAt ? formatWhen(x.resolvedAt) : formatWhen(x.createdAt);
 
-      const canApprove = view === "pending";
+      const canApprove = x.status === "PENDING";
       const requestType: "EARLY_LEAVE" | "OVERTIME" = x.attendance.isEarlyLeave
         ? "EARLY_LEAVE"
         : "OVERTIME";
@@ -277,13 +283,14 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
 
     list.sort((a, b) => b.sortTime - a.sortTime);
     return list;
-  }, [requests, exceptions, view, t, dateLocale]);
+  }, [requests, exceptions, t, dateLocale]);
 
   const filteredRows = useMemo(
     () =>
       rows.filter((row) =>
         matchesWorkRequestFilters({
           filterDate: row.filterDate,
+          filterEndDate: row.filterEndDate,
           requestType: row.requestType,
           searchText: row.searchText,
           filters,
@@ -302,9 +309,7 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
   if (empty) {
     return (
       <p className={`${emptyState} px-5 py-6 sm:px-6`}>
-        {view === "history"
-          ? t("approvals.receivedHistoryEmpty")
-          : t("admin.approvalsEmpty")}
+        {t("admin.approvalsEmpty")}
       </p>
     );
   }
@@ -325,7 +330,7 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
             <th className={th}>{t("approvals.receivedColReason")}</th>
             <th className={th}>{t("approvals.receivedColStatus")}</th>
             <th className={th}>{t("approvals.receivedColProcessed")}</th>
-            {view === "pending" ? <th className={th}>{t("approvals.receivedColActions")}</th> : null}
+            <th className={th}>{t("approvals.receivedColActions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -368,38 +373,36 @@ export function AdminApprovalPanel({ kind, view, filters }: Props) {
               <td className={`${td} whitespace-nowrap text-[0.8125rem] text-[var(--apple-label-secondary)]`}>
                 {row.processedLabel}
               </td>
-              {view === "pending" ? (
-                <td className={td} onClick={(e) => e.stopPropagation()}>
-                  {row.canApprove ? (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className={`${btnSuccess} !px-3 !py-1.5 text-[0.8125rem]`}
-                        onClick={() =>
-                          void (row.actionKind === "work"
-                            ? resolveWorkRequest(row.actionId, "approve")
-                            : resolveException(row.actionId, "approve"))
-                        }
-                      >
-                        {t("admin.exceptionsApprove")}
-                      </button>
-                      <button
-                        type="button"
-                        className={`${btnSecondary} !px-3 !py-1.5 text-[0.8125rem]`}
-                        onClick={() =>
-                          void (row.actionKind === "work"
-                            ? resolveWorkRequest(row.actionId, "reject")
-                            : resolveException(row.actionId, "reject"))
-                        }
-                      >
-                        {t("admin.exceptionsReject")}
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-[0.8125rem] text-[var(--apple-label-tertiary)]">—</span>
-                  )}
-                </td>
-              ) : null}
+              <td className={td} onClick={(e) => e.stopPropagation()}>
+                {row.canApprove ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={`${btnSuccess} !px-3 !py-1.5 text-[0.8125rem]`}
+                      onClick={() =>
+                        void (row.actionKind === "work"
+                          ? resolveWorkRequest(row.actionId, "approve")
+                          : resolveException(row.actionId, "approve"))
+                      }
+                    >
+                      {t("admin.exceptionsApprove")}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${btnSecondary} !px-3 !py-1.5 text-[0.8125rem]`}
+                      onClick={() =>
+                        void (row.actionKind === "work"
+                          ? resolveWorkRequest(row.actionId, "reject")
+                          : resolveException(row.actionId, "reject"))
+                      }
+                    >
+                      {t("admin.exceptionsReject")}
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-[0.8125rem] text-[var(--apple-label-tertiary)]">—</span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

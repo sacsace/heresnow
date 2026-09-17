@@ -3,15 +3,11 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  canApproveWorkRequest,
-  canManageWorkRequests,
-  canReceiveWorkRequests,
-} from "@/lib/workRequestAccess";
+import { canApproveWorkRequest, canReceiveWorkRequests } from "@/lib/workRequestAccess";
 import { ExceptionStatus, WorkRequestType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-/** 사전 신청(WorkRequest) + 출퇴근 예외(AttendanceException) 통합 목록 */
+/** 받은 결재 — 로그인 사용자에게 지정된 사전 신청(WorkRequest) 목록 */
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -40,110 +36,34 @@ export async function GET(req: Request) {
   if (!companyId) return NextResponse.json({ error: "No company" }, { status: 400 });
 
   const kind = url.searchParams.get("kind") ?? "all";
-  const statusParam = url.searchParams.get("status") ?? "pending";
+  const statusParam = url.searchParams.get("status") ?? "all";
   const requestType: WorkRequestType | null =
     kind === "early-leave" ? "EARLY_LEAVE" : kind === "overtime" ? "OVERTIME" : null;
 
-  const manageAll = canManageWorkRequests(session.user.role);
   const isResolved = statusParam === "resolved";
-  const statusFilter: ExceptionStatus | { in: ExceptionStatus[] } = isResolved
+  const isPending = statusParam === "pending";
+  const statusFilter: ExceptionStatus | { in: ExceptionStatus[] } | undefined = isResolved
     ? { in: [ExceptionStatus.APPROVED, ExceptionStatus.REJECTED] }
-    : ExceptionStatus.PENDING;
+    : isPending
+      ? ExceptionStatus.PENDING
+      : undefined;
 
-  const [requests, exceptions] = await Promise.all([
-    prisma.workRequest.findMany({
-      where: {
-        companyId,
-        status: statusFilter,
-        ...(requestType ? { type: requestType } : {}),
-        ...(manageAll ? {} : { assignedApproverUserId: session.user.id }),
-      },
-      orderBy: isResolved
-        ? [{ resolvedAt: "desc" }, { createdAt: "desc" }]
-        : [{ createdAt: "desc" }],
-      include: {
-        employee: { select: { name: true } },
-        assignedApprover: { select: { id: true, employee: { select: { name: true } } } },
-        resolver: { select: { employee: { select: { name: true } } } },
-      },
-    }),
-    manageAll
-      ? prisma.attendanceException.findMany({
-          where: {
-            companyId,
-            status: statusFilter,
-            attendance: {
-              type: "CHECK_OUT",
-              ...(requestType === "EARLY_LEAVE"
-                ? { isEarlyLeave: true }
-                : requestType === "OVERTIME"
-                  ? { isEarlyLeave: false }
-                  : {}),
-            },
-          },
-          orderBy: isResolved
-            ? [{ resolvedAt: "desc" }, { createdAt: "desc" }]
-            : [{ createdAt: "desc" }],
-          include: {
-            attendance: {
-              select: {
-                employeeId: true,
-                type: true,
-                timestamp: true,
-                isEarlyLeave: true,
-                isOvertime: true,
-                employee: { select: { name: true } },
-                site: { select: { name: true } },
-              },
-            },
-          },
-        })
-      : Promise.resolve([]),
-  ]);
-
-  const checkInByCheckout = new Map<string, string>();
-  if (exceptions.length > 0) {
-    const checkoutTimes = exceptions.map((ex) => ex.attendance.timestamp.getTime());
-    const employeeIds = [...new Set(exceptions.map((ex) => ex.attendance.employeeId))];
-    const windowStart = new Date(Math.min(...checkoutTimes) - 48 * 60 * 60 * 1000);
-    const checkIns = await prisma.attendanceRecord.findMany({
-      where: {
-        companyId,
-        employeeId: { in: employeeIds },
-        type: "CHECK_IN",
-        timestamp: { gte: windowStart },
-      },
-      orderBy: { timestamp: "asc" },
-      select: { id: true, employeeId: true, timestamp: true },
-    });
-
-    const checkInsByEmployee = new Map<string, typeof checkIns>();
-    for (const row of checkIns) {
-      const list = checkInsByEmployee.get(row.employeeId) ?? [];
-      list.push(row);
-      checkInsByEmployee.set(row.employeeId, list);
-    }
-
-    for (const ex of exceptions) {
-      const checkoutAt = ex.attendance.timestamp;
-      const list = checkInsByEmployee.get(ex.attendance.employeeId) ?? [];
-      let matched: (typeof checkIns)[number] | null = null;
-      for (let i = list.length - 1; i >= 0; i -= 1) {
-        if (list[i].timestamp < checkoutAt) {
-          matched = list[i];
-          break;
-        }
-      }
-      if (matched) {
-        checkInByCheckout.set(ex.attendanceId, matched.timestamp.toISOString());
-      }
-    }
-  }
-
-  const exceptionsWithCheckIn = exceptions.map((ex) => ({
-    ...ex,
-    checkInAt: checkInByCheckout.get(ex.attendanceId) ?? null,
-  }));
+  const requests = await prisma.workRequest.findMany({
+    where: {
+      companyId,
+      assignedApproverUserId: session.user.id,
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(requestType ? { type: requestType } : {}),
+    },
+    orderBy: isResolved
+      ? [{ resolvedAt: "desc" }, { createdAt: "desc" }]
+      : [{ createdAt: "desc" }, { workDate: "desc" }],
+    include: {
+      employee: { select: { name: true } },
+      assignedApprover: { select: { id: true, employee: { select: { name: true } } } },
+      resolver: { select: { employee: { select: { name: true } } } },
+    },
+  });
 
   const requestsWithAcl = requests.map((item) => ({
     ...item,
@@ -158,5 +78,5 @@ export async function GET(req: Request) {
       }),
   }));
 
-  return NextResponse.json({ requests: requestsWithAcl, exceptions: exceptionsWithCheckIn });
+  return NextResponse.json({ requests: requestsWithAcl, exceptions: [] });
 }

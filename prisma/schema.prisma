@@ -39,6 +39,9 @@ enum ExceptionStatus {
 enum WorkRequestType {
   EARLY_LEAVE
   OVERTIME
+  REMOTE_WORK
+  VACATION
+  HALF_DAY_LEAVE
 }
 
 enum OvertimeMode {
@@ -449,8 +452,10 @@ model WorkRequest {
   employeeId     String
   employee       Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   type           WorkRequestType
-  /// 회사 타임존 기준 근무일 YYYY-MM-DD
+  /// 회사 타임존 기준 근무일 YYYY-MM-DD (휴가는 시작일)
   workDate       String
+  /// VACATION: 종료일 YYYY-MM-DD (없으면 workDate와 동일)
+  workEndDate    String?
   reason         String
   /// OVERTIME: 예상 추가 근무 분
   extraMinutes   Int?

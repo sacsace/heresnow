@@ -9,13 +9,22 @@ import { overtimeApplicationEnabled } from "@/lib/overtimePolicy";
 import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
 import { canReceiveWorkRequests } from "@/lib/workRequestAccess";
 import { isValidWorkRequestApprover } from "@/lib/workRequestApprovers";
+import {
+  vacationRangeIncludesDay,
+  workRequestRangesOverlap,
+} from "@/lib/workRequestDates";
+import { parseWorkRequestTypeParam } from "@/lib/workRequestTypes";
+import { notifyApproverOfWorkRequest } from "@/lib/workRequestPush";
 import { WorkRequestType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+const ymdSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 const createSchema = z.object({
   type: z.nativeEnum(WorkRequestType),
-  workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  workDate: ymdSchema,
+  workEndDate: ymdSchema.optional(),
   reason: z.string().trim().min(1).max(2000),
   extraMinutes: z.number().int().min(1).max(24 * 60).optional(),
   assignedApproverUserId: z.string().min(1),
@@ -30,11 +39,7 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const typeParam = url.searchParams.get("type");
-  const type =
-    typeParam === "EARLY_LEAVE" || typeParam === "OVERTIME"
-      ? (typeParam as WorkRequestType)
-      : undefined;
+  const type = parseWorkRequestTypeParam(url.searchParams.get("type"));
 
   const [company, employee, items] = await Promise.all([
     prisma.company.findUnique({
@@ -101,6 +106,25 @@ export async function POST(req: Request) {
   }
 
   const { type, workDate, reason, extraMinutes, assignedApproverUserId } = parsed.data;
+  let { workEndDate } = parsed.data;
+
+  if (type === "VACATION") {
+    if (!workEndDate) {
+      return NextResponse.json(
+        { error: "휴가 종료일을 입력해 주세요.", code: "WORK_END_DATE_REQUIRED" },
+        { status: 400 }
+      );
+    }
+    if (workEndDate < workDate) {
+      return NextResponse.json(
+        { error: "휴가 종료일은 시작일 이후여야 합니다.", code: "WORK_END_DATE_INVALID" },
+        { status: 400 }
+      );
+    }
+  } else {
+    workEndDate = undefined;
+  }
+
   if (type === "OVERTIME" && extraMinutes == null) {
     return NextResponse.json(
       { error: "초과 근무 예상 시간(분)을 입력해 주세요.", code: "EXTRA_MINUTES_REQUIRED" },
@@ -115,7 +139,7 @@ export async function POST(req: Request) {
     }),
     prisma.employee.findFirst({
       where: { id: session.user.employeeId, companyId: session.user.companyId },
-      select: { workScheduleType: true, userId: true },
+      select: { workScheduleType: true, userId: true, name: true },
     }),
   ]);
   if (!company || !employee) {
@@ -158,19 +182,39 @@ export async function POST(req: Request) {
     );
   }
 
-  const duplicate = await prisma.workRequest.findFirst({
+  if (
+    type === "VACATION" &&
+    vacationRangeIncludesDay({ workDate, workEndDate, day: today })
+  ) {
+    return NextResponse.json(
+      {
+        error: "당일 휴가는 신청할 수 없습니다. 최소 하루 전에 신청해 주세요.",
+        code: "VACATION_SAME_DAY_FORBIDDEN",
+      },
+      { status: 400 }
+    );
+  }
+
+  const existingRequests = await prisma.workRequest.findMany({
     where: {
       companyId: session.user.companyId,
       employeeId: session.user.employeeId,
-      type,
-      workDate,
+      status: { not: "REJECTED" },
     },
-    select: { id: true, status: true },
+    select: { id: true, workDate: true, workEndDate: true },
   });
-  if (duplicate) {
+  const overlapping = existingRequests.find((item) =>
+    workRequestRangesOverlap({
+      workDate,
+      workEndDate,
+      otherWorkDate: item.workDate,
+      otherWorkEndDate: item.workEndDate,
+    })
+  );
+  if (overlapping) {
     return NextResponse.json(
       {
-        error: "같은 날짜에 이미 신청한 내역이 있습니다.",
+        error: "같은 날짜에 이미 다른 근태 신청이 있습니다.",
         code: "DUPLICATE_WORK_DATE",
       },
       { status: 409 }
@@ -183,10 +227,22 @@ export async function POST(req: Request) {
       employeeId: session.user.employeeId,
       type,
       workDate,
+      workEndDate: workEndDate ?? null,
       reason: reason.trim(),
       extraMinutes: type === "OVERTIME" ? extraMinutes : null,
       assignedApproverUserId,
     },
+  });
+
+  void notifyApproverOfWorkRequest({
+    approverUserId: assignedApproverUserId,
+    requestId: created.id,
+    employeeName: employee.name,
+    type,
+    workDate,
+    workEndDate: workEndDate ?? null,
+  }).catch((err) => {
+    console.error("[work-request push]", err);
   });
 
   return NextResponse.json({ request: created }, { status: 201 });

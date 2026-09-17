@@ -1,9 +1,11 @@
 "use client";
 
+import { usePendingReceivedApprovalsCount } from "@/components/approvals/usePendingReceivedApprovalsCount";
 import { AppHeaderActions } from "@/components/AppHeaderActions";
 import { AppLogo } from "@/components/AppLogo";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { useI18n } from "@/components/LanguageProvider";
+import { NavCountBadge } from "@/components/ui/NavCountBadge";
 import { navBar, navBarInnerEmployee } from "@/lib/uiStyles";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -12,13 +14,18 @@ import { useMemo } from "react";
 export function EmployeeHeader() {
   const { t } = useI18n();
   const pathname = usePathname();
+  const pendingReceivedCount = usePendingReceivedApprovalsCount();
 
   const navItems = useMemo(
     () => [
       { href: "/employee", label: t("employee.navPunch"), exact: true },
-      { href: "/employee/approvals", label: t("approvals.navTitle") },
+      {
+        href: "/employee/approvals",
+        label: t("approvals.navTitle"),
+        badge: pendingReceivedCount,
+      },
     ],
-    [t]
+    [pendingReceivedCount, t]
   );
 
   function isActive(href: string, exact?: boolean) {
@@ -48,7 +55,10 @@ export function EmployeeHeader() {
                       : "text-[var(--apple-label-secondary)] hover:bg-[var(--fill-secondary)] hover:text-[var(--foreground)]"
                   }`}
                 >
-                  {item.label}
+                  <span className="inline-flex items-center gap-1.5">
+                    {item.label}
+                    {item.badge ? <NavCountBadge count={item.badge} /> : null}
+                  </span>
                 </Link>
               );
             })}
