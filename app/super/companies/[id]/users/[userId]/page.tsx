@@ -7,7 +7,6 @@ import { groupFaceCredentials, type FaceEnrollmentGroup } from "@/lib/faceEnroll
 import { isStrongPassword } from "@/lib/passwordPolicy";
 import {
   bannerSuccess,
-  bannerWarning,
   btnDestructive,
   btnPrimaryLg,
   btnSecondary,
