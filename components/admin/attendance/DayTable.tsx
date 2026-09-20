@@ -13,7 +13,7 @@ import {
 } from "@/components/admin/attendance/helpers";
 import { useI18n } from "@/components/LanguageProvider";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
-import { formatCheckOutDisplay } from "@/lib/autoCheckOut";
+import { formatCheckOutDisplay } from "@/lib/autoCheckOutDisplay";
 import { statusBadge } from "@/lib/statusBadge";
 import { btnDestructive, table, tableHead, tableWrap, td, th, trDivider } from "@/lib/uiStyles";
 import { useMemo, useState } from "react";

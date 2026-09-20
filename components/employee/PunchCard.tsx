@@ -38,7 +38,7 @@ import {
   formatTimeInCompanyTz,
   recordDisplayTimezone,
 } from "@/lib/companyTimezones";
-import { formatCheckOutDisplay, isAutoCheckOutMemo } from "@/lib/autoCheckOut";
+import { formatCheckOutDisplay, isAutoCheckOutMemo } from "@/lib/autoCheckOutDisplay";
 import type { AttendanceType } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 

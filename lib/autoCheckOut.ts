@@ -1,29 +1,16 @@
 import { TWENTY_FOUR_H_MS } from "@/lib/attendancePunchRules";
 import { calendarDayInTz } from "@/lib/adminMonthlyAttendance";
+import { AUTO_CHECKOUT_MEMO } from "@/lib/autoCheckOutDisplay";
 import { type CompanyWorkSchedule, scheduledShiftEndAt } from "@/lib/companyWorkSchedule";
-import { evaluateCheckoutOvertimeFlags } from "@/lib/overtimePolicy";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { acquireAttendanceEmployeeLock } from "@/lib/attendanceLock";
 import { enqueueMvsAttendanceIfEnabled } from "@/lib/integrations/enqueueMvsAttendance";
+import { evaluateCheckoutOvertimeFlags } from "@/lib/overtimePolicy";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { fromZonedTime } from "date-fns-tz";
 
-/** 자동 퇴근 기록 식별용 memo — UI 에서 "(자동 퇴근)" 표시 */
-export const AUTO_CHECKOUT_MEMO = "[AUTO_CHECKOUT]";
-
-export function isAutoCheckOutMemo(memo: string | null | undefined): boolean {
-  if (!memo) return false;
-  return memo.includes(AUTO_CHECKOUT_MEMO);
-}
-
-export function formatCheckOutDisplay(
-  time: string,
-  isAuto: boolean,
-  t: (key: string) => string
-): string {
-  return isAuto ? `${time} ${t("employee.autoCheckOut")}` : time;
-}
+export { AUTO_CHECKOUT_MEMO, formatCheckOutDisplay, isAutoCheckOutMemo } from "@/lib/autoCheckOutDisplay";
 
 /**
  * 출근 시각·근무표 기준 정규 퇴근 시각.

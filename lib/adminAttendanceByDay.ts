@@ -1,5 +1,5 @@
 import { calendarDayInTz, timeInTz } from "@/lib/adminMonthlyAttendance";
-import { isAutoCheckOutMemo } from "@/lib/autoCheckOut";
+import { isAutoCheckOutMemo } from "@/lib/autoCheckOutDisplay";
 import { recordDisplayTimezone } from "@/lib/companyTimezones";
 import type { AttendanceStatus, AttendanceType } from "@prisma/client";
 

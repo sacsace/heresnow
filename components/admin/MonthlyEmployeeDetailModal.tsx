@@ -2,7 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import type { MonthlyDayCell, MonthlyEmployeeRow } from "@/lib/adminMonthlyAttendance";
-import { formatCheckOutDisplay } from "@/lib/autoCheckOut";
+import { formatCheckOutDisplay } from "@/lib/autoCheckOutDisplay";
 import { btnSecondary, emptyStateCompact, hint } from "@/lib/uiStyles";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";

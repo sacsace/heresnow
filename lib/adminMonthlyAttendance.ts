@@ -1,4 +1,4 @@
-import { isAutoCheckOutMemo } from "@/lib/autoCheckOut";
+import { isAutoCheckOutMemo } from "@/lib/autoCheckOutDisplay";
 import { recordDisplayTimezone } from "@/lib/companyTimezones";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import type { AttendanceStatus, AttendanceType } from "@prisma/client";
