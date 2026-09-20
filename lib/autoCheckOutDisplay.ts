@@ -11,5 +11,6 @@ export function formatCheckOutDisplay(
   isAuto: boolean,
   t: (key: string) => string
 ): string {
-  return isAuto ? `${time} ${t("employee.autoCheckOut")}` : time;
+  const label = t("employee.autoCheckOut").replace(/\s+/g, "\u00A0");
+  return isAuto ? `${time}\u00A0${label}` : time;
 }

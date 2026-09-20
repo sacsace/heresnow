@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canApproveWorkRequest } from "@/lib/workRequestAccess";
+import { notifyEmployeeOfWorkRequestResult } from "@/lib/workRequestPush";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -29,7 +30,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const item = await prisma.workRequest.findUnique({ where: { id } });
+  const item = await prisma.workRequest.findUnique({
+    where: { id },
+    include: { employee: { select: { userId: true } } },
+  });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (session.user.role !== "SUPER_ADMIN") {
@@ -72,6 +76,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         targetId: item.id,
       },
     });
+  });
+
+  void notifyEmployeeOfWorkRequestResult({
+    employeeUserId: item.employee.userId,
+    requestId: item.id,
+    approved,
+    type: item.type,
+    workDate: item.workDate,
+    workEndDate: item.workEndDate,
+  }).catch((err) => {
+    console.error("[work-request result push]", err);
   });
 
   return NextResponse.json({ ok: true });

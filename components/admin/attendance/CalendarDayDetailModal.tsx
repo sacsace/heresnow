@@ -247,7 +247,7 @@ export function CalendarDayDetailModal({ open, onClose, date, rows, dateLocale }
                           {t("admin.attendanceColCheckOut")}
                         </span>
                         {r.checkOut ? (
-                          <span className="font-semibold tabular-nums text-[var(--foreground)]">
+                          <span className="whitespace-nowrap font-semibold tabular-nums text-[var(--foreground)]">
                             {formatCheckOutDisplay(
                               r.checkOut.time,
                               r.checkOut.isAutoCheckOut,

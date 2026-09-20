@@ -1,5 +1,8 @@
 /** PWA·모바일 플랫폼 감지 (푸시 알림·홈 화면 설치 안내) */
 
+/** Android 앱 설치 직후 PushAutoEnabler 가 구독 등록 */
+export const PWA_INSTALLED_EVENT = "heresnow-pwa-installed";
+
 export function isMobileDevice(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";

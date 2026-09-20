@@ -161,7 +161,7 @@ export function MonthlyEmployeeDetailModal({
                   <th className="w-[4.5rem] py-2 text-center font-medium normal-case tracking-normal">
                     {t("admin.monthlyIn")}
                   </th>
-                  <th className="w-[4.5rem] py-2 text-center font-medium normal-case tracking-normal">
+                  <th className="min-w-[7.25rem] py-2 text-center font-medium normal-case tracking-normal">
                     {t("admin.monthlyOut")}
                   </th>
                 </tr>
@@ -202,15 +202,19 @@ export function MonthlyEmployeeDetailModal({
                         {d.checkIn ?? "—"}
                       </td>
                       <td
-                        className={`py-2.5 text-center tabular-nums font-semibold ${
+                        className={`whitespace-nowrap py-2.5 text-center tabular-nums font-semibold ${
                           d.checkOut
                             ? "text-[var(--foreground)]"
                             : "text-[var(--apple-orange-dark)]"
                         }`}
                       >
-                        {d.checkOut
-                          ? formatCheckOutDisplay(d.checkOut, Boolean(d.checkOutAuto), t)
-                          : "—"}
+                        {d.checkOut ? (
+                          <span className="inline-block whitespace-nowrap">
+                            {formatCheckOutDisplay(d.checkOut, Boolean(d.checkOutAuto), t)}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                     </tr>
                   );

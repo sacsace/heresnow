@@ -1,7 +1,8 @@
 import { formatWorkRequestDateRange } from "@/lib/workRequestDates";
 import { pickMessages, translate, type Locale } from "@/lib/i18n/dictionaries";
+import { sendPushToUser } from "@/lib/pushNotify";
 import { prisma } from "@/lib/prisma";
-import { isWebPushConfigured, sendWebPush, type PushPayload } from "@/lib/webPush";
+import { isWebPushConfigured, type PushPayload } from "@/lib/webPush";
 import type { Role, WorkRequestType } from "@prisma/client";
 
 const TYPE_I18N_KEY: Record<WorkRequestType, string> = {
@@ -43,24 +44,39 @@ function workRequestReceivedPushCopy(
   };
 }
 
-async function sendPushToUser(userId: string, buildPayload: (locale: Locale) => PushPayload) {
-  const subscriptions = await prisma.pushSubscription.findMany({
-    where: { userId },
-    select: { id: true, endpoint: true, p256dh: true, auth: true, locale: true },
-  });
-  if (subscriptions.length === 0) return;
+function workRequestResultPushCopy(
+  locale: Locale,
+  params: {
+    approved: boolean;
+    type: WorkRequestType;
+    workDate: string;
+    workEndDate?: string | null;
+  }
+): PushPayload {
+  const messages = pickMessages(locale);
+  const t = (key: string) => translate(messages, key);
+  const typeLabel = t(TYPE_I18N_KEY[params.type]);
+  const dateLabel = formatWorkRequestDateRange(params.workDate, params.workEndDate);
 
-  const removedIds: string[] = [];
-  for (const sub of subscriptions) {
-    const locale: Locale = sub.locale === "en" ? "en" : "ko";
-    const payload = buildPayload(locale);
-    const result = await sendWebPush(sub, payload);
-    if (!result.ok && result.gone) removedIds.push(sub.id);
+  if (params.approved) {
+    return {
+      title: t("approvals.pushWorkRequestApprovedTitle"),
+      body: t("approvals.pushWorkRequestApprovedBody")
+        .replace("{type}", typeLabel)
+        .replace("{date}", dateLabel),
+      url: "/employee/approvals",
+      tag: "work-request-approved",
+    };
   }
 
-  if (removedIds.length > 0) {
-    await prisma.pushSubscription.deleteMany({ where: { id: { in: removedIds } } });
-  }
+  return {
+    title: t("approvals.pushWorkRequestRejectedTitle"),
+    body: t("approvals.pushWorkRequestRejectedBody")
+      .replace("{type}", typeLabel)
+      .replace("{date}", dateLabel),
+    url: "/employee/approvals",
+    tag: "work-request-rejected",
+  };
 }
 
 /** 근태 신청 접수 — 지정 승인권자에게 모바일 푸시 */
@@ -86,6 +102,24 @@ export async function notifyApproverOfWorkRequest(params: {
   await sendPushToUser(params.approverUserId, (locale) => ({
     ...workRequestReceivedPushCopy(locale, params),
     url,
+    tag,
+  }));
+}
+
+/** 근태 신청 승인/반려 — 신청 직원에게 모바일 푸시 */
+export async function notifyEmployeeOfWorkRequestResult(params: {
+  employeeUserId: string;
+  requestId: string;
+  approved: boolean;
+  type: WorkRequestType;
+  workDate: string;
+  workEndDate?: string | null;
+}): Promise<void> {
+  if (!isWebPushConfigured()) return;
+
+  const tag = `work-request-result-${params.requestId}`;
+  await sendPushToUser(params.employeeUserId, (locale) => ({
+    ...workRequestResultPushCopy(locale, params),
     tag,
   }));
 }

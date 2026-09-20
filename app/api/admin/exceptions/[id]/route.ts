@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { notifyEmployeeOfAttendanceExceptionResult } from "@/lib/attendanceExceptionPush";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { evaluateCheckoutOvertimeFlags } from "@/lib/overtimePolicy";
@@ -49,6 +50,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         include: {
           employee: {
             select: {
+              userId: true,
               workScheduleType: true,
               shiftCode: true,
               workStartTime: true,
@@ -150,6 +152,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         targetId: ex.id,
       },
     });
+  });
+
+  const isEarlyLeave = checkout.isEarlyLeave;
+  const isOvertime =
+    checkout.type === "CHECK_OUT" && !isEarlyLeave;
+
+  void notifyEmployeeOfAttendanceExceptionResult({
+    employeeUserId: ex.attendance.employee.userId,
+    exceptionId: ex.id,
+    approved,
+    isEarlyLeave,
+    isOvertime,
+  }).catch((err) => {
+    console.error("[attendance exception push]", err);
   });
 
   return NextResponse.json({ ok: true });

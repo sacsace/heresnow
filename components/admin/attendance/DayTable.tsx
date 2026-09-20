@@ -217,7 +217,7 @@ export function AttendanceDayTable({
                 <td className={`${td} text-[0.875rem] text-[var(--apple-label-secondary)]`}>
                   {r.checkOut ? (
                     <>
-                      <span className="font-semibold text-[var(--foreground)]">
+                      <span className="whitespace-nowrap font-semibold text-[var(--foreground)]">
                         {(() => {
                           const timeText = formatCheckOutDisplay(
                             r.checkOut.time,

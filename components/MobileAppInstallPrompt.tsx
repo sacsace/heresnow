@@ -2,7 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import { AppLogo } from "@/components/AppLogo";
-import { isIos, isMobileDevice, isStandaloneApp } from "@/lib/pwaPlatform";
+import { isIos, isMobileDevice, isStandaloneApp, PWA_INSTALLED_EVENT } from "@/lib/pwaPlatform";
 import { btnPrimary, btnSecondary } from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
 
@@ -78,7 +78,10 @@ export function MobileAppInstallPrompt() {
     setInstalling(true);
     try {
       await installEvent.prompt();
-      await installEvent.userChoice;
+      const choice = await installEvent.userChoice;
+      if (choice.outcome === "accepted") {
+        window.dispatchEvent(new CustomEvent(PWA_INSTALLED_EVENT));
+      }
     } catch {
       /* ignore */
     } finally {

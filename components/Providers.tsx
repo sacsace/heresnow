@@ -3,6 +3,7 @@
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { MobileAppInstallPrompt } from "@/components/MobileAppInstallPrompt";
 import { SessionKickWatcher } from "@/components/SessionKickWatcher";
+import { PushAutoEnabler } from "@/components/PushAutoEnabler";
 import { PushServiceWorkerRegistrar } from "@/components/PushServiceWorkerRegistrar";
 import type { Locale } from "@/lib/i18n/dictionaries";
 import { SessionProvider } from "next-auth/react";
@@ -21,6 +22,7 @@ export function Providers({
         <SessionKickWatcher />
         {children}
         <PushServiceWorkerRegistrar />
+        <PushAutoEnabler />
         <MobileAppInstallPrompt />
       </LanguageProvider>
     </SessionProvider>
