@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { applyPendingAutoCheckOutForEmployee } from "@/lib/autoCheckOut";
 import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
@@ -21,6 +22,11 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const take = Math.min(Number(searchParams.get("limit") ?? "50") || 50, 200);
+
+    await applyPendingAutoCheckOutForEmployee({
+      employeeId: session.user.employeeId,
+      companyId: session.user.companyId,
+    });
 
     const [company, employee, rows] = await Promise.all([
       prisma.company.findUnique({

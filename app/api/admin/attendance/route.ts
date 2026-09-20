@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
 import { aggregateAttendanceByDay, filterAttendanceDayRows } from "@/lib/adminAttendanceByDay";
+import { applyPendingAutoCheckOutsForCompany } from "@/lib/autoCheckOut";
 import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
 import { lateMinutesFor, overtimeMinutesFor } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
@@ -67,6 +68,8 @@ export async function GET(req: Request) {
   if (!company) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
+
+  await applyPendingAutoCheckOutsForCompany(companyId);
 
   const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const companySchedule = {

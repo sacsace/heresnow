@@ -2,6 +2,7 @@
 
 import { useI18n } from "@/components/LanguageProvider";
 import type { MonthlyDayCell, MonthlyEmployeeRow } from "@/lib/adminMonthlyAttendance";
+import { formatCheckOutDisplay } from "@/lib/autoCheckOut";
 import { btnSecondary, emptyStateCompact, hint } from "@/lib/uiStyles";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -207,7 +208,9 @@ export function MonthlyEmployeeDetailModal({
                             : "text-[var(--apple-orange-dark)]"
                         }`}
                       >
-                        {d.checkOut ?? "—"}
+                        {d.checkOut
+                          ? formatCheckOutDisplay(d.checkOut, Boolean(d.checkOutAuto), t)
+                          : "—"}
                       </td>
                     </tr>
                   );

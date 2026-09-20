@@ -7,6 +7,7 @@ import {
   daysInMonth,
   monthRangeUtc,
 } from "@/lib/adminMonthlyAttendance";
+import { applyPendingAutoCheckOutsForCompany } from "@/lib/autoCheckOut";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -60,6 +61,8 @@ export async function GET(req: Request) {
   const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const { start, end } = monthRangeUtc(ym.year, ym.month, tz);
 
+  await applyPendingAutoCheckOutsForCompany(companyId);
+
   const [employees, records] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId },
@@ -76,6 +79,8 @@ export async function GET(req: Request) {
         type: true,
         timestamp: true,
         status: true,
+        memo: true,
+        recordTimezone: true,
       },
     }),
   ]);

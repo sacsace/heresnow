@@ -13,6 +13,7 @@ import {
 } from "@/components/admin/attendance/helpers";
 import { useI18n } from "@/components/LanguageProvider";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
+import { formatCheckOutDisplay } from "@/lib/autoCheckOut";
 import { statusBadge } from "@/lib/statusBadge";
 import { btnDestructive, table, tableHead, tableWrap, td, th, trDivider } from "@/lib/uiStyles";
 import { useMemo, useState } from "react";
@@ -217,9 +218,16 @@ export function AttendanceDayTable({
                   {r.checkOut ? (
                     <>
                       <span className="font-semibold text-[var(--foreground)]">
-                        {r.checkOutDate && r.checkOutDate !== r.date
-                          ? `${formatShortDate(r.checkOutDate, dl)} ${r.checkOut.time}`
-                          : r.checkOut.time}
+                        {(() => {
+                          const timeText = formatCheckOutDisplay(
+                            r.checkOut.time,
+                            r.checkOut.isAutoCheckOut,
+                            t
+                          );
+                          return r.checkOutDate && r.checkOutDate !== r.date
+                            ? `${formatShortDate(r.checkOutDate, dl)} ${timeText}`
+                            : timeText;
+                        })()}
                       </span>
                       {checkOutExtra ? <span className="mt-1 block">{checkOutExtra}</span> : null}
                     </>

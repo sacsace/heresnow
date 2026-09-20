@@ -6,6 +6,7 @@ import {
   aggregateAttendanceByDay,
   filterAttendanceDayRows,
 } from "@/lib/adminAttendanceByDay";
+import { applyPendingAutoCheckOutsForCompany } from "@/lib/autoCheckOut";
 import {
   dataHeaderRowIndex,
   styleAttendanceDataSheet,
@@ -145,6 +146,9 @@ export async function GET(req: Request) {
   if (!company) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
+
+  await applyPendingAutoCheckOutsForCompany(companyId);
+
   const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const downloadFilename = attendanceExportFilename(company.name, tz, locale);
   const companySchedule = {

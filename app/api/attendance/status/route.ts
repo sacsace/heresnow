@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { applyPendingAutoCheckOutForEmployee } from "@/lib/autoCheckOut";
 import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
 import {
   calendarDayInTz,
@@ -68,6 +69,12 @@ export async function GET() {
 
   const tz = company.timezone?.trim() || DEFAULT_COMPANY_TIMEZONE;
   const now = new Date();
+
+  await applyPendingAutoCheckOutForEmployee({
+    employeeId: session.user.employeeId,
+    companyId: session.user.companyId,
+    now,
+  });
   const freePunchEnabled =
     Boolean(company.freePunchEnabled) && employee.workScheduleType === "FREE";
   const overtimeApprovalRequired = overtimeRequiresApproval({

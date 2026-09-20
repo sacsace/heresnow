@@ -1,4 +1,5 @@
 import { calendarDayInTz, timeInTz } from "@/lib/adminMonthlyAttendance";
+import { isAutoCheckOutMemo } from "@/lib/autoCheckOut";
 import { recordDisplayTimezone } from "@/lib/companyTimezones";
 import type { AttendanceStatus, AttendanceType } from "@prisma/client";
 
@@ -21,6 +22,8 @@ export type AttendancePunchSummary = {
   businessTripLocation: string | null;
   businessTripReason: string | null;
   memo: string | null;
+  /** 24시간 미퇴근 후 정규 퇴근 시각으로 자동 등록된 퇴근 */
+  isAutoCheckOut: boolean;
   site: { name: string } | null;
 };
 
@@ -90,6 +93,7 @@ function toPunchSummary(r: RecordInput, timeZone: string): AttendancePunchSummar
     businessTripLocation: r.businessTripLocation,
     businessTripReason: r.businessTripReason,
     memo: r.memo,
+    isAutoCheckOut: isAutoCheckOutMemo(r.memo),
     site: r.site,
   };
 }

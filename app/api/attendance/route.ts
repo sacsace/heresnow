@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
 import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
+import { applyPendingAutoCheckOutForEmployee } from "@/lib/autoCheckOut";
 import {
   capCheckOutTimestamp,
   checkInErrorMessage,
@@ -157,6 +158,11 @@ export async function POST(req: Request) {
   if (!employee) {
     return NextResponse.json({ error: "직원 정보가 올바르지 않습니다." }, { status: 403 });
   }
+
+  await applyPendingAutoCheckOutForEmployee({
+    employeeId: employee.id,
+    companyId: session.user.companyId,
+  });
 
   const [company, lastRecord, sites] = await Promise.all([
     prisma.company.findUnique({

@@ -38,6 +38,7 @@ import {
   formatTimeInCompanyTz,
   recordDisplayTimezone,
 } from "@/lib/companyTimezones";
+import { formatCheckOutDisplay, isAutoCheckOutMemo } from "@/lib/autoCheckOut";
 import type { AttendanceType } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -1159,7 +1160,11 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                       </td>
                       <td className={`${td} whitespace-nowrap font-semibold tabular-nums`}>
                         {pair.checkOut ? (
-                          formatTime(pair.checkOut)
+                          formatCheckOutDisplay(
+                            formatTime(pair.checkOut),
+                            isAutoCheckOutMemo(pair.checkOut.memo),
+                            t
+                          )
                         ) : (
                           <span className="font-normal text-[var(--apple-label-tertiary)]">—</span>
                         )}

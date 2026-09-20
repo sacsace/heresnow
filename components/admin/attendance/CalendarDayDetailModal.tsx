@@ -9,6 +9,7 @@ import {
   workMinutesOf,
 } from "@/components/admin/attendance/helpers";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
+import { formatCheckOutDisplay } from "@/lib/autoCheckOut";
 import { statusBadge } from "@/lib/statusBadge";
 import {
   btnSecondary,
@@ -247,7 +248,11 @@ export function CalendarDayDetailModal({ open, onClose, date, rows, dateLocale }
                         </span>
                         {r.checkOut ? (
                           <span className="font-semibold tabular-nums text-[var(--foreground)]">
-                            {r.checkOut.time}
+                            {formatCheckOutDisplay(
+                              r.checkOut.time,
+                              r.checkOut.isAutoCheckOut,
+                              t
+                            )}
                             {r.checkOut.site?.name ? (
                               <span className="ml-2 font-normal text-[var(--apple-label-secondary)]">
                                 {r.checkOut.site.name}

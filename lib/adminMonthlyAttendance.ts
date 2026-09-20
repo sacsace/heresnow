@@ -1,3 +1,4 @@
+import { isAutoCheckOutMemo } from "@/lib/autoCheckOut";
 import { recordDisplayTimezone } from "@/lib/companyTimezones";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import type { AttendanceStatus, AttendanceType } from "@prisma/client";
@@ -6,6 +7,8 @@ export type MonthlyDayCell = {
   date: string;
   checkIn: string | null;
   checkOut: string | null;
+  /** 정규 퇴근 시각 자동 등록 */
+  checkOutAuto?: boolean;
   /** 출근만 또는 퇴근만 */
   incomplete: boolean;
   pending: boolean;
@@ -53,6 +56,7 @@ type RecordLike = {
   type: AttendanceType;
   timestamp: Date;
   status: AttendanceStatus;
+  memo?: string | null;
   recordTimezone?: string | null;
 };
 
@@ -72,7 +76,15 @@ export function buildMonthlyRows(
 
   const byEmpDay = new Map<
     string,
-    Map<string, { checkIn: string | null; checkOut: string | null; pending: boolean }>
+    Map<
+      string,
+      {
+        checkIn: string | null;
+        checkOut: string | null;
+        checkOutAuto: boolean;
+        pending: boolean;
+      }
+    >
   >();
 
   for (const r of records) {
@@ -86,14 +98,17 @@ export function buildMonthlyRows(
     }
     let cell = emp.get(day);
     if (!cell) {
-      cell = { checkIn: null, checkOut: null, pending: false };
+      cell = { checkIn: null, checkOut: null, checkOutAuto: false, pending: false };
       emp.set(day, cell);
     }
     const t = timeInTz(r.timestamp, rt);
     if (r.type === "CHECK_IN") {
       if (!cell.checkIn || t < cell.checkIn) cell.checkIn = t;
     } else {
-      if (!cell.checkOut || t > cell.checkOut) cell.checkOut = t;
+      if (!cell.checkOut || t > cell.checkOut) {
+        cell.checkOut = t;
+        cell.checkOutAuto = isAutoCheckOutMemo(r.memo);
+      }
     }
     if (r.status === "PENDING") cell.pending = true;
   }
@@ -111,6 +126,7 @@ export function buildMonthlyRows(
         date,
         checkIn: c.checkIn,
         checkOut: c.checkOut,
+        checkOutAuto: c.checkOutAuto,
         incomplete,
         pending: c.pending,
       };
