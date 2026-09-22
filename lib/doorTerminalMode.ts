@@ -2,6 +2,7 @@ import { localMinutesFromDate, parseHHmm } from "@/lib/attendanceRules";
 import { calendarDayInTz } from "@/lib/attendancePunchRules";
 import {
   DEFAULT_WORK_END,
+  DEFAULT_WORK_START,
   localWeekday,
   normalizeWorkScheduleByDay,
   type CompanyWorkSchedule,
@@ -40,8 +41,8 @@ function resolveWorkEndStrForWeekday(weekday: number, schedule: CompanyWorkSched
 function resolveWorkStartStrForWeekday(weekday: number, schedule: CompanyWorkSchedule): string {
   const byDay = normalizeWorkScheduleByDay(schedule.workScheduleByDay);
   const dayWindow = byDay[weekday];
-  // 출입문 단말은 회사/직원의 기본 출근시간을 우선 사용.
-  return schedule.workStartTime ?? dayWindow?.workStartTime ?? "09:00";
+  // 요일별 시간표 → 회사 기본 (지각·푸시·출입문 출근 시각과 동일)
+  return dayWindow?.workStartTime ?? schedule.workStartTime ?? DEFAULT_WORK_START;
 }
 
 /** 회사 타임존·오늘 요일 기준 정규 퇴근 시각 */
