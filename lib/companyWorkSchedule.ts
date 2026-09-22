@@ -114,9 +114,9 @@ function resolveWorkWindowForWeekday(
   weekday: number,
   schedule: CompanyWorkSchedule
 ): { startMin: number | null; endMin: number | null; endStr: string; startStr: string } {
+  const startStr = workStartTimeForWeekday(weekday, schedule);
   const byDay = normalizeWorkScheduleByDay(schedule.workScheduleByDay);
   const dayWindow = byDay[weekday];
-  const startStr = dayWindow?.workStartTime ?? schedule.workStartTime ?? DEFAULT_WORK_START;
   const endStr = dayWindow?.workEndTime ?? schedule.workEndTime ?? DEFAULT_WORK_END;
   return {
     startMin: parseHHmm(startStr),
@@ -124,6 +124,16 @@ function resolveWorkWindowForWeekday(
     endStr,
     startStr,
   };
+}
+
+/** 요일별 출근 HH:mm — 푸시·지각·출입문 공통 */
+export function workStartTimeForWeekday(
+  weekday: number,
+  schedule: CompanyWorkSchedule
+): string {
+  const byDay = normalizeWorkScheduleByDay(schedule.workScheduleByDay);
+  const dayWindow = byDay[weekday];
+  return dayWindow?.workStartTime ?? schedule.workStartTime ?? DEFAULT_WORK_START;
 }
 
 function nextCalendarDayStr(dayStr: string): string {

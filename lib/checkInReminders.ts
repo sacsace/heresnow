@@ -14,8 +14,8 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 /** 출근 15분 전·후 알림 */
 export const REMINDER_OFFSET_MS = 15 * 60 * 1000;
-/** 5분 크론 간격 — ±4분 윈도우 */
-export const CRON_WINDOW_MS = 4 * 60 * 1000;
+/** 5분 크론 간격 — 크론 주기와 동일한 ±5분 윈도 (한 번의 tick 에서 반드시 포착) */
+export const CRON_WINDOW_MS = 5 * 60 * 1000;
 
 function isInWindow(now: Date, target: Date, windowMs: number): boolean {
   return Math.abs(now.getTime() - target.getTime()) <= windowMs;
