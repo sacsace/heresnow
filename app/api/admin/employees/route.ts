@@ -54,6 +54,7 @@ export async function GET(req: Request) {
         where: { id: companyId },
         select: {
           seatLimit: true,
+          faceRecognitionEnabled: true,
           freePunchEnabled: true,
           workStartTime: true,
           workEndTime: true,
@@ -87,6 +88,7 @@ export async function GET(req: Request) {
       employees: employeesWithLogin,
       seatLimit: company.seatLimit,
       freePunchEnabled: company.freePunchEnabled,
+      faceRecognitionEnabled: company.faceRecognitionEnabled,
       shiftPresets,
       companySchedule,
     });

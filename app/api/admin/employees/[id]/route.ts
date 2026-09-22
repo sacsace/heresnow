@@ -66,6 +66,7 @@ const patchSchema = z.object({
     .nullable()
     .optional(),
   isTeamLeader: z.boolean().optional(),
+  punchWithoutFace: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -220,6 +221,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
     ...(parsed.data.isTeamLeader !== undefined
       ? { isTeamLeader: parsed.data.isTeamLeader }
+      : {}),
+    ...(parsed.data.punchWithoutFace !== undefined
+      ? { punchWithoutFace: parsed.data.punchWithoutFace }
       : {}),
   };
 

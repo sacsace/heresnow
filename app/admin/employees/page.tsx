@@ -47,7 +47,7 @@ import {
   assignableRolesForCaller,
   canDeleteEmployee,
 } from "@/lib/roleHierarchy";
-import { bypassesSeatLimit } from "@/lib/seatAccessShared";
+import { annotateEmployeesWithLoginAccess, bypassesSeatLimit } from "@/lib/seatAccessShared";
 import type { Role } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -66,10 +66,26 @@ type Emp = {
   loginEligibleByAdmin?: boolean;
   seatRank?: number;
   isTeamLeader?: boolean;
+  punchWithoutFace?: boolean;
 };
 
 const profileEditRoles = new Set<Role>(["COMPANY_ADMIN", "HR_MANAGER", "SUPER_ADMIN"]);
 const EMPLOYEES_PAGE_SIZE = 10;
+
+function mergeEmployeePatchIntoRow(prev: Emp, updated: Emp): Emp {
+  return {
+    ...prev,
+    ...updated,
+    user: { ...prev.user, ...updated.user },
+    department: updated.department !== undefined ? updated.department : prev.department,
+    scheduleSummary: updated.scheduleSummary ?? prev.scheduleSummary,
+  };
+}
+
+function mergePatchedEmployeeRow(prev: Emp[], empId: string, updated: Emp, seatLimit: number): Emp[] {
+  const merged = prev.map((x) => (x.id === empId ? mergeEmployeePatchIntoRow(x, updated) : x));
+  return annotateEmployeesWithLoginAccess(merged, seatLimit);
+}
 
 export default function AdminEmployeesPage() {
   const { t, locale } = useI18n();
@@ -103,6 +119,7 @@ export default function AdminEmployeesPage() {
     workEndTime: "18:00",
   });
   const [companyFreePunchEnabled, setCompanyFreePunchEnabled] = useState(false);
+  const [companyFaceRecognitionEnabled, setCompanyFaceRecognitionEnabled] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [scheduleModalEmp, setScheduleModalEmp] = useState<EmployeeScheduleTarget | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
@@ -148,6 +165,7 @@ export default function AdminEmployeesPage() {
           workEndTime: companySchedule.workEndTime ?? "18:00",
         });
         setCompanyFreePunchEnabled(Boolean(ej.freePunchEnabled));
+        setCompanyFaceRecognitionEnabled(Boolean(ej.faceRecognitionEnabled));
         const loc: ShiftLocale = locale === "en" ? "en" : "ko";
         setShiftPresets(
           localizeShiftPresetsMap(
@@ -397,7 +415,13 @@ export default function AdminEmployeesPage() {
       }
       const updated = j.employee as Emp | undefined;
       if (updated) {
-        setEmployees((prev) => prev.map((x) => (x.id === empId ? updated : x)));
+        setEmployees((prev) => {
+          const merged = prev.map((x) =>
+            x.id === empId ? mergeEmployeePatchIntoRow(x, updated) : x
+          );
+          if (seatInfo == null) return merged;
+          return annotateEmployeesWithLoginAccess(merged, seatInfo.limit);
+        });
       } else {
         await loadEmployees();
       }
@@ -611,8 +635,12 @@ export default function AdminEmployeesPage() {
     setRowBusyId(emp.id);
     setRowError(null);
     const prevRole = emp.user.role;
+    const seatLimit = seatInfo?.limit ?? 0;
     setEmployees((prev) =>
-      prev.map((x) => (x.id === emp.id ? { ...x, user: { ...x.user, role: nextRole } } : x))
+      annotateEmployeesWithLoginAccess(
+        prev.map((x) => (x.id === emp.id ? { ...x, user: { ...x.user, role: nextRole } } : x)),
+        seatLimit
+      )
     );
     try {
       const r = await fetch(`/api/admin/employees/${encodeURIComponent(emp.id)}`, {
@@ -630,22 +658,26 @@ export default function AdminEmployeesPage() {
               : t("admin.employeesRoleSaveFail")
         );
         setEmployees((prev) =>
-          prev.map((x) => (x.id === emp.id ? { ...x, user: { ...x.user, role: prevRole } } : x))
+          annotateEmployeesWithLoginAccess(
+            prev.map((x) => (x.id === emp.id ? { ...x, user: { ...x.user, role: prevRole } } : x)),
+            seatInfo?.limit ?? 0
+          )
         );
         return;
       }
       const updated = j.employee as Emp | undefined;
       if (updated?.user?.role) {
         setEmployees((prev) =>
-          prev.map((x) =>
-            x.id === emp.id ? { ...x, user: { ...x.user, role: updated.user.role } } : x
-          )
+          mergePatchedEmployeeRow(prev, emp.id, updated, seatInfo?.limit ?? 0)
         );
       }
     } catch (err) {
       console.error("[employees role patch]", err);
       setEmployees((prev) =>
-        prev.map((x) => (x.id === emp.id ? { ...x, user: { ...x.user, role: prevRole } } : x))
+        annotateEmployeesWithLoginAccess(
+          prev.map((x) => (x.id === emp.id ? { ...x, user: { ...x.user, role: prevRole } } : x)),
+          seatInfo?.limit ?? 0
+        )
       );
     } finally {
       setRowBusyId(null);
@@ -664,6 +696,23 @@ export default function AdminEmployeesPage() {
         revert: () =>
           setEmployees((list) =>
             list.map((x) => (x.id === emp.id ? { ...x, isTeamLeader: prev } : x))
+          ),
+      }
+    );
+  }
+
+  async function changePunchWithoutFace(emp: Emp, punchWithoutFace: boolean) {
+    if (Boolean(emp.punchWithoutFace) === punchWithoutFace) return;
+    const prev = Boolean(emp.punchWithoutFace);
+    await patchEmployee(
+      emp.id,
+      { punchWithoutFace },
+      {
+        optimistic: (list) =>
+          list.map((x) => (x.id === emp.id ? { ...x, punchWithoutFace } : x)),
+        revert: () =>
+          setEmployees((list) =>
+            list.map((x) => (x.id === emp.id ? { ...x, punchWithoutFace: prev } : x))
           ),
       }
     );
@@ -994,6 +1043,9 @@ export default function AdminEmployeesPage() {
             onToggleSelect={canEditProfile ? toggleSelect : undefined}
             onToggleSelectAll={canEditProfile ? toggleSelectAll : undefined}
             onChangeTeamLeader={canEditProfile ? changeTeamLeader : undefined}
+            onChangePunchWithoutFace={
+              canEditProfile && companyFaceRecognitionEnabled ? changePunchWithoutFace : undefined
+            }
           />
           )}
 

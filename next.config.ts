@@ -77,44 +77,39 @@ const nextConfig: NextConfig = {
         path: false,
         crypto: false,
       };
-      // @vladmandic/face-api 의 내부 동적 require 경고는 라이브러리 고유 동작이며
-      // 브라우저 경로에서만 사용되므로 노이즈 로그를 필터링한다.
       config.module = config.module ?? {};
+      // face-api ESM 내부의 동적 require — 라이브러리 한계, 런타임에는 dynamic import 로 로드
       config.module.exprContextCritical = false;
     }
+    const isFaceApiCriticalDependencyWarning = (warning: unknown): boolean => {
+      const isObj = (v: unknown): v is Record<string, unknown> =>
+        typeof v === "object" && v !== null;
+      const asText = (v: unknown): string =>
+        typeof v === "string" ? v : v == null ? "" : String(v);
+
+      const message =
+        typeof warning === "string"
+          ? warning
+          : isObj(warning) && "message" in warning
+            ? asText(warning.message)
+            : "";
+
+      if (!message.includes("Critical dependency")) return false;
+
+      const moduleResource =
+        isObj(warning) &&
+        "module" in warning &&
+        isObj(warning.module) &&
+        "resource" in warning.module
+          ? asText(warning.module.resource)
+          : "";
+      const combined = `${message}\n${moduleResource}`;
+      return combined.includes("face-api") || combined.includes("@vladmandic");
+    };
+
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),
-      (warning: unknown) => {
-        const isObj = (v: unknown): v is Record<string, unknown> =>
-          typeof v === "object" && v !== null;
-        const asText = (v: unknown): string =>
-          typeof v === "string" ? v : v == null ? "" : String(v);
-
-        const message =
-          typeof warning === "string"
-            ? warning
-            : isObj(warning) && "message" in warning
-              ? asText(warning.message)
-              : "";
-
-        const details =
-          isObj(warning) && "details" in warning ? asText(warning.details) : "";
-        const stack = isObj(warning) && "stack" in warning ? asText(warning.stack) : "";
-        const moduleName =
-          isObj(warning) && "module" in warning ? asText(warning.module) : "";
-        const moduleResource =
-          isObj(warning) &&
-          "module" in warning &&
-          isObj(warning.module) &&
-          "resource" in warning.module
-            ? asText(warning.module.resource)
-            : "";
-        const combined = `${message}\n${details}\n${stack}\n${moduleName}\n${moduleResource}`;
-        return (
-          message.includes("Critical dependency: require function is used in a way") &&
-          combined.includes("@vladmandic/face-api")
-        );
-      },
+      isFaceApiCriticalDependencyWarning,
     ];
     return config;
   },

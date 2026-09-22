@@ -68,6 +68,7 @@ export async function GET() {
     where: { id: session.user.employeeId, companyId: session.user.companyId },
     select: {
       faceEnrolledAt: true,
+      punchWithoutFace: true,
       company: { select: { faceRecognitionEnabled: true } },
       faceCredentials: {
         select: {
@@ -98,7 +99,8 @@ export async function GET() {
     enrolled: emp.faceEnrolledAt != null,
     enrolledAt: emp.faceEnrolledAt?.toISOString() ?? null,
     hasPreview: emp.faceCredentials.some((c) => c.previewUrl != null),
-    faceRecognitionEnabled: emp.company.faceRecognitionEnabled,
+    faceRecognitionEnabled:
+      emp.company.faceRecognitionEnabled && !emp.punchWithoutFace,
     enrollmentCount: countFaceEnrollmentGroups(credentialItems),
     maxEnrollments: MAX_FACE_ENROLLMENTS,
     credentials: emp.faceCredentials.map((c) => ({

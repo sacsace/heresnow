@@ -153,6 +153,7 @@ export async function POST(req: Request) {
       workStartTime: true,
       workEndTime: true,
       workScheduleByDay: true,
+      punchWithoutFace: true,
     },
   });
   if (!employee) {
@@ -217,7 +218,7 @@ export async function POST(req: Request) {
     freePunchEnabled,
   });
 
-  const faceRequired = company.faceRecognitionEnabled;
+  const faceRequired = company.faceRecognitionEnabled && !employee.punchWithoutFace;
   let faceMatched = false;
 
   // 안면 인식 검증 — 출근/퇴근 모두 동일 정책 적용

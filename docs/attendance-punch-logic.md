@@ -349,13 +349,18 @@ reject:
 
 `Company.faceRecognitionEnabled=true` 시 **출근·퇴근 모두** 안면 검증.
 
+**직원별 예외:** `Employee.punchWithoutFace=true` 이면 해당 직원만 일반 `POST /api/attendance` 펀치에서 안면 검증을 생략한다. 회사 안면 OFF이면 전원 생략과 동일. 출입문(DOOR) 단말·안면 로그인·회사 설정은 변경 없음.
+
 | 항목 | 값 |
 |------|-----|
 | Descriptor 길이 | 128 |
 | 매칭 threshold | 0.58 (유클리드 거리) |
 | body 필드 | `faceDescriptor: number[128]` |
+| effective (직원 앱) | `faceRecognitionEnabled = company && !punchWithoutFace` (`GET /api/employee/face`) |
 
-MVS 연동 시 CHECK_IN + 안면 매칭 성공 시에만 `faceVerified=true`.
+관리자는 **직원 목록 → 「안면 인식 생략」** 체크로 `PATCH /api/admin/employees/[id]` `{ punchWithoutFace }` 설정.
+
+MVS 연동 시 CHECK_IN + 안면 매칭 성공 시에만 `faceVerified=true` (생략 직원은 `faceRequired=false`).
 
 ---
 

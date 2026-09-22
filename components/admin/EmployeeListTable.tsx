@@ -22,6 +22,7 @@ export type EmployeeRow = {
   loginEligibleByAdmin?: boolean;
   seatRank?: number;
   isTeamLeader?: boolean;
+  punchWithoutFace?: boolean;
 };
 
 const rowControl =
@@ -67,7 +68,8 @@ const MIN_WIDTHS: ColWidths = {
 const LOGIN_COL_WIDTH = 84;
 const SCHEDULE_COL_WIDTH = 116;
 const SELECT_COL_WIDTH = 48;
-const TEAM_LEADER_COL_WIDTH = 56;
+const TEAM_LEADER_COL_WIDTH = 72;
+const PUNCH_WITHOUT_FACE_COL_WIDTH = 88;
 
 const ROLE_ORDER: Role[] = ["EMPLOYEE", "DOOR", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN"];
 
@@ -125,6 +127,7 @@ type Props = {
   deleteDisabledReason: (emp: EmployeeRow, isSelf: boolean) => string | undefined;
   roleLabel: (role: string) => string;
   onChangeTeamLeader?: (emp: EmployeeRow, isTeamLeader: boolean) => void;
+  onChangePunchWithoutFace?: (emp: EmployeeRow, punchWithoutFace: boolean) => void;
   canEditSchedule?: boolean;
   onEditSchedule?: (emp: EmployeeRow) => void;
   selectedIds?: Set<string>;
@@ -156,6 +159,7 @@ export function EmployeeListTable({
   deleteDisabledReason,
   roleLabel,
   onChangeTeamLeader,
+  onChangePunchWithoutFace,
   canEditSchedule = false,
   onEditSchedule,
   selectedIds,
@@ -332,7 +336,8 @@ export function EmployeeListTable({
     SCHEDULE_COL_WIDTH +
     (showSelect ? SELECT_COL_WIDTH : 0) +
     (showLoginStatus ? LOGIN_COL_WIDTH : 0) +
-    (onChangeTeamLeader ? TEAM_LEADER_COL_WIDTH : 0);
+    (onChangeTeamLeader ? TEAM_LEADER_COL_WIDTH : 0) +
+    (onChangePunchWithoutFace ? PUNCH_WITHOUT_FACE_COL_WIDTH : 0);
 
   const colPct = (px: number) => `${(px / tableMinWidth) * 100}%`;
 
@@ -350,6 +355,9 @@ export function EmployeeListTable({
           <col style={{ width: colPct(widths.department) }} />
           {showLoginStatus && <col style={{ width: colPct(LOGIN_COL_WIDTH) }} />}
           {onChangeTeamLeader && <col style={{ width: colPct(TEAM_LEADER_COL_WIDTH) }} />}
+          {onChangePunchWithoutFace && (
+            <col style={{ width: colPct(PUNCH_WITHOUT_FACE_COL_WIDTH) }} />
+          )}
           <col style={{ width: colPct(SCHEDULE_COL_WIDTH) }} />
           <col style={{ width: colPct(widths.password) }} />
           <col style={{ width: colPct(widths.actions) }} />
@@ -386,6 +394,15 @@ export function EmployeeListTable({
               fixedHeaderCell(t("admin.employeesTeamLeaderCol"), TEAM_LEADER_COL_WIDTH, {
                 align: "center",
               })}
+            {onChangePunchWithoutFace &&
+              fixedHeaderCell(
+                t("admin.employeesPunchWithoutFaceColShort"),
+                PUNCH_WITHOUT_FACE_COL_WIDTH,
+                {
+                  align: "center",
+                  title: t("admin.employeesPunchWithoutFaceCol"),
+                }
+              )}
             {fixedHeaderCell(
               locale === "en" ? t("admin.empScheduleColShort") : t("admin.empScheduleCol"),
               SCHEDULE_COL_WIDTH,
@@ -563,6 +580,25 @@ export function EmployeeListTable({
                         onChange={(ev) => onChangeTeamLeader(e, ev.target.checked)}
                       />
                     ) : e.isTeamLeader ? (
+                      <span className="text-[0.75rem] text-[var(--apple-label-secondary)]">✓</span>
+                    ) : null}
+                  </td>
+                )}
+                {onChangePunchWithoutFace && (
+                  <td className={`${empTd} text-center`}>
+                    {canEditProfile && e.user.role !== "DOOR" ? (
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-[var(--apple-blue)]"
+                        checked={Boolean(e.punchWithoutFace)}
+                        disabled={isBusy}
+                        aria-label={t("admin.employeesPunchWithoutFaceLabel").replace(
+                          "{name}",
+                          e.name
+                        )}
+                        onChange={(ev) => onChangePunchWithoutFace(e, ev.target.checked)}
+                      />
+                    ) : e.punchWithoutFace ? (
                       <span className="text-[0.75rem] text-[var(--apple-label-secondary)]">✓</span>
                     ) : null}
                   </td>

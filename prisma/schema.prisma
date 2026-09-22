@@ -384,6 +384,8 @@ model Employee {
   workScheduleByDay  Json?
   /// 팀장 — 근태 신청 승인권자 후보
   isTeamLeader       Boolean  @default(false)
+  /// 회사 안면 인식이 켜져 있어도 일반 출퇴근 펀치에서 안면 검증 생략
+  punchWithoutFace   Boolean  @default(false)
   createdAt DateTime @default(now())
 
   attendanceRecords AttendanceRecord[]

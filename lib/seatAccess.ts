@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { bypassesSeatLimit, SEAT_EXEMPT_ROLES } from "@/lib/seatAccessShared";
+import {
+  annotateEmployeesWithLoginAccess,
+  bypassesSeatLimit,
+  SEAT_EXEMPT_ROLES,
+} from "@/lib/seatAccessShared";
 import type { Role } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 
-export { bypassesSeatLimit, SEAT_EXEMPT_ROLES };
+export { annotateEmployeesWithLoginAccess, bypassesSeatLimit, SEAT_EXEMPT_ROLES };
 
 /** 직원 목록·로그인 좌석 배정 기준 정렬 (이름순) */
 export const EMPLOYEE_SEAT_ORDER: Prisma.EmployeeOrderByWithRelationInput[] = [
@@ -75,24 +79,3 @@ export async function isUserSeatLoginAllowed(input: {
   return isEmployeeSeatLoginEligible(input.companyId, input.employeeId);
 }
 
-export function annotateEmployeesWithLoginAccess<
-  T extends { id: string; user: { role: string } },
->(
-  employees: T[],
-  seatLimit: number
-): (T & { loginEligible: boolean; loginEligibleByAdmin: boolean; seatRank: number })[] {
-  const limit = Math.max(0, Math.floor(seatLimit));
-  const billable = employees.filter((e) => !bypassesSeatLimit(e.user.role));
-  const eligibleIds = new Set(billable.slice(0, limit).map((e) => e.id));
-
-  return employees.map((employee, index) => {
-    const loginEligibleByAdmin = bypassesSeatLimit(employee.user.role);
-    const inSeatRange = eligibleIds.has(employee.id);
-    return {
-      ...employee,
-      seatRank: index + 1,
-      loginEligibleByAdmin,
-      loginEligible: loginEligibleByAdmin || inSeatRange,
-    };
-  });
-}

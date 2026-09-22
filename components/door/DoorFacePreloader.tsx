@@ -1,7 +1,7 @@
 "use client";
 
 import { FACE_MODEL_BIN_URLS, FACE_MODEL_MANIFEST_URLS } from "@/lib/faceModelCache";
-import { prefetchFaceRecognition } from "@/lib/faceRecognitionClient";
+import { prefetchFaceRecognitionLazy } from "@/lib/faceRecognitionPrefetch";
 import { getFaceDeviceProfile } from "@/lib/faceDeviceProfile";
 import { useEffect } from "react";
 
@@ -28,7 +28,7 @@ export function DoorFacePreloader() {
       document.head.appendChild(wasm);
     }
 
-    prefetchFaceRecognition(true);
+    prefetchFaceRecognitionLazy(true);
     void import("@/components/employee/FaceCapture");
   }, []);
 

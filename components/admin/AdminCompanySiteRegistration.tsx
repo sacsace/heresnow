@@ -51,6 +51,23 @@ function parseLongitude(s: string): number | null {
   return n;
 }
 
+type Props = {
+  /** SUPER_ADMIN(root)이 특정 회사 근무지를 관리할 때 지정 */
+  companyId?: string;
+};
+
+function siteApiQuery(companyId: string | undefined, extra?: Record<string, string>): string {
+  const params = new URLSearchParams();
+  if (companyId) params.set("companyId", companyId);
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      params.set(key, value);
+    }
+  }
+  const s = params.toString();
+  return s ? `?${s}` : "";
+}
+
 function scheduleSummary(site: SiteRow, t: (k: string) => string): string {
   if (site.workScheduleMode === "SHIFT" && site.shiftCode) {
     return t("admin.siteScheduleShift").replace("{code}", site.shiftCode);
@@ -63,8 +80,9 @@ function scheduleSummary(site: SiteRow, t: (k: string) => string): string {
   return t("admin.siteScheduleCompany");
 }
 
-export function AdminCompanySiteRegistration() {
+export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
   const { t } = useI18n();
+  const companyQs = siteApiQuery(companyId);
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [canEdit, setCanEdit] = useState(false);
@@ -90,8 +108,8 @@ export function AdminCompanySiteRegistration() {
     setLoading(true);
     setError(null);
     const [siteRes, deptRes] = await Promise.all([
-      fetch("/api/admin/site"),
-      fetch("/api/admin/departments"),
+      fetch(`/api/admin/site${companyQs}`),
+      fetch(`/api/admin/departments${companyQs}`),
     ]);
     const j = await siteRes.json().catch(() => ({}));
     const dj = await deptRes.json().catch(() => ({}));
@@ -105,7 +123,7 @@ export function AdminCompanySiteRegistration() {
     setSites(rows);
     setCanEdit(Boolean((j as { canEdit?: boolean }).canEdit));
     setDepartments((dj as { departments?: Department[] }).departments ?? []);
-  }, [t]);
+  }, [t, companyQs]);
 
   useEffect(() => {
     void load();
@@ -255,7 +273,7 @@ export function AdminCompanySiteRegistration() {
     };
 
     const isEdit = formMode.kind === "edit";
-    const r = await fetch("/api/admin/site", {
+    const r = await fetch(`/api/admin/site${companyQs}`, {
       method: isEdit ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(isEdit ? { ...body, id: formMode.id } : body),
@@ -279,7 +297,9 @@ export function AdminCompanySiteRegistration() {
     setDeletingId(site.id);
     setError(null);
     setSaved(false);
-    const r = await fetch(`/api/admin/site?id=${encodeURIComponent(site.id)}`, { method: "DELETE" });
+    const r = await fetch(`/api/admin/site${siteApiQuery(companyId, { id: site.id })}`, {
+      method: "DELETE",
+    });
     const j = await r.json().catch(() => ({}));
     setDeletingId(null);
     if (!r.ok) {
