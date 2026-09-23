@@ -16,7 +16,7 @@ export const SIX_H_MS = 6 * 60 * 60 * 1000;
 export const FORTY_EIGHT_H_MS = 48 * 60 * 60 * 1000;
 /** 30시간 초과 미퇴근 시 OT 미적용 보정 기준 */
 export const THIRTY_H_MS = 30 * 60 * 60 * 1000;
-/** 24시간 초과 미퇴근 시 정규 퇴근 시각 자동 등록 기준 */
+/** @deprecated 미사용 — 자동 퇴근은 출근일 다음날 06:00(회사 TZ) 기준 (`lib/autoCheckOut.ts`) */
 export const TWENTY_FOUR_H_MS = 24 * 60 * 60 * 1000;
 /** 출근~퇴근 1회당 최대 근무 시간 (총 21시간) */
 export const MAX_SHIFT_WORK_MS = 21 * 60 * 60 * 1000;

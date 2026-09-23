@@ -22,7 +22,7 @@ export type AttendancePunchSummary = {
   businessTripLocation: string | null;
   businessTripReason: string | null;
   memo: string | null;
-  /** 24시간 미퇴근 후 정규 퇴근 시각으로 자동 등록된 퇴근 */
+  /** 출근일 다음날 06:00(회사 TZ) 이후 정규 퇴근 시각으로 자동 등록된 퇴근 */
   isAutoCheckOut: boolean;
   site: { name: string } | null;
 };

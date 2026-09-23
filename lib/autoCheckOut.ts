@@ -1,4 +1,3 @@
-import { TWENTY_FOUR_H_MS } from "@/lib/attendancePunchRules";
 import { calendarDayInTz } from "@/lib/adminMonthlyAttendance";
 import { AUTO_CHECKOUT_MEMO } from "@/lib/autoCheckOutDisplay";
 import { type CompanyWorkSchedule, scheduledShiftEndAt } from "@/lib/companyWorkSchedule";
@@ -8,7 +7,25 @@ import { enqueueMvsAttendanceIfEnabled } from "@/lib/integrations/enqueueMvsAtte
 import { evaluateCheckoutOvertimeFlags } from "@/lib/overtimePolicy";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { fromZonedTime } from "date-fns-tz";
+import { addDays } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+
+/** 회사 타임존 — 출근일 다음날 이 시각까지 미퇴근이면 서버 자동 퇴근 */
+export const AUTO_CHECKOUT_CUTOFF_HOUR = 6;
+
+/** 출근일(회사 TZ) 다음날 AUTO_CHECKOUT_CUTOFF_HOUR:00 — 이 시각 이후 자동 퇴근 가능 */
+export function autoCheckOutDeadlineAfterCheckIn(checkInAt: Date, timeZone: string): Date {
+  const tz = timeZone.trim() || "UTC";
+  const checkInDay = calendarDayInTz(checkInAt, tz);
+  const anchor = fromZonedTime(`${checkInDay} 12:00:00`, tz);
+  const nextDay = formatInTimeZone(addDays(anchor, 1), tz, "yyyy-MM-dd");
+  const hour = String(AUTO_CHECKOUT_CUTOFF_HOUR).padStart(2, "0");
+  return fromZonedTime(`${nextDay} ${hour}:00:00`, tz);
+}
+
+export function isAutoCheckOutDue(checkInAt: Date, now: Date, timeZone: string): boolean {
+  return now.getTime() >= autoCheckOutDeadlineAfterCheckIn(checkInAt, timeZone).getTime();
+}
 
 export { AUTO_CHECKOUT_MEMO, formatCheckOutDisplay, isAutoCheckOutMemo } from "@/lib/autoCheckOutDisplay";
 
@@ -123,7 +140,7 @@ async function createAutoCheckOutRecord(
   return record.id;
 }
 
-/** 미퇴근 출근이 24시간 이상 지속되면 정규 퇴근 시각으로 CHECK_OUT 을 생성한다. */
+/** 미퇴근 출근 — 출근일 다음날 06:00(회사 TZ) 이후 정규 퇴근 시각으로 CHECK_OUT 생성 */
 export async function applyPendingAutoCheckOutForEmployee(
   params: ApplyAutoCheckOutParams
 ): Promise<string | null> {
@@ -176,11 +193,11 @@ export async function applyPendingAutoCheckOutForEmployee(
     return null;
   }
 
-  if (now.getTime() - lastRecord.timestamp.getTime() < TWENTY_FOUR_H_MS) {
+  const tz = company.timezone?.trim() || "UTC";
+
+  if (!isAutoCheckOutDue(lastRecord.timestamp, now, tz)) {
     return null;
   }
-
-  const tz = company.timezone?.trim() || "UTC";
   const schedule = resolveEmployeeWorkSchedule(employee, company);
   const checkoutAt = resolveAutoCheckOutTimestamp(lastRecord.timestamp, tz, schedule);
   const freePunchEnabled =
@@ -210,7 +227,7 @@ export async function applyPendingAutoCheckOutForEmployee(
     if (!latest || latest.type !== "CHECK_IN" || latest.id !== lastRecord.id) {
       return;
     }
-    if (now.getTime() - latest.timestamp.getTime() < TWENTY_FOUR_H_MS) {
+    if (!isAutoCheckOutDue(latest.timestamp, now, tz)) {
       return;
     }
 
