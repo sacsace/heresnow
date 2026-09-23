@@ -80,6 +80,9 @@ export const ko = {
     faceEnrollCaptureTitle: "안면 등록",
     faceEnrollCaptureLead: "정면·좌·우 등 5개 각도를 자동 캡처합니다. 등록 완성도 100%가 되면 자동 저장됩니다.",
     faceEnrollOk: "안면이 등록되었습니다.",
+    faceEnrollConflictOther:
+      "다른 직원에게 이미 등록된 얼굴과 유사합니다. 본인 얼굴로 다시 등록해 주세요.",
+    faceEnrollAlertTitle: "안면 등록 불가",
     faceCancelReEnroll: "취소",
     faceNone: "등록된 안면이 없습니다.",
     faceCredentialLabel: "안면 {n}",
@@ -156,6 +159,11 @@ export const ko = {
     pushPermissionDenied:
       "알림 권한이 거부되었습니다. 브라우저/시스템 설정에서 HeresNow 알림을 허용해 주세요.",
     pushLoadFail: "알림 설정을 불러오지 못했습니다.",
+    pushTestButton: "테스트 알림 보내기",
+    pushTestSending: "전송 중…",
+    pushTestOk: "테스트 알림을 보냈습니다. 기기 알림함을 확인해 주세요.",
+    pushTestFail: "테스트 알림을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    pushTestNoSubscription: "먼저 위에서 모바일 알림을 켜 주세요.",
     pushIosGuideTitle: "iPhone — 홈 화면 추가가 필요합니다",
     pushIosGuideLead:
       "iPhone에서는 Safari 탭이 아니라 홈 화면에 추가한 뒤, 앱 아이콘으로 실행해야 출근 알림을 받을 수 있습니다.",
@@ -1193,6 +1201,9 @@ export const ko = {
     faceEnrollHintPose: "안내에 맞게 얼굴 방향을 조정해 주세요.",
     faceEnrollOk: "안면 등록이 완료되었습니다.",
     faceEnrollFail: "안면 등록에 실패했습니다.",
+    faceEnrollRetryHint: "등록에 실패했습니다. 안내를 확인한 뒤 다시 시도해 주세요.",
+    faceEnrollConflictOther:
+      "다른 직원에게 이미 등록된 얼굴과 유사합니다. 본인 얼굴로 다시 등록해 주세요.",
     faceVerifyTitle: "안면 인식 출근",
     faceVerifyLead: "카메라에 본인 얼굴을 맞추면 자동으로 확인 후 출근이 기록됩니다.",
     faceVerifyButton: "안면 인식하고 출근하기",
@@ -1443,6 +1454,9 @@ export const en = {
     faceEnrollCaptureLead:
       "Automatically captures 5 angles. Saves when enrollment reaches 100%.",
     faceEnrollOk: "Face enrolled successfully.",
+    faceEnrollConflictOther:
+      "This face is too similar to one already enrolled for another employee. Please enroll your own face again.",
+    faceEnrollAlertTitle: "Could not enroll face",
     faceCancelReEnroll: "Cancel",
     faceNone: "No face enrollments yet.",
     faceCredentialLabel: "Face {n}",
@@ -1521,6 +1535,11 @@ export const en = {
     pushPermissionDenied:
       "Notification permission was denied. Allow HeresNow notifications in your browser or system settings.",
     pushLoadFail: "Could not load notification settings.",
+    pushTestButton: "Send test notification",
+    pushTestSending: "Sending…",
+    pushTestOk: "Test notification sent. Check your device notifications.",
+    pushTestFail: "Could not send the test notification. Try again in a moment.",
+    pushTestNoSubscription: "Turn on mobile notifications above first.",
     pushIosGuideTitle: "iPhone — add to Home Screen first",
     pushIosGuideLead:
       "On iPhone, check-in reminders work only after you add HeresNow to your Home Screen and open it from the app icon—not from a Safari tab.",
@@ -2582,6 +2601,9 @@ export const en = {
     faceEnrollHintPose: "Adjust your head to match the guide.",
     faceEnrollOk: "Face enrolled successfully.",
     faceEnrollFail: "Face enrollment failed.",
+    faceEnrollRetryHint: "Enrollment failed. Review the message and try again.",
+    faceEnrollConflictOther:
+      "This face is too similar to one already enrolled for another employee. Please enroll your own face again.",
     faceVerifyTitle: "Face check-in",
     faceVerifyLead: "Align your face in the frame to verify and record check-in automatically.",
     faceVerifyButton: "Verify face and check in",

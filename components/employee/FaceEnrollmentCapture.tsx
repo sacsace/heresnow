@@ -29,6 +29,7 @@ import {
   loadFaceModels,
 } from "@/lib/faceRecognitionClient";
 import { useI18n } from "@/components/LanguageProvider";
+import { mapFaceEnrollApiError } from "@/lib/faceEnrollApiError";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
@@ -146,10 +147,9 @@ export function FaceEnrollmentCapture({
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const msg =
-            typeof j.error === "string" ? j.error : tRef.current("employee.faceEnrollFail");
+          const msg = mapFaceEnrollApiError(j.error, tRef.current);
           setPhase("error");
-          setHint(msg);
+          setHint(tRef.current("employee.faceEnrollRetryHint"));
           onError?.(msg);
           savingRef.current = false;
           return;
@@ -163,7 +163,7 @@ export function FaceEnrollmentCapture({
       } catch {
         const msg = tRef.current("employee.faceEnrollFail");
         setPhase("error");
-        setHint(msg);
+        setHint(tRef.current("employee.faceEnrollRetryHint"));
         onError?.(msg);
         savingRef.current = false;
       }
@@ -388,7 +388,13 @@ export function FaceEnrollmentCapture({
       </div>
 
       {hint && (
-        <p className="mt-2 text-xs leading-relaxed text-[var(--apple-label-secondary)] sm:text-sm">
+        <p
+          className={`mt-2 text-xs leading-relaxed sm:text-sm ${
+            phase === "error"
+              ? "font-medium text-[var(--apple-orange-dark)]"
+              : "text-[var(--apple-label-secondary)]"
+          }`}
+        >
           {hint}
         </p>
       )}

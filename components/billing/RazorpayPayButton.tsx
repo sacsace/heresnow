@@ -201,6 +201,7 @@ export function RazorpayPayButton({
       )}
       <AppleAlertDialog
         open={paySuccessOpen}
+        variant="success"
         title={t("admin.billingPaySuccessTitle")}
         message={t("admin.billingPaySuccess")}
         onClose={() => setPaySuccessOpen(false)}

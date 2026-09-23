@@ -4,6 +4,7 @@ import { FacePreviewModal } from "@/components/account/FacePreviewModal";
 import { FaceCapture } from "@/components/employee/FaceCapture";
 import { FaceEnrollmentCapture } from "@/components/employee/FaceEnrollmentCapture";
 import { useI18n } from "@/components/LanguageProvider";
+import { AppleAlertDialog } from "@/components/ui/AppleAlertDialog";
 import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import {
   faceEnrollmentGridCols,
@@ -58,6 +59,7 @@ export function FaceManagementCard({ className = "" }: Props) {
   const [previewCredentialId, setPreviewCredentialId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FaceEnrollmentGroup | null>(null);
+  const [enrollAlert, setEnrollAlert] = useState<{ title: string; message: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -240,16 +242,12 @@ export function FaceManagementCard({ className = "" }: Props) {
                   setSuccess(t("account.faceEnrollOk"));
                   void load();
                 }}
-                onError={(msg) =>
-                  setError(
-                    msg === "FACE_ENROLLMENT_LIMIT"
-                      ? t("account.faceEnrollLimit").replace(
-                          "{max}",
-                          String(MAX_FACE_ENROLLMENTS)
-                        )
-                      : msg
-                  )
-                }
+                onError={(msg) => {
+                  setEnrollAlert({
+                    title: t("account.faceEnrollAlertTitle"),
+                    message: msg,
+                  });
+                }}
                 onCancel={() => {
                   setEnrolling(false);
                   setError(null);
@@ -355,6 +353,14 @@ export function FaceManagementCard({ className = "" }: Props) {
             : status?.hasPreview
         )}
         credentialId={previewCredentialId}
+      />
+
+      <AppleAlertDialog
+        open={enrollAlert != null}
+        variant="warning"
+        title={enrollAlert?.title ?? ""}
+        message={enrollAlert?.message ?? ""}
+        onClose={() => setEnrollAlert(null)}
       />
 
       <AppleConfirmDialog

@@ -22,14 +22,14 @@ import {
 } from "@/components/auth/authStyles";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { useI18n } from "@/components/LanguageProvider";
-import { staySignedInCredentialValue } from "@/lib/clientPlatform";
+import { isMobileOrTabletClient, staySignedInCredentialValue } from "@/lib/clientPlatform";
 import { prefetchFaceRecognition } from "@/lib/faceRecognitionClient";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { signIn } from "next-auth/react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState, Suspense, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, Suspense, useEffect, useRef, useCallback } from "react";
 
 type LoginMode = "password" | "face";
 
@@ -51,19 +51,14 @@ function LoginForm() {
   const enrollDecisionRef = useRef<((ok: boolean) => void) | null>(null);
   const passkeyInFlightRef = useRef(false);
   const LOGIN_TIMEOUT_MS = 12_000;
-  const isMobileOrTablet = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    const ua = window.navigator.userAgent.toLowerCase();
-    const uaMobile =
-      /android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/.test(ua);
-    const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-    const touchCapable = (window.navigator.maxTouchPoints ?? 0) > 0;
-    return uaMobile || (coarsePointer && touchCapable);
+  /** SSR·하이드레이션과 맞추기 위해 마운트 후에만 true — useMemo+window는 모바일에서 불일치 오류 유발 */
+  const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+
+  useEffect(() => {
+    setIsMobileOrTablet(isMobileOrTabletClient());
+    setPasskeySupported(typeof window.PublicKeyCredential !== "undefined");
   }, []);
-  const passkeySupported = useMemo(
-    () => typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined",
-    []
-  );
 
   useEffect(() => {
     let cancelled = false;

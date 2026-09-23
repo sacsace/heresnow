@@ -219,13 +219,7 @@ export async function POST(req: Request) {
         sample.descriptor
       );
       if (conflict) {
-        return NextResponse.json(
-          {
-            error:
-              "다른 직원에게 이미 등록된 얼굴과 유사합니다. 본인 얼굴로 다시 등록해 주세요.",
-          },
-          { status: 409 }
-        );
+        return NextResponse.json({ error: "FACE_CONFLICT_OTHER_EMPLOYEE" }, { status: 409 });
       }
     }
 
@@ -275,10 +269,7 @@ export async function POST(req: Request) {
     descriptor
   );
   if (conflict) {
-    return NextResponse.json(
-      { error: "다른 직원에게 이미 등록된 얼굴과 유사합니다. 본인 얼굴로 다시 등록해 주세요." },
-      { status: 409 }
-    );
+    return NextResponse.json({ error: "FACE_CONFLICT_OTHER_EMPLOYEE" }, { status: 409 });
   }
 
   const created = await prisma.employeeFaceCredential.create({

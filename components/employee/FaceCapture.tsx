@@ -25,6 +25,7 @@ import {
   type FaceExtractOptions,
 } from "@/lib/faceRecognitionClient";
 import { useI18n } from "@/components/LanguageProvider";
+import { mapFaceEnrollApiError } from "@/lib/faceEnrollApiError";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Mode = "enroll" | "verify";
@@ -337,8 +338,7 @@ export function FaceCapture({
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const msg =
-            typeof j.error === "string" ? j.error : tRef.current("employee.faceEnrollFail");
+          const msg = mapFaceEnrollApiError(j.error, tRef.current);
           setStatus(msg);
           onErrorRef.current?.(msg);
           return false;

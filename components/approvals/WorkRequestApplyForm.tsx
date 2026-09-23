@@ -389,6 +389,7 @@ export function WorkRequestApplyForm({
 
       <AppleAlertDialog
         open={sameDayVacationAlertOpen}
+        variant="warning"
         title={t("approvals.vacationSameDayTitle")}
         message={t("approvals.vacationSameDayMessage")}
         onClose={() => setSameDayVacationAlertOpen(false)}

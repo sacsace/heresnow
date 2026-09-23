@@ -7,6 +7,7 @@ import { needsIosHomeScreenForPush } from "@/lib/pwaPlatform";
 import {
   bannerInfo,
   bannerSuccess,
+  btnSecondary,
   card,
   cardBody,
   cardHeader,
@@ -47,6 +48,7 @@ export function PushNotificationCard({ className = "" }: Props) {
   const [status, setStatus] = useState<PushStatus>(DEFAULT_STATUS);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -97,6 +99,38 @@ export function PushNotificationCard({ className = "" }: Props) {
     if (!mounted) return;
     void load();
   }, [mounted, load]);
+
+  async function sendTestPush() {
+    if (testBusy || busy) return;
+    if (!status.configured) {
+      setError(t("account.pushNotConfigured"));
+      return;
+    }
+    if (!status.subscribed) {
+      setError(t("account.pushTestNoSubscription"));
+      return;
+    }
+
+    setTestBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const r = await fetch("/api/user/push-subscription/test", { method: "POST" });
+      const j = (await r.json().catch(() => ({}))) as { error?: string; sent?: number };
+      if (!r.ok) {
+        if (j.error === "NOT_CONFIGURED") setError(t("account.pushNotConfigured"));
+        else if (j.error === "NO_SUBSCRIPTION") setError(t("account.pushTestNoSubscription"));
+        else setError(t("account.pushTestFail"));
+        await load();
+        return;
+      }
+      setSuccess(t("account.pushTestOk"));
+    } catch {
+      setError(t("account.pushTestFail"));
+    } finally {
+      setTestBusy(false);
+    }
+  }
 
   async function setPushEnabled(next: boolean) {
     if (busy) return;
@@ -217,6 +251,21 @@ export function PushNotificationCard({ className = "" }: Props) {
             {success ? <div className={bannerSuccess}>{success}</div> : null}
             {mounted && !loading && status.configured && !iosNeedsHomeScreen && permission !== "denied" ? (
               <div className={bannerInfo}>{t("account.pushToggleHint")}</div>
+            ) : null}
+
+            {mounted &&
+            !loading &&
+            status.configured &&
+            !iosNeedsHomeScreen &&
+            permission !== "denied" ? (
+              <button
+                type="button"
+                className={`${btnSecondary} w-full sm:w-auto`}
+                disabled={testBusy || busy || !status.subscribed}
+                onClick={() => void sendTestPush()}
+              >
+                {testBusy ? t("account.pushTestSending") : t("account.pushTestButton")}
+              </button>
             ) : null}
           </>
         )}

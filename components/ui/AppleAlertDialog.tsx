@@ -1,6 +1,12 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
+import {
+  AppleDialogBackdrop,
+  AppleDialogHeader,
+  AppleDialogPanel,
+  type AppleDialogVariant,
+} from "@/components/ui/appleDialogShared";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -9,15 +15,18 @@ type Props = {
   title: string;
   message: string;
   buttonLabel?: string;
+  /** default = 파란 강조, warning = 주황 아이콘, success = 초록 체크 */
+  variant?: AppleDialogVariant;
   onClose: () => void;
 };
 
-/** Apple HIG 스타일 안내 알림 — 확인 버튼만 (성공·완료 메시지) */
+/** Apple HIG 스타일 안내 알림 — 확인 버튼만 */
 export function AppleAlertDialog({
   open,
   title,
   message,
   buttonLabel,
+  variant = "default",
   onClose,
 }: Props) {
   const { t } = useI18n();
@@ -47,49 +56,34 @@ export function AppleAlertDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[110] flex items-end justify-center p-4 sm:items-center sm:p-6"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="apple-alert-title"
       aria-describedby="apple-alert-message"
     >
-      <button
-        type="button"
-        aria-label={label}
-        onClick={onClose}
-        className="absolute inset-0 h-full w-full bg-black/25 backdrop-blur-[6px] transition-opacity"
-      />
+      <AppleDialogBackdrop onClose={onClose} ariaLabel={label} />
 
-      <div
-        className="relative w-full max-w-[17.5rem] overflow-hidden rounded-[0.875rem] bg-[var(--background)] shadow-[0_8px_40px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.06] sm:max-w-[20rem] sm:rounded-[0.75rem]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-4 pb-4 pt-5 text-center sm:px-5 sm:pt-5 sm:text-left">
-          <h2
-            id="apple-alert-title"
-            className="text-[1.0625rem] font-semibold leading-snug tracking-tight text-[var(--foreground)]"
-          >
-            {title}
-          </h2>
-          <p
-            id="apple-alert-message"
-            className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--apple-label-secondary)]"
-          >
-            {message}
-          </p>
-        </div>
+      <AppleDialogPanel className="sm:animate-none">
+        <AppleDialogHeader
+          title={title}
+          message={message}
+          variant={variant}
+          titleId="apple-alert-title"
+          messageId="apple-alert-message"
+        />
 
-        <div className="border-t border-[var(--separator)] sm:flex sm:justify-end sm:px-4 sm:py-3">
+        <div className="border-t border-[var(--separator)]">
           <button
             type="button"
             autoFocus
             onClick={onClose}
-            className="touch-manipulation min-h-[2.75rem] w-full px-4 text-[1.0625rem] font-semibold text-[var(--apple-blue)] transition-colors active:bg-[var(--fill-tertiary)] sm:min-h-0 sm:w-auto sm:rounded-[0.4375rem] sm:bg-[var(--apple-blue)] sm:px-3.5 sm:py-1.5 sm:text-[0.8125rem] sm:text-white sm:hover:bg-[#0071e3] sm:active:bg-[#0066cc]"
+            className="touch-manipulation min-h-[3rem] w-full px-4 text-[1.0625rem] font-semibold text-[var(--apple-blue)] transition-colors active:bg-[var(--fill-tertiary)] sm:min-h-[2.75rem]"
           >
             {label}
           </button>
         </div>
-      </div>
+      </AppleDialogPanel>
     </div>,
     document.body
   );
