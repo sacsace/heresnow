@@ -109,6 +109,11 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       images: ["/favicon.png"],
     },
+    verification: {
+      other: {
+        "naver-site-verification": "4435e3e1cb871c61b9baa8e8b414af0547726b30",
+      },
+    },
     robots: {
       index: true,
       follow: true,
