@@ -109,6 +109,8 @@ export function FaceEnrollmentCapture({
   const [needsTap, setNeedsTap] = useState(false);
   const [captureFlash, setCaptureFlash] = useState(false);
   const [collectedCount, setCollectedCount] = useState(0);
+  const [canForceConflict, setCanForceConflict] = useState(false);
+  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
@@ -123,10 +125,12 @@ export function FaceEnrollmentCapture({
   }, []);
 
   const submitBatch = useCallback(
-    async (samples: EnrollmentSample[]) => {
+    async (samples: EnrollmentSample[], forceDespiteConflict = false) => {
       if (savingRef.current) return;
       savingRef.current = true;
       setPhase("saving");
+      setCanForceConflict(false);
+      setConflictMessage(null);
       setHint(tRef.current("employee.faceEnrollSaving"));
 
       const v = videoRef.current;
@@ -143,13 +147,18 @@ export function FaceEnrollmentCapture({
               qualityScore: s.qualityScore,
             })),
             ...(previewUrl ? { previewUrl } : {}),
+            ...(forceDespiteConflict ? { forceDespiteConflict: true } : {}),
           }),
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const msg = mapFaceEnrollApiError(j.error, tRef.current);
+          const msg = mapFaceEnrollApiError(j, tRef.current);
           setPhase("error");
           setHint(tRef.current("employee.faceEnrollRetryHint"));
+          if (j.error === "FACE_CONFLICT_OTHER_EMPLOYEE") {
+            setConflictMessage(msg);
+            setCanForceConflict(j.canForce === true);
+          }
           onError?.(msg);
           savingRef.current = false;
           return;
@@ -452,6 +461,32 @@ export function FaceEnrollmentCapture({
           )}
         </div>
       )}
+
+      {phase === "error" && conflictMessage ? (
+        <p className="mt-3 text-sm font-medium leading-relaxed text-[var(--apple-orange-dark)]">
+          {conflictMessage}
+        </p>
+      ) : null}
+
+      {phase === "error" && canForceConflict ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-[0.75rem] leading-relaxed text-[var(--apple-label-secondary)]">
+            {t("employee.faceEnrollForceHint")}
+          </p>
+          <button
+            type="button"
+            className="flex min-h-[2.75rem] w-full items-center justify-center rounded-xl bg-[var(--apple-orange)]/15 text-sm font-semibold text-[var(--apple-orange-dark)]"
+            disabled={disabled}
+            onClick={() => {
+              const samples = samplesRef.current;
+              if (samples.length === 0) return;
+              void submitBatch(samples, true);
+            }}
+          >
+            {t("employee.faceEnrollForceButton")}
+          </button>
+        </div>
+      ) : null}
 
       {onCancel && phase !== "saving" && phase !== "completed" ? (
         <button

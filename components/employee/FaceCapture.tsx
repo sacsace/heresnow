@@ -338,7 +338,7 @@ export function FaceCapture({
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const msg = mapFaceEnrollApiError(j.error, tRef.current);
+          const msg = mapFaceEnrollApiError(j, tRef.current);
           setStatus(msg);
           onErrorRef.current?.(msg);
           return false;

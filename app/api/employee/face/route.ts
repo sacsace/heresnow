@@ -3,7 +3,10 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
 import { seatLoginForbiddenResponse } from "@/lib/requireSeatLogin";
-import { findConflictingFaceEmployee } from "@/lib/faceEnrollGuard";
+import {
+  findConflictingFaceEmployee,
+  findConflictingFaceEmployeeForSamples,
+} from "@/lib/faceEnrollGuard";
 import {
   loadEmployeeFaceCredentials,
   matchFaceCredentials,
@@ -42,14 +45,35 @@ const sampleSchema = z.object({
 const singleEnrollSchema = z.object({
   descriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH),
   previewUrl: z.string().max(1_000_000).optional(),
+  /** COMPANY_ADMIN / HR_MANAGER / SUPER_ADMIN 만 — 충돌 무시 등록 */
+  forceDespiteConflict: z.boolean().optional(),
 });
 
 const batchEnrollSchema = z.object({
   samples: z.array(sampleSchema).min(5).max(10),
   previewUrl: z.string().max(1_000_000).optional(),
+  forceDespiteConflict: z.boolean().optional(),
 });
 
 const enrollBodySchema = z.union([singleEnrollSchema, batchEnrollSchema]);
+
+function canForceFaceEnrollDespiteConflict(role: string | null | undefined): boolean {
+  return role === "COMPANY_ADMIN" || role === "HR_MANAGER" || role === "SUPER_ADMIN";
+}
+
+function conflictResponse(
+  conflict: { name: string },
+  canForce: boolean
+) {
+  return NextResponse.json(
+    {
+      error: "FACE_CONFLICT_OTHER_EMPLOYEE",
+      conflictEmployeeName: conflict.name,
+      canForce,
+    },
+    { status: 409 }
+  );
+}
 
 const deleteSchema = z.union([
   z.object({ id: z.string().min(1) }),
@@ -212,14 +236,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: batchError }, { status: 400 });
     }
 
-    for (const sample of samples) {
-      const conflict = await findConflictingFaceEmployee(
+    const canForce = canForceFaceEnrollDespiteConflict(session.user.role);
+    const force = Boolean(parsed.data.forceDespiteConflict) && canForce;
+    if (!force) {
+      const conflict = await findConflictingFaceEmployeeForSamples(
         session.user.companyId,
         session.user.employeeId,
-        sample.descriptor
+        samples.map((s) => s.descriptor)
       );
       if (conflict) {
-        return NextResponse.json({ error: "FACE_CONFLICT_OTHER_EMPLOYEE" }, { status: 409 });
+        return conflictResponse(conflict, canForce);
       }
     }
 
@@ -263,13 +289,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "유효한 안면 데이터가 필요합니다." }, { status: 400 });
   }
 
-  const conflict = await findConflictingFaceEmployee(
-    session.user.companyId,
-    session.user.employeeId,
-    descriptor
-  );
-  if (conflict) {
-    return NextResponse.json({ error: "FACE_CONFLICT_OTHER_EMPLOYEE" }, { status: 409 });
+  const canForce = canForceFaceEnrollDespiteConflict(session.user.role);
+  const force = Boolean(parsed.data.forceDespiteConflict) && canForce;
+  if (!force) {
+    const conflict = await findConflictingFaceEmployee(
+      session.user.companyId,
+      session.user.employeeId,
+      descriptor
+    );
+    if (conflict) {
+      return conflictResponse(conflict, canForce);
+    }
   }
 
   const created = await prisma.employeeFaceCredential.create({

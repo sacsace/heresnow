@@ -82,6 +82,10 @@ export const ko = {
     faceEnrollOk: "안면이 등록되었습니다.",
     faceEnrollConflictOther:
       "다른 직원에게 이미 등록된 얼굴과 유사합니다. 본인 얼굴로 다시 등록해 주세요.",
+    faceEnrollConflictOtherNamed:
+      "「{name}」 직원에게 이미 등록된 얼굴과 유사합니다. 해당 등록을 확인하거나 본인 얼굴로 다시 등록해 주세요.",
+    faceEnrollForceButton: "관리자: 강제 등록",
+    faceEnrollForceHint: "충돌을 무시하고 이 계정에 등록합니다. 대리 등록이 아닌지 확인하세요.",
     faceEnrollAlertTitle: "안면 등록 불가",
     faceCancelReEnroll: "취소",
     faceNone: "등록된 안면이 없습니다.",
@@ -1204,6 +1208,10 @@ export const ko = {
     faceEnrollRetryHint: "등록에 실패했습니다. 안내를 확인한 뒤 다시 시도해 주세요.",
     faceEnrollConflictOther:
       "다른 직원에게 이미 등록된 얼굴과 유사합니다. 본인 얼굴로 다시 등록해 주세요.",
+    faceEnrollConflictOtherNamed:
+      "「{name}」 직원에게 이미 등록된 얼굴과 유사합니다. 해당 등록을 확인하거나 본인 얼굴로 다시 등록해 주세요.",
+    faceEnrollForceButton: "관리자: 강제 등록",
+    faceEnrollForceHint: "충돌을 무시하고 이 계정에 등록합니다. 대리 등록이 아닌지 확인하세요.",
     faceVerifyTitle: "안면 인식 출근",
     faceVerifyLead: "카메라에 본인 얼굴을 맞추면 자동으로 확인 후 출근이 기록됩니다.",
     faceVerifyButton: "안면 인식하고 출근하기",
@@ -1456,6 +1464,10 @@ export const en = {
     faceEnrollOk: "Face enrolled successfully.",
     faceEnrollConflictOther:
       "This face is too similar to one already enrolled for another employee. Please enroll your own face again.",
+    faceEnrollConflictOtherNamed:
+      "This face is too similar to the enrollment for “{name}”. Check that record or enroll with your own face.",
+    faceEnrollForceButton: "Admin: force enroll",
+    faceEnrollForceHint: "Enrolls on this account ignoring the conflict. Confirm this is not a proxy enrollment.",
     faceEnrollAlertTitle: "Could not enroll face",
     faceCancelReEnroll: "Cancel",
     faceNone: "No face enrollments yet.",
@@ -2604,6 +2616,10 @@ export const en = {
     faceEnrollRetryHint: "Enrollment failed. Review the message and try again.",
     faceEnrollConflictOther:
       "This face is too similar to one already enrolled for another employee. Please enroll your own face again.",
+    faceEnrollConflictOtherNamed:
+      "This face is too similar to the enrollment for “{name}”. Check that record or enroll with your own face.",
+    faceEnrollForceButton: "Admin: force enroll",
+    faceEnrollForceHint: "Enrolls on this account ignoring the conflict. Confirm this is not a proxy enrollment.",
     faceVerifyTitle: "Face check-in",
     faceVerifyLead: "Align your face in the frame to verify and record check-in automatically.",
     faceVerifyButton: "Verify face and check in",

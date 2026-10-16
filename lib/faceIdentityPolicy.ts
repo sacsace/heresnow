@@ -14,8 +14,12 @@ export type FaceIdentityPolicy = {
   identityMinMargin: number;
   /** Min templates under threshold for same employee (1:1 and per-employee 1:N score) */
   minTemplateMatches: number;
-  /** Block enrolling face too close to another employee */
+  /** Soft conflict: template distance below this counts as a hit */
   enrollConflictMaxDistance: number;
+  /** Hard conflict: a single template below this always blocks enrollment */
+  enrollConflictHardMaxDistance: number;
+  /** Soft conflict needs at least this many templates under soft max */
+  enrollConflictMinTemplateHits: number;
   /** Multi-frame: min frames agreeing on same employee */
   multiFrameRequiredMatches: number;
   /** Multi-frame: total frames expected */
@@ -33,7 +37,9 @@ const DEFAULT_POLICY: FaceIdentityPolicy = {
   loginMinConfidencePercent: parseEnvInt("FACE_LOGIN_MIN_CONFIDENCE_PERCENT", 35),
   identityMinMargin: parseEnvFloat("FACE_IDENTITY_MIN_MARGIN", 0.1),
   minTemplateMatches: parseEnvInt("FACE_MIN_TEMPLATE_MATCHES", 2),
-  enrollConflictMaxDistance: parseEnvFloat("FACE_ENROLL_CONFLICT_MAX_DISTANCE", 0.4),
+  enrollConflictMaxDistance: parseEnvFloat("FACE_ENROLL_CONFLICT_MAX_DISTANCE", 0.35),
+  enrollConflictHardMaxDistance: parseEnvFloat("FACE_ENROLL_CONFLICT_HARD_MAX_DISTANCE", 0.28),
+  enrollConflictMinTemplateHits: parseEnvInt("FACE_ENROLL_CONFLICT_MIN_TEMPLATE_HITS", 2),
   multiFrameRequiredMatches: parseEnvInt("FACE_MULTIFRAME_REQUIRED", 3),
   multiFrameTotal: parseEnvInt("FACE_MULTIFRAME_TOTAL", 5),
   enrollmentSamePersonMaxDistance: parseEnvFloat("FACE_ENROLL_SAME_PERSON_MAX", 0.42),

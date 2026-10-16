@@ -215,25 +215,12 @@ function LeafletMapCanvas({
         preferCanvas: true,
       }).setView([20.5937, 78.9629], 5);
 
-      const street = L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          maxZoom: 20,
-          subdomains: "abcd",
-        }
-      );
-      const osmFallback = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+      // CARTO basemaps require an API key (since 2026-09-25); without it tiles
+      // return HTTP 200 "API KEY REQUIRED" images so tileerror fallback never runs.
+      const street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
         subdomains: "abc",
-      });
-      street.on("tileerror", () => {
-        const active = mapInstanceRef.current;
-        if (!active || cancelled || !active.hasLayer(street)) return;
-        active.removeLayer(street);
-        if (!active.hasLayer(osmFallback)) osmFallback.addTo(active);
       });
 
       const satellite = L.tileLayer(
