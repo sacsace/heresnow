@@ -105,6 +105,10 @@ export async function findConflictingFaceEmployeeForSamples(
   }
 
   if (!best) return null;
-  const { sampleHits: _, ...conflict } = best;
-  return conflict;
+  return {
+    id: best.id,
+    name: best.name,
+    bestDistance: best.bestDistance,
+    templateHits: best.templateHits,
+  };
 }
