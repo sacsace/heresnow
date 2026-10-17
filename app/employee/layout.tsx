@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/AppShell";
 import { EmployeeHeader } from "@/components/EmployeeHeader";
+import { getPlatformMenuFlags } from "@/lib/platformMenuFlags";
 import { requireConsent } from "@/lib/requireConsent";
 import { appContainerEmployee } from "@/lib/uiStyles";
 import type { Metadata } from "next";
@@ -11,10 +12,11 @@ export const metadata: Metadata = {
 
 export default async function EmployeeLayout({ children }: { children: React.ReactNode }) {
   await requireConsent();
+  const menuFlags = await getPlatformMenuFlags();
 
   return (
     <AppShell
-      header={<EmployeeHeader />}
+      header={<EmployeeHeader showWorkRequestsMenu={menuFlags.showWorkRequestsMenu} />}
       bodyClassName={appContainerEmployee}
       shellClassName="min-w-0 overflow-x-hidden pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
     >

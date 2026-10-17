@@ -1,15 +1,17 @@
 "use client";
 
-const CACHE_NAME = "heresnow-face-v1";
+const CACHE_NAME = "heresnow-face-v2";
 
 /** 런타임에 실제로 로드하는 모델 바이너리 (manifest보다 용량이 큼 — 먼저 받기) */
 export const FACE_MODEL_BIN_URLS = [
   "/models/face_recognition_model.bin",
+  "/models/ssd_mobilenetv1_model.bin",
   "/models/tiny_face_detector_model.bin",
   "/models/face_landmark_68_tiny_model.bin",
 ] as const;
 
 export const FACE_MODEL_MANIFEST_URLS = [
+  "/models/ssd_mobilenetv1_model-weights_manifest.json",
   "/models/tiny_face_detector_model-weights_manifest.json",
   "/models/face_landmark_68_tiny_model-weights_manifest.json",
   "/models/face_recognition_model-weights_manifest.json",

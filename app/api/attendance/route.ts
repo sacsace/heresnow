@@ -23,8 +23,9 @@ import {
 } from "@/lib/companyWorkSchedule";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { formatInTimeZone } from "date-fns-tz";
-import { matchFaceCredentials } from "@/lib/faceCredentials";
 import { FACE_DESCRIPTOR_LENGTH, parseFaceDescriptor } from "@/lib/faceMatch";
+import { matchFaceHybrid } from "@/lib/faceMatchHybrid";
+import { isValidFacePreviewUrl } from "@/lib/facePreviewValidation";
 import {
   enqueueMvsAttendanceIfEnabled,
   faceVerifiedForAttendance,
@@ -67,6 +68,8 @@ const bodySchema = z
     deviceInfo: z.string().max(500).optional(),
     /** 출근 시 필수: 등록 얼굴과 일치 검증 */
     faceDescriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH).optional(),
+    /** InsightFace 서버 매칭용 얼굴 JPEG data URL (선택) */
+    faceImage: z.string().max(1_000_000).optional(),
     /** 출장·반경 밖 출퇴근 확인(WARN 모드) */
     acknowledgeGeofence: z.boolean().optional().default(false),
   })
@@ -138,6 +141,7 @@ export async function POST(req: Request) {
     photoUrl,
     deviceInfo,
     faceDescriptor,
+    faceImage,
     acknowledgeGeofence,
   } = parsed.data;
 
@@ -235,7 +239,9 @@ export async function POST(req: Request) {
       );
     }
     const probe = parseFaceDescriptor(faceDescriptor);
-    if (!probe) {
+    const faceImageUrl =
+      typeof faceImage === "string" && isValidFacePreviewUrl(faceImage) ? faceImage : null;
+    if (!probe && !faceImageUrl) {
       return NextResponse.json(
         { error: "안면 인식 정보가 없습니다. 다시 인식해 주세요." },
         { status: 400 }
@@ -243,30 +249,28 @@ export async function POST(req: Request) {
     }
     const credentials = await prisma.employeeFaceCredential.findMany({
       where: { employeeId: employee.id },
-      select: { id: true, descriptor: true },
+      select: { id: true, descriptor: true, descriptorV2: true },
     });
-    const match = matchFaceCredentials(credentials, probe);
+    const match = await matchFaceHybrid({
+      credentials,
+      probe128: probe,
+      faceImageDataUrl: faceImageUrl,
+      purpose: "punch",
+    });
     if (!match.matched) {
       const body: Record<string, unknown> = {
         error:
           type === "CHECK_IN"
             ? "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다."
             : "등록된 얼굴과 일치하지 않습니다. 본인만 퇴근할 수 있습니다.",
-        code: match.reason ?? "FACE_NOT_MATCHED",
+        code: "FACE_NOT_MATCHED",
+        matchPath: match.path,
       };
       if (process.env.NODE_ENV === "development") {
         body.distance = match.distance;
-        body.templateMatchCount = match.templateMatchCount;
+        body.confidencePercent = match.confidencePercent;
       }
       return NextResponse.json(body, { status: 403 });
-    }
-    if (match.credentialId) {
-      void prisma.employeeFaceCredential
-        .update({
-          where: { id: match.credentialId },
-          data: { lastUsedAt: new Date() },
-        })
-        .catch(() => {});
     }
     faceMatched = true;
   }

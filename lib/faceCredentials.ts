@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 export type FaceCredentialRow = {
   id: string;
   descriptor: unknown;
+  descriptorV2?: unknown;
   previewUrl?: string | null;
 };
 
@@ -23,13 +24,18 @@ export type FaceMatchResult = {
 export function matchFaceCredentials(
   credentials: FaceCredentialRow[],
   probe: number[],
-  threshold?: number
+  threshold?: number,
+  options?: { minTemplateMatches?: number }
 ): FaceMatchResult {
   const policy = resolveFaceIdentityPolicy();
+  const punchPolicy =
+    options?.minTemplateMatches != null
+      ? { ...policy, minTemplateMatches: options.minTemplateMatches }
+      : policy;
   const result = verifyEmployeeTemplates(
     credentials,
     probe,
-    policy,
+    punchPolicy,
     threshold ?? policy.matchThreshold
   );
   return {
@@ -40,6 +46,17 @@ export function matchFaceCredentials(
     templateMatchCount: result.templateMatchCount,
     reason: result.reason,
   };
+}
+
+/** 출퇴근용 1:1 — 세션 직원 고정, 템플릿 1개만 통과해도 인정 */
+export function matchFaceCredentialsForPunch(
+  credentials: FaceCredentialRow[],
+  probe: number[]
+): FaceMatchResult {
+  const policy = resolveFaceIdentityPolicy();
+  return matchFaceCredentials(credentials, probe, policy.punchMatchThreshold, {
+    minTemplateMatches: policy.punchMinTemplateMatches,
+  });
 }
 
 /** Employee.faceDescriptor 등 레거시 필드를 credential 테이블과 동기화 */
@@ -78,7 +95,7 @@ export async function syncEmployeeFaceFields(employeeId: string): Promise<void> 
 export async function loadEmployeeFaceCredentials(employeeId: string): Promise<FaceCredentialRow[]> {
   return prisma.employeeFaceCredential.findMany({
     where: { employeeId },
-    select: { id: true, descriptor: true, previewUrl: true },
+    select: { id: true, descriptor: true, descriptorV2: true, previewUrl: true },
     orderBy: { createdAt: "asc" },
   });
 }

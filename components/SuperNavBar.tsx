@@ -6,15 +6,28 @@ import { useI18n } from "@/components/LanguageProvider";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { navBar, navBarInnerSuper, navLink, navLinkActive, navLinkEqual, navLinkSuperMin, navLinksRow } from "@/lib/uiStyles";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 
 export function SuperNavBar() {
   const { t } = useI18n();
   const pathname = usePathname();
-  const nav = [
-    { href: "/super", label: t("super.navCompanies"), exact: true },
-    { href: "/super/pricing", label: t("super.navPricing") },
-  ];
+  const { data: session } = useSession();
+  const isRoot =
+    session?.user?.role === "SUPER_ADMIN" &&
+    (session.user.email ?? "").trim().toLowerCase() === "root";
+
+  const nav = useMemo(
+    () => [
+      { href: "/super", label: t("super.navCompanies"), exact: true },
+      { href: "/super/pricing", label: t("super.navPricing") },
+      ...(isRoot
+        ? [{ href: "/super/menu-settings", label: t("super.navMenuSettings") }]
+        : []),
+    ],
+    [isRoot, t]
+  );
 
   function isActive(href: string, exact?: boolean) {
     if (exact) return pathname === href;

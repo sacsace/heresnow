@@ -452,7 +452,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     return { ok: true, data: j };
   }
 
-  async function submitCheckIn(faceDescriptor?: number[]): Promise<boolean> {
+  async function submitCheckIn(
+    faceDescriptor?: number[],
+    faceImage?: string | null
+  ): Promise<boolean> {
     if (!punchStatus?.canCheckIn) {
       setMsg(checkInBlockMessage() ?? t("employee.alreadyCheckedIn"));
       return false;
@@ -493,6 +496,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         reCheckInReason: reCheckInReason.trim() || undefined,
         photoUrl: photoUrl || undefined,
         ...(faceDescriptor ? { faceDescriptor } : {}),
+        ...(faceImage ? { faceImage } : {}),
       });
       if (!result.ok) {
         setMsg(result.message);
@@ -526,7 +530,10 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     }
   }
 
-  async function submitCheckOut(faceDescriptor?: number[]): Promise<boolean> {
+  async function submitCheckOut(
+    faceDescriptor?: number[],
+    faceImage?: string | null
+  ): Promise<boolean> {
     if (punchStatus?.earlyLeaveExpected && !punchStatus?.lateCheckOutPastWindow && !earlyLeaveReason.trim()) {
       setMsg(t("employee.earlyLeaveReasonRequired"));
       return false;
@@ -553,6 +560,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         earlyLeaveReason: earlyLeaveReason.trim() || undefined,
         overtimeReason: overtimeReason.trim() || undefined,
         ...(faceDescriptor ? { faceDescriptor } : {}),
+        ...(faceImage ? { faceImage } : {}),
       });
       if (!result.ok) {
         if (
@@ -608,8 +616,8 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     enrollSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   const checkInNotice = checkInBlockMessage();
+  /** busy(저장 중)로 FaceCapture 를 끄면 카메라 루프가 끊겨 재시도가 멈춤 — 폼 검증만 반영 */
   const checkInFaceDisabled =
-    busy ||
     (Boolean(punchStatus?.reCheckInApprovalRequired) && !reCheckInReason.trim()) ||
     (checkInMode === "businessTrip" &&
       (!businessTripLocation.trim() || !businessTripReason.trim()));
@@ -620,7 +628,6 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         ? t("employee.overtimeSubmitButton")
         : t("employee.checkOutOnly");
   const checkOutFaceDisabled =
-    busy ||
     (Boolean(punchStatus?.earlyLeaveExpected) &&
       !punchStatus?.lateCheckOutPastWindow &&
       !earlyLeaveReason.trim()) ||
@@ -835,8 +842,14 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                   autoVerify
                   fastScan
                   scanWhenFaceVisible
+                  verifyOnClientOnly
+                  highAccuracyScan
+                  profileKind="login"
+                  intent="punch"
                   disabled={checkInFaceDisabled}
-                  onVerified={(descriptor) => submitCheckIn(descriptor)}
+                  onVerified={(descriptor, ctx) =>
+                    submitCheckIn(descriptor, ctx?.previewUrl)
+                  }
                   onError={setMsg}
                 />
               </div>
@@ -1013,12 +1026,19 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
                   </button>
                   <FaceCapture
                     mode="verify"
+                    autoVerify
+                    fastScan
+                    scanWhenFaceVisible
+                    verifyOnClientOnly
+                    highAccuracyScan
+                    profileKind="login"
+                    intent="punch"
                     disabled={checkOutFaceDisabled}
                     verifyTitle={t("employee.faceVerifyCheckoutTitle")}
                     verifyLead={t("employee.faceVerifyCheckoutLead")}
                     verifyButton={t("employee.faceVerifyCheckoutButton")}
-                    onVerified={async (descriptor) => {
-                      const ok = await submitCheckOut(descriptor);
+                    onVerified={async (descriptor, ctx) => {
+                      const ok = await submitCheckOut(descriptor, ctx?.previewUrl);
                       if (ok) setCheckOutFaceStarted(false);
                       return ok;
                     }}

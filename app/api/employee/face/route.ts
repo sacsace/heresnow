@@ -9,7 +9,6 @@ import {
 } from "@/lib/faceEnrollGuard";
 import {
   loadEmployeeFaceCredentials,
-  matchFaceCredentials,
   syncEmployeeFaceFields,
 } from "@/lib/faceCredentials";
 import {
@@ -21,8 +20,9 @@ import {
   type EnrollmentPoseType,
   type EnrollmentSample,
 } from "@/lib/faceEnrollment";
-import { isValidFacePreviewUrl } from "@/lib/facePreviewValidation";
+import { attachDescriptorV2ToCredentials, matchFaceHybrid } from "@/lib/faceMatchHybrid";
 import { FACE_DESCRIPTOR_LENGTH, parseFaceDescriptor } from "@/lib/faceMatch";
+import { isValidFacePreviewUrl } from "@/lib/facePreviewValidation";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -50,7 +50,7 @@ const singleEnrollSchema = z.object({
 });
 
 const batchEnrollSchema = z.object({
-  samples: z.array(sampleSchema).min(5).max(10),
+  samples: z.array(sampleSchema).min(3).max(10),
   previewUrl: z.string().max(1_000_000).optional(),
   forceDespiteConflict: z.boolean().optional(),
 });
@@ -271,11 +271,16 @@ export async function POST(req: Request) {
     });
 
     await syncEmployeeFaceFields(session.user.employeeId);
+    const v2 = await attachDescriptorV2ToCredentials(
+      created.map((c) => c.id),
+      previewUrl
+    );
 
     return NextResponse.json({
       ok: true,
       enrolled: true,
       batchId,
+      embedV2: v2.ok,
       credentials: created.map((c) => ({
         id: c.id,
         createdAt: c.createdAt.toISOString(),
@@ -313,10 +318,12 @@ export async function POST(req: Request) {
   });
 
   await syncEmployeeFaceFields(session.user.employeeId);
+  const v2 = await attachDescriptorV2ToCredentials([created.id], previewUrl);
 
   return NextResponse.json({
     ok: true,
     enrolled: true,
+    embedV2: v2.ok,
     credential: {
       id: created.id,
       createdAt: created.createdAt.toISOString(),
@@ -392,13 +399,21 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = singleEnrollSchema.safeParse(json);
+  const verifySchema = z.object({
+    descriptor: z.array(z.number().finite()).length(FACE_DESCRIPTOR_LENGTH).optional(),
+    previewUrl: z.string().max(1_000_000).optional(),
+  });
+  const parsed = verifySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: "안면 인식에 실패했습니다." }, { status: 400 });
   }
 
-  const probe = parseFaceDescriptor(parsed.data.descriptor);
-  if (!probe) {
+  const probe = parsed.data.descriptor ? parseFaceDescriptor(parsed.data.descriptor) : null;
+  const previewUrl =
+    parsed.data.previewUrl != null && isValidFacePreviewUrl(parsed.data.previewUrl)
+      ? parsed.data.previewUrl
+      : null;
+  if (!probe && !previewUrl) {
     return NextResponse.json({ error: "안면 인식에 실패했습니다." }, { status: 400 });
   }
 
@@ -415,7 +430,11 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "등록된 안면 정보가 없습니다. 다시 등록해 주세요." }, { status: 400 });
   }
 
-  const result = matchFaceCredentials(credentials, probe);
+  const result = await matchFaceHybrid({
+    credentials,
+    probe128: probe,
+    faceImageDataUrl: previewUrl,
+  });
 
   if (!result.matched) {
     return NextResponse.json(
@@ -424,18 +443,10 @@ export async function PUT(req: Request) {
         matched: false,
         confidencePercent: result.confidencePercent,
         distance: result.distance,
+        matchPath: result.path,
       },
       { status: 403 }
     );
-  }
-
-  if (result.credentialId) {
-    void prisma.employeeFaceCredential
-      .update({
-        where: { id: result.credentialId },
-        data: { lastUsedAt: new Date() },
-      })
-      .catch(() => {});
   }
 
   return NextResponse.json({
@@ -443,6 +454,6 @@ export async function PUT(req: Request) {
     matched: true,
     confidencePercent: result.confidencePercent,
     distance: result.distance,
-    matchedCredentialId: result.credentialId,
+    matchPath: result.path,
   });
 }

@@ -28,21 +28,27 @@ export type FaceIdentityPolicy = {
   enrollmentSamePersonMaxDistance: number;
   /** Login — minimum match confidence % (distance-derived; not detection score) */
   loginMinConfidencePercent: number;
+  /** 출퇴근 1:1 — 이미 본인 세션이므로 로그인보다 약간 관대 */
+  punchMatchThreshold: number;
+  punchMinTemplateMatches: number;
 };
 
 const DEFAULT_POLICY: FaceIdentityPolicy = {
-  matchThreshold: parseEnvFloat("FACE_MATCH_THRESHOLD", 0.42),
-  loginMatchThreshold: parseEnvFloat("FACE_LOGIN_MATCH_THRESHOLD", 0.4),
-  doorMatchThreshold: parseEnvFloat("FACE_DOOR_MATCH_THRESHOLD", 0.4),
-  loginMinConfidencePercent: parseEnvInt("FACE_LOGIN_MIN_CONFIDENCE_PERCENT", 35),
-  identityMinMargin: parseEnvFloat("FACE_IDENTITY_MIN_MARGIN", 0.1),
+  matchThreshold: parseEnvFloat("FACE_MATCH_THRESHOLD", 0.4),
+  loginMatchThreshold: parseEnvFloat("FACE_LOGIN_MATCH_THRESHOLD", 0.38),
+  doorMatchThreshold: parseEnvFloat("FACE_DOOR_MATCH_THRESHOLD", 0.38),
+  loginMinConfidencePercent: parseEnvInt("FACE_LOGIN_MIN_CONFIDENCE_PERCENT", 40),
+  identityMinMargin: parseEnvFloat("FACE_IDENTITY_MIN_MARGIN", 0.12),
   minTemplateMatches: parseEnvInt("FACE_MIN_TEMPLATE_MATCHES", 2),
   enrollConflictMaxDistance: parseEnvFloat("FACE_ENROLL_CONFLICT_MAX_DISTANCE", 0.35),
   enrollConflictHardMaxDistance: parseEnvFloat("FACE_ENROLL_CONFLICT_HARD_MAX_DISTANCE", 0.28),
   enrollConflictMinTemplateHits: parseEnvInt("FACE_ENROLL_CONFLICT_MIN_TEMPLATE_HITS", 2),
   multiFrameRequiredMatches: parseEnvInt("FACE_MULTIFRAME_REQUIRED", 3),
   multiFrameTotal: parseEnvInt("FACE_MULTIFRAME_TOTAL", 5),
-  enrollmentSamePersonMaxDistance: parseEnvFloat("FACE_ENROLL_SAME_PERSON_MAX", 0.42),
+  enrollmentSamePersonMaxDistance: parseEnvFloat("FACE_ENROLL_SAME_PERSON_MAX", 0.4),
+  /** 1:1 세션 고정 — 조명·각도 편차 허용 (로그인 1:N 보다 관대) */
+  punchMatchThreshold: parseEnvFloat("FACE_PUNCH_MATCH_THRESHOLD", 0.58),
+  punchMinTemplateMatches: parseEnvInt("FACE_PUNCH_MIN_TEMPLATE_MATCHES", 1),
 };
 
 export type CompanyFacePolicyOverrides = {

@@ -11,7 +11,7 @@ export type FaceApiModule = typeof import("@vladmandic/face-api");
 
 export type FaceExtractOptions = {
   profileKind?: FaceProfileKind;
-  /** 감지 confidence 하한 (0~1) */
+  /** 감지 confidence 하한 (0~1) — 모델 minConfidence 와 후처리 공통 */
   minDetectionScore?: number;
   /** 얼굴 bbox 면적 / 프레임 면적 하한 */
   minFaceAreaRatio?: number;
@@ -20,8 +20,15 @@ export type FaceExtractOptions = {
 /** 로그인·1:N 식별 — 저품질 프레임으로 인한 오탐 방지 */
 export const LOGIN_FACE_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "login",
-  minDetectionScore: 0.55,
-  minFaceAreaRatio: 0.04,
+  minDetectionScore: 0.58,
+  minFaceAreaRatio: 0.05,
+};
+
+/** 출퇴근 1:1 검증 — 감지 실패로 「인식 중」에 머물지 않도록 완화 */
+export const PUNCH_FACE_EXTRACT_OPTIONS: FaceExtractOptions = {
+  profileKind: "login",
+  minDetectionScore: 0.32,
+  minFaceAreaRatio: 0.02,
 };
 
 export type FaceDetectionResult = {
@@ -160,8 +167,9 @@ export async function loadFaceModels(): Promise<void> {
     faceApiMod = await faceApiPromise;
     const modelPath = "/models";
     try {
-      await faceApiMod.nets.tinyFaceDetector.loadFromUri(modelPath);
       await Promise.all([
+        faceApiMod.nets.ssdMobilenetv1.loadFromUri(modelPath),
+        faceApiMod.nets.tinyFaceDetector.loadFromUri(modelPath),
         faceApiMod.nets.faceLandmark68TinyNet.loadFromUri(modelPath),
         faceApiMod.nets.faceRecognitionNet.loadFromUri(modelPath),
       ]);
@@ -174,7 +182,7 @@ export async function loadFaceModels(): Promise<void> {
     modelsReady = true;
     void warmupFaceInference(faceApiMod).catch(() => {});
     console.info(
-      `[face] ready backend=${activeBackend} inputSize=${profile.detectorInputSize}`
+      `[face] ready backend=${activeBackend} detector=ssd+tiny score=${profile.detectorScoreThreshold}`
     );
   });
 
@@ -202,11 +210,28 @@ async function warmupFaceInference(faceapi: FaceApiModule): Promise<void> {
     .withFaceDescriptor();
 }
 
-function detectorOptions(faceapi: FaceApiModule, kind: FaceProfileKind = "default") {
+type DetectorMode = "primary" | "fast";
+
+function detectorOptions(
+  faceapi: FaceApiModule,
+  kind: FaceProfileKind = "default",
+  mode: DetectorMode = "primary",
+  minConfidenceOverride?: number
+) {
   const profile = getFaceDeviceProfile(kind);
+  const minConfidence =
+    typeof minConfidenceOverride === "number"
+      ? minConfidenceOverride
+      : profile.detectorScoreThreshold;
+  const useSsd = mode === "primary" && profile.primaryDetector === "ssd";
+  if (useSsd) {
+    return new faceapi.SsdMobilenetv1Options({
+      minConfidence,
+    });
+  }
   return new faceapi.TinyFaceDetectorOptions({
     inputSize: profile.detectorInputSize,
-    scoreThreshold: profile.detectorScoreThreshold,
+    scoreThreshold: Math.min(minConfidence, 0.5),
   });
 }
 
@@ -236,7 +261,8 @@ export async function detectFaceInFrame(
   await loadFaceModels();
   const faceapi = getFaceApi();
   const kind = options?.profileKind ?? "default";
-  const result = await faceapi.detectSingleFace(input, detectorOptions(faceapi, kind));
+  /** 존재 여부만 — Tiny로 빠르게 */
+  const result = await faceapi.detectSingleFace(input, detectorOptions(faceapi, kind, "fast"));
   return !!result;
 }
 
@@ -249,8 +275,9 @@ export async function extractFaceDetection(
   const faceapi = getFaceApi();
   const kind = options?.profileKind ?? "default";
 
+  const minScore = options?.minDetectionScore ?? 0;
   const result = await faceapi
-    .detectSingleFace(input, detectorOptions(faceapi, kind))
+    .detectSingleFace(input, detectorOptions(faceapi, kind, "primary", minScore || undefined))
     .withFaceLandmarks(true)
     .withFaceDescriptor();
 
@@ -259,7 +286,6 @@ export async function extractFaceDetection(
   }
 
   const detectionScore = result.detection.score;
-  const minScore = options?.minDetectionScore ?? 0;
   if (detectionScore < minScore) return null;
 
   const minArea = options?.minFaceAreaRatio ?? 0;

@@ -18,8 +18,9 @@ function copyDir(src, dest, label) {
   console.log(`Copied ${label} to ${dest}`);
 }
 
-/** 런타임에 실제로 로드하는 3종만 public/models 에 복사 */
+/** 런타임에 로드하는 모델만 public/models 에 복사 (SSD + Tiny + landmark + recognition) */
 const REQUIRED_FACE_MODEL_PREFIXES = [
+  "ssd_mobilenetv1_model",
   "tiny_face_detector_model",
   "face_landmark_68_tiny_model",
   "face_recognition_model",

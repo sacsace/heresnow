@@ -78,7 +78,8 @@ export const ko = {
     faceAddButton: "안면 추가 등록",
     faceEnrollLimit: "안면은 최대 {max}개까지 등록할 수 있습니다.",
     faceEnrollCaptureTitle: "안면 등록",
-    faceEnrollCaptureLead: "정면·좌·우 등 5개 각도를 자동 캡처합니다. 등록 완성도 100%가 되면 자동 저장됩니다.",
+    faceEnrollCaptureLead:
+      "밝은 곳에서 정면·왼쪽·오른쪽 3단계를 자동 캡처합니다. 얼굴이 타원 안에 들어오면 됩니다.",
     faceEnrollOk: "안면이 등록되었습니다.",
     faceEnrollConflictOther:
       "다른 직원에게 이미 등록된 얼굴과 유사합니다. 본인 얼굴로 다시 등록해 주세요.",
@@ -1027,6 +1028,18 @@ export const ko = {
     navCompanies: "회사",
     navPricing: "요금표",
     navBilling: "상향 요청",
+    navMenuSettings: "메뉴 설정",
+    menuSettingsTitle: "메뉴 표시 설정",
+    menuSettingsLead: "전역으로 숨긴 메뉴를 root만 다시 켤 수 있습니다.",
+    menuSettingsHint:
+      "꺼져 있으면 모든 회사의 직원·관리자 화면에 해당 메뉴가 보이지 않으며, 직접 URL 접근도 막힙니다.",
+    menuSettingsWorkRequests: "근태 신청 메뉴 표시",
+    menuSettingsBilling: "결제하기 메뉴 표시",
+    menuSettingsSave: "저장",
+    menuSettingsSaved: "저장했습니다. 새로고침하면 메뉴에 반영됩니다.",
+    menuSettingsLoadFail: "설정을 불러오지 못했습니다.",
+    menuSettingsSaveFail: "저장에 실패했습니다.",
+    menuSettingsForbidden: "root 계정만 이 설정을 변경할 수 있습니다.",
     companiesTitle: "회사 (테넌트)",
     platformLead:
       "슈퍼관리자(SUPER_ADMIN)로 로그인한 계정이 HeresNow를 사용하는 모든 회사의 구독 만료·사용자 수(상한)를 조정합니다.",
@@ -1221,6 +1234,7 @@ export const ko = {
     faceScanning: "얼굴 인식 중…",
     faceScanIdle: "카메라 앞에 서 주세요.",
     faceStabilizing: "얼굴 확인 중… 잠시 유지해 주세요.",
+    facePunchHoldStill: "정면을 바라보고 잠시 움직이지 말아 주세요…",
     faceVerifyOk: "본인 확인되었습니다. 출근 처리 중…",
     faceVerifyRetry: "출퇴근 저장에 실패했습니다. 얼굴을 다시 맞춰 주세요.",
     faceVerifyFail: "본인 확인에 실패했습니다.",
@@ -1460,7 +1474,7 @@ export const en = {
     faceEnrollLimit: "You can register up to {max} face enrollments.",
     faceEnrollCaptureTitle: "Enroll face",
     faceEnrollCaptureLead:
-      "Automatically captures 5 angles. Saves when enrollment reaches 100%.",
+      "In good light, captures 3 steps: front, left, and right. Keep your face inside the oval.",
     faceEnrollOk: "Face enrolled successfully.",
     faceEnrollConflictOther:
       "This face is too similar to one already enrolled for another employee. Please enroll your own face again.",
@@ -2434,6 +2448,18 @@ export const en = {
     navCompanies: "Companies",
     navPricing: "Pricing",
     navBilling: "Upgrade requests",
+    navMenuSettings: "Menu settings",
+    menuSettingsTitle: "Menu visibility",
+    menuSettingsLead: "Only the root account can re-enable globally hidden menus.",
+    menuSettingsHint:
+      "When off, the menu is hidden for every company (employees and admins), and direct URLs are blocked.",
+    menuSettingsWorkRequests: "Show Work requests menu",
+    menuSettingsBilling: "Show Billing menu",
+    menuSettingsSave: "Save",
+    menuSettingsSaved: "Saved. Refresh to update navigation.",
+    menuSettingsLoadFail: "Could not load settings.",
+    menuSettingsSaveFail: "Save failed.",
+    menuSettingsForbidden: "Only the root account can change these settings.",
     companiesTitle: "Companies (tenants)",
     platformLead:
       "Signed in as a super admin (SUPER_ADMIN), you can adjust subscription end dates and per-company user limits.",
@@ -2629,6 +2655,7 @@ export const en = {
     faceScanning: "Scanning face…",
     faceScanIdle: "Stand in front of the camera.",
     faceStabilizing: "Hold still — verifying your face…",
+    facePunchHoldStill: "Face the camera and hold still…",
     faceVerifyOk: "Verified. Recording check-in…",
     faceVerifyRetry: "Could not save attendance. Please align your face again.",
     faceVerifyFail: "Face verification failed.",

@@ -19,6 +19,16 @@ enum Role {
   DOOR
 }
 
+/// 플랫폼 전역 설정 (root SUPER_ADMIN만 변경)
+model PlatformSettings {
+  id                   String   @id @default("default")
+  /// 근태 신청 메뉴 (직원·관리자)
+  showWorkRequestsMenu Boolean  @default(false)
+  /// 결제하기 메뉴 (관리자)
+  showBillingMenu      Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
+}
+
 enum AttendanceType {
   CHECK_IN
   CHECK_OUT
@@ -402,7 +412,12 @@ model EmployeeFaceCredential {
   id                String   @id @default(cuid())
   employeeId        String
   employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// face-api 128-d (레거시·오프라인 클라이언트 매칭)
   descriptor        Json
+  /// InsightFace 등 서버 임베딩 (예: 512-d). FACE_EMBED_SERVICE_URL 사용 시 저장
+  descriptorV2      Json?
+  /// 예: insightface-buffalo_l
+  embedModel        String?
   previewUrl        String?
   /// FRONT | LEFT_SLIGHT | RIGHT_SLIGHT | UP_OR_VARIATION | FRONT_VARIATION
   poseType          String?

@@ -1,23 +1,24 @@
 import { euclideanDistance } from "@/lib/faceMatch";
 import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 
-/** 등록에 필요한 유효 샘플 수 */
-export const ENROLLMENT_SAMPLE_TARGET = 5;
+/** 등록에 필요한 유효 샘플 수 (정면·좌·우) */
+export const ENROLLMENT_SAMPLE_TARGET = 3;
 
-export const ENROLLMENT_CAPTURE_COOLDOWN_MS = 900;
+export const ENROLLMENT_CAPTURE_COOLDOWN_MS = 700;
 export const ENROLLMENT_ANALYSIS_INTERVAL_MS = 125;
 
 /** Same-person enrollment gate — from face identity policy (env FACE_ENROLL_SAME_PERSON_MAX) */
 export function enrollmentSamePersonMaxDistance(): number {
   return resolveFaceIdentityPolicy().enrollmentSamePersonMaxDistance;
 }
-export const ENROLLMENT_DUPLICATE_MAX_DISTANCE = 0.18;
+export const ENROLLMENT_DUPLICATE_MAX_DISTANCE = 0.16;
 export const ENROLLMENT_FRONT_VARIATION_MIN_DISTANCE = 0.12;
 
-export const ENROLLMENT_MIN_QUALITY = 0.32;
+/** 3단계 등록 — 완료가 막히지 않도록 품질 게이트를 완화 */
+export const ENROLLMENT_MIN_QUALITY = 0.28;
 export const ENROLLMENT_MIN_DETECTION = 0.35;
-export const ENROLLMENT_MIN_AREA_RATIO = 0.02;
-export const ENROLLMENT_MAX_AREA_RATIO = 0.55;
+export const ENROLLMENT_MIN_AREA_RATIO = 0.025;
+export const ENROLLMENT_MAX_AREA_RATIO = 0.58;
 export const ENROLLMENT_MIN_BRIGHTNESS = 0.12;
 export const ENROLLMENT_MAX_BRIGHTNESS = 0.93;
 
@@ -28,12 +29,11 @@ export type EnrollmentPoseType =
   | "UP_OR_VARIATION"
   | "FRONT_VARIATION";
 
+/** 필수 3단계: 정면 → 왼쪽 → 오른쪽 */
 export const REQUIRED_ENROLLMENT_POSES: EnrollmentPoseType[] = [
   "FRONT",
   "LEFT_SLIGHT",
   "RIGHT_SLIGHT",
-  "UP_OR_VARIATION",
-  "FRONT_VARIATION",
 ];
 
 export type EnrollmentSample = {
@@ -73,12 +73,13 @@ export function classifyPose(yaw: number, pitch: number): EnrollmentPoseType | n
   const absYaw = Math.abs(yaw);
   const absPitch = Math.abs(pitch);
 
-  if (yaw <= -12 && yaw >= -35) return "LEFT_SLIGHT";
-  if (yaw >= 12 && yaw <= 35) return "RIGHT_SLIGHT";
+  /** 좌·우 각도를 넓게 인정 (8~40°) — 등록 완료가 쉽도록 */
+  if (yaw <= -8 && yaw >= -40) return "LEFT_SLIGHT";
+  if (yaw >= 8 && yaw <= 40) return "RIGHT_SLIGHT";
 
   if (absYaw <= 18) {
     if (pitch <= -12 || pitch >= 18) return "UP_OR_VARIATION";
-    if (absYaw <= 10 && absPitch <= 14) return "FRONT";
+    if (absYaw <= 12 && absPitch <= 16) return "FRONT";
     return "FRONT_VARIATION";
   }
 
@@ -95,19 +96,11 @@ export function resolveEffectivePose(
   if (poseType === needed) return poseType;
 
   if (needed === "FRONT") {
-    if (
-      poseType === "FRONT_VARIATION" ||
-      poseType === "UP_OR_VARIATION"
-    ) {
+    if (poseType === "FRONT_VARIATION" || poseType === "UP_OR_VARIATION") {
       return "FRONT";
     }
   }
-  if (needed === "FRONT_VARIATION") {
-    if (poseType === "FRONT" || poseType === "UP_OR_VARIATION") return "FRONT_VARIATION";
-  }
-  if (needed === "UP_OR_VARIATION" && poseType === "FRONT") {
-    return "UP_OR_VARIATION";
-  }
+  /** 좌·우 필요 시 FRONT_VARIATION도 약한 각도로 인정하지 않음 — LEFT/RIGHT만 */
 
   return null;
 }
@@ -176,19 +169,15 @@ export function nextNeededPose(samples: EnrollmentSample[]): EnrollmentPoseType 
   return null;
 }
 
-/** 등록 완성도 0~100 — 인식 정확도가 아님 */
+/** 등록 완성도 0~100 — 필수 포즈만 채우면 100% (품질로 80%에 멈추지 않음) */
 export function computeEnrollmentProgress(samples: EnrollmentSample[]): number {
   const covered = coveredPoses(samples);
   let filled = 0;
   for (const pose of REQUIRED_ENROLLMENT_POSES) {
     if (covered.has(pose)) filled += 1;
   }
-  if (filled < ENROLLMENT_SAMPLE_TARGET) {
-    return Math.round((filled / ENROLLMENT_SAMPLE_TARGET) * 100);
-  }
-  const avgQ = samples.reduce((a, s) => a + s.qualityScore, 0) / samples.length;
-  if (avgQ < ENROLLMENT_MIN_QUALITY) return 80;
-  return 100;
+  if (filled >= REQUIRED_ENROLLMENT_POSES.length) return 100;
+  return Math.round((filled / REQUIRED_ENROLLMENT_POSES.length) * 100);
 }
 
 export function isEnrollmentComplete(samples: EnrollmentSample[]): boolean {
@@ -295,18 +284,16 @@ export function validateEnrollmentBatch(samples: EnrollmentSample[]): string | n
     }
   }
 
-  for (let i = 0; i < samples.length; i++) {
-    for (let j = i + 1; j < samples.length; j++) {
-      const d = euclideanDistance(samples[i]!.descriptor, samples[j]!.descriptor);
-      if (d >= enrollmentSamePersonMaxDistance() + 0.08) {
+  /** 좌·우 포즈는 서로 멀 수 있음 — 정면 기준과만 동일인 검증 */
+  const front = samples.find((s) => s.poseType === "FRONT");
+  if (front) {
+    for (const s of samples) {
+      if (s === front) continue;
+      const d = euclideanDistance(front.descriptor, s.descriptor);
+      if (d >= enrollmentSamePersonMaxDistance() + 0.12) {
         return "등록 샘플 간 동일인 검증에 실패했습니다.";
       }
     }
-  }
-
-  const avgQ = samples.reduce((a, s) => a + s.qualityScore, 0) / samples.length;
-  if (avgQ < ENROLLMENT_MIN_QUALITY) {
-    return "평균 품질이 기준에 미달합니다.";
   }
 
   return null;

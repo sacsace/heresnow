@@ -2,12 +2,18 @@
 
 export type FaceProfileKind = "default" | "login" | "kiosk";
 
+/** 감지 모델 — ssd=정확도 우선, tiny=존재 여부·저사양 폴백 */
+export type FaceDetectorKind = "ssd" | "tiny";
+
 export type FaceDeviceProfile = {
   /** iOS/iPadOS WebKit — WebGL fp16 이슈로 WASM 우선 */
   preferWasmBackend: boolean;
-  /** tinyFaceDetector inputSize (작을수록 빠름, 정확도 약간↓) */
+  /** TinyFaceDetector inputSize (작을수록 빠름) */
   detectorInputSize: number;
+  /** TinyFace scoreThreshold / SSD minConfidence */
   detectorScoreThreshold: number;
+  /** 로그인·등록·검증 기본 감지기 */
+  primaryDetector: FaceDetectorKind;
   /** 인앱 브라우저 추정 (카메라 실패 시 안내용, 선차단 X) */
   likelyInAppBrowser: boolean;
   isMobile: boolean;
@@ -53,9 +59,9 @@ export function getFaceDeviceProfile(kind: FaceProfileKind = "default"): FaceDev
   if (kind === "kiosk") {
     return {
       preferWasmBackend: ios,
-      // 단말 모드: 속도/정확도 균형. 입력 해상도는 유지하고 confidence 기준을 더 엄격히.
       detectorInputSize: 320,
-      detectorScoreThreshold: 0.62,
+      detectorScoreThreshold: 0.55,
+      primaryDetector: "ssd",
       likelyInAppBrowser: isLikelyInAppBrowser(),
       isMobile: mobile,
     };
@@ -65,7 +71,9 @@ export function getFaceDeviceProfile(kind: FaceProfileKind = "default"): FaceDev
     return {
       preferWasmBackend: ios,
       detectorInputSize: 416,
-      detectorScoreThreshold: 0.58,
+      /** SSD minConfidence — Tiny 대비 약간 낮게 잡아 미검출↓ */
+      detectorScoreThreshold: 0.5,
+      primaryDetector: "ssd",
       likelyInAppBrowser: isLikelyInAppBrowser(),
       isMobile: mobile,
     };
@@ -81,7 +89,8 @@ export function getFaceDeviceProfile(kind: FaceProfileKind = "default"): FaceDev
   return {
     preferWasmBackend: ios,
     detectorInputSize,
-    detectorScoreThreshold: mobile ? 0.45 : 0.5,
+    detectorScoreThreshold: mobile ? 0.48 : 0.5,
+    primaryDetector: "ssd",
     likelyInAppBrowser: isLikelyInAppBrowser(),
     isMobile: mobile,
   };

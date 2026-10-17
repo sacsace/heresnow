@@ -16,12 +16,18 @@ type Props = {
   children: React.ReactNode;
   bodyClassName?: string;
   subscriptionExpired?: boolean;
+  /** 플랫폼 root 설정 — 근태 신청 메뉴 */
+  showWorkRequestsMenu?: boolean;
+  /** 플랫폼 root 설정 — 결제하기 메뉴 */
+  showBillingMenu?: boolean;
 };
 
 export function AdminChrome({
   children,
   bodyClassName = "",
   subscriptionExpired = false,
+  showWorkRequestsMenu = false,
+  showBillingMenu = false,
 }: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
@@ -41,7 +47,7 @@ export function AdminChrome({
         disabled: subscriptionExpired && !expiryAllowed.has(item.href),
       }));
 
-    return [
+    const groups = [
       {
         id: "core",
         label: "Core",
@@ -56,28 +62,41 @@ export function AdminChrome({
         label: "People",
         items: withExpiryGate([{ href: "/admin/employees", label: t("admin.navEmployees") }]),
       },
-      {
-        id: "approval",
-        label: t("admin.navApprovalGroup"),
-        items: withExpiryGate([
-          {
-            href: "/admin/approvals",
-            label: t("approvals.navTitle"),
-            badge: pendingReceivedCount,
-          },
-        ]),
-      },
+      ...(showWorkRequestsMenu
+        ? [
+            {
+              id: "approval",
+              label: t("admin.navApprovalGroup"),
+              items: withExpiryGate([
+                {
+                  href: "/admin/approvals",
+                  label: t("approvals.navTitle"),
+                  badge: pendingReceivedCount,
+                },
+              ]),
+            },
+          ]
+        : []),
       {
         id: "ops",
         label: "Operations",
         items: withExpiryGate([
-          { href: "/admin/billing", label: t("admin.navBilling") },
+          ...(showBillingMenu
+            ? [{ href: "/admin/billing", label: t("admin.navBilling") }]
+            : []),
           { href: "/admin/settings", label: t("admin.navSettings") },
           { href: "/admin/account", label: t("common.myAccount") },
         ]),
       },
     ];
-  }, [pendingReceivedCount, subscriptionExpired, t]);
+    return groups;
+  }, [
+    pendingReceivedCount,
+    showBillingMenu,
+    showWorkRequestsMenu,
+    subscriptionExpired,
+    t,
+  ]);
 
   const links = useMemo(() => menuGroups.flatMap((g) => g.items), [menuGroups]);
 

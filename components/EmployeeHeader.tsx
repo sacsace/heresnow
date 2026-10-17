@@ -11,7 +11,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 
-export function EmployeeHeader() {
+type Props = {
+  /** 플랫폼 root 설정 — 근태 신청 메뉴 */
+  showWorkRequestsMenu?: boolean;
+};
+
+export function EmployeeHeader({ showWorkRequestsMenu = false }: Props) {
   const { t } = useI18n();
   const pathname = usePathname();
   const pendingReceivedCount = usePendingReceivedApprovalsCount();
@@ -19,13 +24,17 @@ export function EmployeeHeader() {
   const navItems = useMemo(
     () => [
       { href: "/employee", label: t("employee.navPunch"), exact: true },
-      {
-        href: "/employee/approvals",
-        label: t("approvals.navTitle"),
-        badge: pendingReceivedCount,
-      },
+      ...(showWorkRequestsMenu
+        ? [
+            {
+              href: "/employee/approvals",
+              label: t("approvals.navTitle"),
+              badge: pendingReceivedCount,
+            },
+          ]
+        : []),
     ],
-    [pendingReceivedCount, t]
+    [pendingReceivedCount, showWorkRequestsMenu, t]
   );
 
   function isActive(href: string, exact?: boolean) {

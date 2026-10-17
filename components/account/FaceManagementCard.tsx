@@ -261,11 +261,14 @@ export function FaceManagementCard({ className = "" }: Props) {
                   verifyOnClientOnly
                   verifyTitle={t("account.faceTestButton")}
                   verifyLead={t("account.faceTestLead")}
-                  onVerified={async (descriptor) => {
+                  onVerified={async (descriptor, ctx) => {
                     const r = await fetch("/api/employee/face", {
                       method: "PUT",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ descriptor }),
+                      body: JSON.stringify({
+                        descriptor,
+                        ...(ctx?.previewUrl ? { previewUrl: ctx.previewUrl } : {}),
+                      }),
                     });
                     const j = (await r.json().catch(() => ({}))) as {
                       confidencePercent?: number;

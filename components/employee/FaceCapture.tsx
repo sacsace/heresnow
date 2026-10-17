@@ -22,6 +22,7 @@ import {
   extractFaceDetection,
   loadFaceModels,
   LOGIN_FACE_EXTRACT_OPTIONS,
+  PUNCH_FACE_EXTRACT_OPTIONS,
   type FaceExtractOptions,
 } from "@/lib/faceRecognitionClient";
 import { useI18n } from "@/components/LanguageProvider";
@@ -56,6 +57,8 @@ type Props = {
   profileKind?: FaceProfileKind;
   /** 연속 프레임 평균으로 인식 안정화 (출입문 단말) */
   highAccuracyScan?: boolean;
+  /** punch: 출퇴근 1:1 — 빠른 감지·이중 API 검증 없음 */
+  intent?: "punch" | "default";
   /** false: 실패 후에도 얼굴을 프레임에 유지한 채 재시도 (로그인) */
   blockRetryUntilFaceAbsent?: boolean;
   verifyRetryLabel?: string;
@@ -68,7 +71,7 @@ type Props = {
   onEnrolled?: () => void;
   onVerified?: (
     descriptor: number[],
-    context?: { frameDescriptors?: number[][] }
+    context?: { frameDescriptors?: number[][]; previewUrl?: string | null }
   ) => boolean | void | Promise<boolean | void>;
   onError?: (message: string) => void;
 };
@@ -85,9 +88,12 @@ const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const AUTO_SCAN_INITIAL_DELAY_MS_FAST = 50;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
 const HIGH_ACCURACY_FRAME_COUNT_LOGIN = 5;
+/** 출퇴근은 1프레임 즉시 검증 — 안정화 대기로 「인식 중」에 멈추지 않음 */
+const HIGH_ACCURACY_FRAME_COUNT_PUNCH = 1;
 const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 5;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
 const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.17;
+const HIGH_ACCURACY_MAX_SPREAD_PUNCH = 0.4;
 const ENROLL_ANGLE_COUNT = 3;
 const ENROLL_FRAMES_PER_ANGLE = 3;
 const ENROLL_MIN_QUALITY_PERCENT = 50;
@@ -129,7 +135,8 @@ export function FaceCapture({
   rootClassName,
   profileKind = "default",
   highAccuracyScan = false,
-  blockRetryUntilFaceAbsent = true,
+  intent = "default",
+  blockRetryUntilFaceAbsent: blockRetryUntilFaceAbsentProp,
   verifyRetryLabel,
   multiAngleEnroll: multiAngleEnrollProp,
   enrollCompareExisting = false,
@@ -141,6 +148,9 @@ export function FaceCapture({
 }: Props) {
   const multiAngleEnroll =
     multiAngleEnrollProp ?? (mode === "enroll" && profileKind === "login");
+  /** 출퇴근은 프레임을 유지한 채 바로 재시도 */
+  const blockRetryUntilFaceAbsent =
+    blockRetryUntilFaceAbsentProp ?? intent !== "punch";
   const { t } = useI18n();
   const tRef = useRef(t);
   tRef.current = t;
@@ -152,10 +162,14 @@ export function FaceCapture({
   const verifyBlockedUntilNoFaceRef = useRef(false);
   const faceInFrameRef = useRef(false);
   const qualityBufferRef = useRef<number[][]>([]);
+  /** 동시 tryAutoScan 방지 (rVFC + interval 경합) */
+  const scanInFlightRef = useRef(false);
   const profileKindRef = useRef(profileKind);
   profileKindRef.current = profileKind;
   const highAccuracyScanRef = useRef(highAccuracyScan);
   highAccuracyScanRef.current = highAccuracyScan;
+  const intentRef = useRef(intent);
+  intentRef.current = intent;
   const blockRetryUntilFaceAbsentRef = useRef(blockRetryUntilFaceAbsent);
   blockRetryUntilFaceAbsentRef.current = blockRetryUntilFaceAbsent;
   const verifyRetryLabelRef = useRef(verifyRetryLabel);
@@ -362,7 +376,9 @@ export function FaceCapture({
 
   const finishClientVerify = useCallback(
     async (arr: number[], frameDescriptors?: number[][]): Promise<boolean> => {
-      const verified = await onVerifiedRef.current?.(arr, { frameDescriptors });
+      const v = videoRef.current;
+      const previewUrl = v ? captureVideoFrameAsJpegDataUrl(v) : null;
+      const verified = await onVerifiedRef.current?.(arr, { frameDescriptors, previewUrl });
       if (verified === false) {
         setStatus(verifyRetryLabelRef.current ?? tRef.current("employee.faceVerifyRetry"));
         if (scanWhenFaceVisible && blockRetryUntilFaceAbsentRef.current) {
@@ -380,10 +396,15 @@ export function FaceCapture({
 
   const finishServerVerify = useCallback(
     async (arr: number[]): Promise<boolean> => {
+      const v = videoRef.current;
+      const previewUrl = v ? captureVideoFrameAsJpegDataUrl(v) : null;
       const r = await fetch("/api/employee/face", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ descriptor: arr }),
+        body: JSON.stringify({
+          descriptor: arr,
+          ...(previewUrl ? { previewUrl } : {}),
+        }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -397,7 +418,7 @@ export function FaceCapture({
         return false;
       }
       setStatus(tRef.current("employee.faceVerifyOk"));
-      const punchOk = await onVerifiedRef.current?.(arr);
+      const punchOk = await onVerifiedRef.current?.(arr, { previewUrl });
       if (punchOk === false) {
         setStatus(tRef.current("employee.faceVerifyRetry"));
         return false;
@@ -427,11 +448,13 @@ export function FaceCapture({
           }
         }
         const extractOpts =
-          profileKindRef.current === "kiosk"
-            ? KIOSK_EXTRACT_OPTIONS
-            : profileKindRef.current === "login"
-              ? LOGIN_FACE_EXTRACT_OPTIONS
-              : undefined;
+          intentRef.current === "punch"
+            ? PUNCH_FACE_EXTRACT_OPTIONS
+            : profileKindRef.current === "kiosk"
+              ? KIOSK_EXTRACT_OPTIONS
+              : profileKindRef.current === "login"
+                ? LOGIN_FACE_EXTRACT_OPTIONS
+                : undefined;
         let arr: number[] | null = null;
         if (mode === "enroll" && multiAngleEnroll) {
           const msg = tRef.current("employee.faceEnrollUseAuto");
@@ -662,76 +685,112 @@ export function FaceCapture({
     };
 
     async function tryAutoScan() {
-      if (cancelled || scanStoppedRef.current || disabled || !ready || cameraError || busyRef.current) {
+      if (
+        cancelled ||
+        scanStoppedRef.current ||
+        disabled ||
+        !ready ||
+        cameraError ||
+        busyRef.current ||
+        scanInFlightRef.current
+      ) {
         return;
       }
 
       const v = videoRef.current;
       if (!v) return;
 
-      if (scanWhenFaceVisible) {
-        const kind = profileKindRef.current;
-        const useHighAccuracy = highAccuracyScanRef.current && verifyOnClientOnly;
-        const extracted = await extractFaceDetection(
-          v,
-          kind === "kiosk"
-            ? KIOSK_EXTRACT_OPTIONS
-            : kind === "login"
-              ? LOGIN_FACE_EXTRACT_OPTIONS
-              : undefined
-        );
-        const faceVisible = !!extracted;
-        if (cancelled || scanStoppedRef.current) return;
+      scanInFlightRef.current = true;
+      try {
+        if (scanWhenFaceVisible) {
+          const kind = profileKindRef.current;
+          const isPunch = intentRef.current === "punch";
+          const useHighAccuracy = highAccuracyScanRef.current && verifyOnClientOnly;
+          const extractOpts = isPunch
+            ? PUNCH_FACE_EXTRACT_OPTIONS
+            : kind === "kiosk"
+              ? KIOSK_EXTRACT_OPTIONS
+              : kind === "login"
+                ? LOGIN_FACE_EXTRACT_OPTIONS
+                : undefined;
+          const extracted = await extractFaceDetection(v, extractOpts);
+          const faceVisible = !!extracted;
+          if (cancelled || scanStoppedRef.current) return;
 
-        const wasInFrame = faceInFrameRef.current;
-        faceInFrameRef.current = faceVisible;
-        setFaceInFrame(faceVisible);
+          const wasInFrame = faceInFrameRef.current;
+          faceInFrameRef.current = faceVisible;
+          setFaceInFrame(faceVisible);
 
-        if (!faceVisible) {
-          if (wasInFrame) {
-            onFaceAbsentRef.current?.();
-          }
-          qualityBufferRef.current = [];
-          verifyBlockedUntilNoFaceRef.current = false;
-          setStatus(scanIdleLabel ?? tRef.current("employee.faceScanIdle"));
-          return;
-        }
-
-        if (verifyBlockedUntilNoFaceRef.current) {
-          return;
-        }
-
-        if (useHighAccuracy) {
-          qualityBufferRef.current.push(descriptorToArray(extracted.descriptor));
-          const requiredFrames =
-            profileKindRef.current === "kiosk"
-              ? HIGH_ACCURACY_FRAME_COUNT_KIOSK
-              : profileKindRef.current === "login"
-                ? HIGH_ACCURACY_FRAME_COUNT_LOGIN
-                : HIGH_ACCURACY_FRAME_COUNT;
-          if (qualityBufferRef.current.length < requiredFrames) {
-            setStatus(tRef.current("employee.faceStabilizing"));
+          if (!faceVisible) {
+            if (wasInFrame) {
+              onFaceAbsentRef.current?.();
+            }
+            qualityBufferRef.current = [];
+            verifyBlockedUntilNoFaceRef.current = false;
+            setStatus(scanIdleLabel ?? tRef.current("employee.faceScanIdle"));
             return;
           }
 
-          const averaged = averageFaceDescriptors(qualityBufferRef.current);
-          const sampled = [...qualityBufferRef.current];
-          qualityBufferRef.current = [];
-          if (!averaged) return;
-          const spread = descriptorSpread(sampled, averaged);
-          const maxSpread =
-            profileKindRef.current === "login"
-              ? HIGH_ACCURACY_MAX_SPREAD_LOGIN
-              : HIGH_ACCURACY_MAX_SPREAD;
-          if (spread > maxSpread) {
-            setStatus(tRef.current("employee.faceStabilizing"));
+          if (verifyBlockedUntilNoFaceRef.current) {
+            return;
+          }
+
+          if (useHighAccuracy) {
+            qualityBufferRef.current.push(descriptorToArray(extracted.descriptor));
+            const requiredFrames = isPunch
+              ? HIGH_ACCURACY_FRAME_COUNT_PUNCH
+              : profileKindRef.current === "kiosk"
+                ? HIGH_ACCURACY_FRAME_COUNT_KIOSK
+                : profileKindRef.current === "login"
+                  ? HIGH_ACCURACY_FRAME_COUNT_LOGIN
+                  : HIGH_ACCURACY_FRAME_COUNT;
+            if (qualityBufferRef.current.length < requiredFrames) {
+              setStatus(
+                isPunch
+                  ? tRef.current("employee.facePunchHoldStill")
+                  : tRef.current("employee.faceStabilizing")
+              );
+              return;
+            }
+
+            const averaged = averageFaceDescriptors(qualityBufferRef.current);
+            const sampled = [...qualityBufferRef.current];
+            qualityBufferRef.current = [];
+            if (!averaged) return;
+
+            /** 출퇴근은 spread 거절로 무한 대기하지 않음 — 바로 매칭 */
+            if (!isPunch) {
+              const spread = descriptorSpread(sampled, averaged);
+              const maxSpread =
+                profileKindRef.current === "login"
+                  ? HIGH_ACCURACY_MAX_SPREAD_LOGIN
+                  : HIGH_ACCURACY_MAX_SPREAD;
+              if (spread > maxSpread) {
+                setStatus(tRef.current("employee.faceStabilizing"));
+                return;
+              }
+            }
+
+            busyRef.current = true;
+            setBusy(true);
+            try {
+              await finishClientVerify(averaged, sampled);
+            } finally {
+              busyRef.current = false;
+              setBusy(false);
+            }
             return;
           }
 
           busyRef.current = true;
           setBusy(true);
           try {
-            await finishClientVerify(averaged, sampled);
+            const arr = descriptorToArray(extracted.descriptor);
+            if (verifyOnClientOnly) {
+              await finishClientVerify(arr);
+            } else {
+              await finishServerVerify(arr);
+            }
           } finally {
             busyRef.current = false;
             setBusy(false);
@@ -739,23 +798,10 @@ export function FaceCapture({
           return;
         }
 
-        busyRef.current = true;
-        setBusy(true);
-        try {
-          const arr = descriptorToArray(extracted.descriptor);
-          if (verifyOnClientOnly) {
-            await finishClientVerify(arr);
-          } else {
-            await finishServerVerify(arr);
-          }
-        } finally {
-          busyRef.current = false;
-          setBusy(false);
-        }
-        return;
+        await runCapture({ silentNoFace: true });
+      } finally {
+        scanInFlightRef.current = false;
       }
-
-      await runCapture({ silentNoFace: true });
     }
 
     async function tick() {
@@ -926,7 +972,9 @@ export function FaceCapture({
                 ? t("employee.faceProcessing")
                 : scanWhenFaceVisible && !faceInFrame
                   ? (scanIdleLabel ?? t("employee.faceScanIdle"))
-                  : t("employee.faceScanning")}
+                  : status
+                    ? status
+                    : t("employee.faceScanning")}
             </div>
           )}
           {multiAngleEnrollActive && ready && !cameraError && !enrollDone && (

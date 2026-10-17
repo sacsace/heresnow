@@ -1,5 +1,6 @@
 import { AdminChrome } from "@/components/admin/AdminChrome";
 import { auth } from "@/auth";
+import { getPlatformMenuFlags } from "@/lib/platformMenuFlags";
 import { prisma } from "@/lib/prisma";
 import { requireConsent } from "@/lib/requireConsent";
 import { isSubscriptionExpired } from "@/lib/subscriptionAccess";
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireConsent();
   const session = await auth();
+  const menuFlags = await getPlatformMenuFlags();
 
   let subscriptionExpired = false;
   const companyId = session?.user?.companyId;
@@ -26,7 +28,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <AdminChrome bodyClassName={appContainerAdmin} subscriptionExpired={subscriptionExpired}>
+    <AdminChrome
+      bodyClassName={appContainerAdmin}
+      subscriptionExpired={subscriptionExpired}
+      showWorkRequestsMenu={menuFlags.showWorkRequestsMenu}
+      showBillingMenu={menuFlags.showBillingMenu}
+    >
       {children}
     </AdminChrome>
   );
