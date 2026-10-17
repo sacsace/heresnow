@@ -244,7 +244,11 @@ export function identifyEmployeeAmongCandidates(
     }
   }
 
-  const confidencePercent = distanceToConfidencePercent(best.bestDistance, threshold);
+  /** 인식률 %는 출퇴근·로그인 공통 스케일 (punchConfidenceReference) */
+  const confidencePercent = distanceToConfidencePercent(
+    best.bestDistance,
+    policy.punchConfidenceReference
+  );
   const minConfidence = context?.minConfidencePercent;
   if (minConfidence != null && confidencePercent < minConfidence) {
     const fail: FaceIdentifyFail = {

@@ -4,7 +4,7 @@ import {
   identifyEmployeeAmongCandidates,
   type FaceIdentifyFail,
 } from "@/lib/faceIdentityMatch";
-import { matchFaceCredentials } from "@/lib/faceCredentials";
+import { matchFaceCredentialsForPunch } from "@/lib/faceCredentials";
 import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 import { dedupeFaceProbes } from "@/lib/faceProbeDedupe";
 import { averageFaceDescriptors, parseFaceDescriptor } from "@/lib/faceMatch";
@@ -120,12 +120,12 @@ function mapLoginFailure(
   };
 }
 
-/** Final 1:1 check — identical to PUT /api/employee/face (account 「인식 테스트」) */
+/** Final 1:1 check — 출퇴근·인식 테스트와 동일 최소 인식률(60%) */
 function verifyLoginEmployee1to1(
   credentials: Array<{ id: string; descriptor: unknown }>,
   probe: number[]
 ): { ok: true; confidencePercent: number } | { ok: false; detail: FaceIdentifyFail["reason"] } {
-  const verify = matchFaceCredentials(credentials, probe);
+  const verify = matchFaceCredentialsForPunch(credentials, probe);
   if (!verify.matched) {
     const detail = (verify.reason ?? "MATCH_THRESHOLD_FAILED") as FaceIdentifyFail["reason"];
     return { ok: false, detail };

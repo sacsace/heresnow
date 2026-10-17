@@ -261,6 +261,7 @@ export function FaceManagementCard({ className = "" }: Props) {
                   verifyOnClientOnly
                   verifyTitle={t("account.faceTestButton")}
                   verifyLead={t("account.faceTestLead")}
+                  verifyButton={t("account.faceTestVerifyButton")}
                   onVerified={async (descriptor, ctx) => {
                     const r = await fetch("/api/employee/face", {
                       method: "PUT",

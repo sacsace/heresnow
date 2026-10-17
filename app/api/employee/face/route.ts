@@ -22,6 +22,7 @@ import {
 } from "@/lib/faceEnrollment";
 import { attachDescriptorV2ToCredentials, matchFaceHybrid } from "@/lib/faceMatchHybrid";
 import { FACE_DESCRIPTOR_LENGTH, parseFaceDescriptor } from "@/lib/faceMatch";
+import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 import { isValidFacePreviewUrl } from "@/lib/facePreviewValidation";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "node:crypto";
@@ -430,20 +431,28 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "등록된 안면 정보가 없습니다. 다시 등록해 주세요." }, { status: 400 });
   }
 
+  /** 계정 「인식 테스트」= 출근과 동일 1:1·인식률 스케일 (출근 기록은 없음) */
   const result = await matchFaceHybrid({
     credentials,
     probe128: probe,
     faceImageDataUrl: previewUrl,
+    purpose: "punch",
   });
 
   if (!result.matched) {
+    const pct = result.confidencePercent;
+    const minPct = resolveFaceIdentityPolicy().punchMinConfidencePercent;
+    const low = Number.isFinite(pct) && pct > 0 && pct < minPct;
     return NextResponse.json(
       {
-        error: "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다.",
+        error: low
+          ? `얼굴 일치율이 ${pct}%입니다. ${minPct}% 이상이어야 합니다. 밝은 곳에서 정면을 맞춰 주세요.`
+          : "등록된 얼굴과 일치하지 않습니다. 밝은 곳에서 정면을 맞춰 주세요.",
         matched: false,
         confidencePercent: result.confidencePercent,
         distance: result.distance,
         matchPath: result.path,
+        code: low ? "FACE_LOW_CONFIDENCE" : "FACE_NOT_MATCHED",
       },
       { status: 403 }
     );

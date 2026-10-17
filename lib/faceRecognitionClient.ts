@@ -15,6 +15,8 @@ export type FaceExtractOptions = {
   minDetectionScore?: number;
   /** 얼굴 bbox 면적 / 프레임 면적 하한 */
   minFaceAreaRatio?: number;
+  /** primary(SSD) 실패 시 TinyFaceDetector 로 재시도 */
+  detectorFallback?: boolean;
 };
 
 /** 로그인·1:N 식별 — 저품질 프레임으로 인한 오탐 방지 */
@@ -24,11 +26,12 @@ export const LOGIN_FACE_EXTRACT_OPTIONS: FaceExtractOptions = {
   minFaceAreaRatio: 0.05,
 };
 
-/** 출퇴근 1:1 검증 — 감지 실패로 「인식 중」에 머물지 않도록 완화 */
+/** 출퇴근 1:1 — 감지 누락 최소화(SSD→Tiny), 매칭 품질은 서버 70% 게이트 */
 export const PUNCH_FACE_EXTRACT_OPTIONS: FaceExtractOptions = {
   profileKind: "login",
-  minDetectionScore: 0.32,
-  minFaceAreaRatio: 0.02,
+  minDetectionScore: 0.28,
+  minFaceAreaRatio: 0.012,
+  detectorFallback: true,
 };
 
 export type FaceDetectionResult = {
@@ -266,6 +269,19 @@ export async function detectFaceInFrame(
   return !!result;
 }
 
+async function detectWithDescriptor(
+  faceapi: FaceApiModule,
+  input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+  kind: FaceProfileKind,
+  mode: DetectorMode,
+  minScore: number
+) {
+  return faceapi
+    .detectSingleFace(input, detectorOptions(faceapi, kind, mode, minScore || undefined))
+    .withFaceLandmarks(true)
+    .withFaceDescriptor();
+}
+
 /** 품질 검사 포함 descriptor 추출 */
 export async function extractFaceDetection(
   input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
@@ -274,12 +290,15 @@ export async function extractFaceDetection(
   await loadFaceModels();
   const faceapi = getFaceApi();
   const kind = options?.profileKind ?? "default";
-
   const minScore = options?.minDetectionScore ?? 0;
-  const result = await faceapi
-    .detectSingleFace(input, detectorOptions(faceapi, kind, "primary", minScore || undefined))
-    .withFaceLandmarks(true)
-    .withFaceDescriptor();
+
+  let result = await detectWithDescriptor(faceapi, input, kind, "primary", minScore);
+  if (
+    (!result?.descriptor || result.descriptor.length !== FACE_DESCRIPTOR_LENGTH) &&
+    options?.detectorFallback
+  ) {
+    result = await detectWithDescriptor(faceapi, input, kind, "fast", minScore);
+  }
 
   if (!result?.descriptor || result.descriptor.length !== FACE_DESCRIPTOR_LENGTH) {
     return null;

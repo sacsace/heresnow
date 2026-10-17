@@ -28,8 +28,15 @@ export type FaceIdentityPolicy = {
   enrollmentSamePersonMaxDistance: number;
   /** Login — minimum match confidence % (distance-derived; not detection score) */
   loginMinConfidencePercent: number;
-  /** 출퇴근 1:1 — 이미 본인 세션이므로 로그인보다 약간 관대 */
+  /** 출퇴근 1:1 — 유클리드 거리 상한 (이보다 멀면 무조건 거절) */
   punchMatchThreshold: number;
+  /**
+   * 출퇴근 인식률 % 계산 기준 거리 (이 거리=0%).
+   * confidence = (1 - distance / punchConfidenceReference) * 100
+   */
+  punchConfidenceReference: number;
+  /** 출퇴근 최소 인식률 % — 이보다 낮으면 체크인 불가 (20~40% 통과 방지) */
+  punchMinConfidencePercent: number;
   punchMinTemplateMatches: number;
 };
 
@@ -37,7 +44,7 @@ const DEFAULT_POLICY: FaceIdentityPolicy = {
   matchThreshold: parseEnvFloat("FACE_MATCH_THRESHOLD", 0.4),
   loginMatchThreshold: parseEnvFloat("FACE_LOGIN_MATCH_THRESHOLD", 0.38),
   doorMatchThreshold: parseEnvFloat("FACE_DOOR_MATCH_THRESHOLD", 0.38),
-  loginMinConfidencePercent: parseEnvInt("FACE_LOGIN_MIN_CONFIDENCE_PERCENT", 40),
+  loginMinConfidencePercent: parseEnvInt("FACE_LOGIN_MIN_CONFIDENCE_PERCENT", 60),
   identityMinMargin: parseEnvFloat("FACE_IDENTITY_MIN_MARGIN", 0.12),
   minTemplateMatches: parseEnvInt("FACE_MIN_TEMPLATE_MATCHES", 2),
   enrollConflictMaxDistance: parseEnvFloat("FACE_ENROLL_CONFLICT_MAX_DISTANCE", 0.35),
@@ -46,8 +53,17 @@ const DEFAULT_POLICY: FaceIdentityPolicy = {
   multiFrameRequiredMatches: parseEnvInt("FACE_MULTIFRAME_REQUIRED", 3),
   multiFrameTotal: parseEnvInt("FACE_MULTIFRAME_TOTAL", 5),
   enrollmentSamePersonMaxDistance: parseEnvFloat("FACE_ENROLL_SAME_PERSON_MAX", 0.4),
-  /** 1:1 세션 고정 — 조명·각도 편차 허용 (로그인 1:N 보다 관대) */
-  punchMatchThreshold: parseEnvFloat("FACE_PUNCH_MATCH_THRESHOLD", 0.58),
+  /**
+   * 절대 거리 상한 (face-api 동일인 통상 0.25~0.45).
+   * 이보다 멀면 인식률과 무관하게 거절.
+   */
+  punchMatchThreshold: parseEnvFloat("FACE_PUNCH_MATCH_THRESHOLD", 0.48),
+  /**
+   * 인식률 % 스케일 — distance 0 → 100%, reference → 0%.
+   * 동일인 거리 0.35≈74%, 0.40≈70%, 0.54≈60%
+   */
+  punchConfidenceReference: parseEnvFloat("FACE_PUNCH_CONFIDENCE_REFERENCE", 1.35),
+  punchMinConfidencePercent: parseEnvInt("FACE_PUNCH_MIN_CONFIDENCE_PERCENT", 60),
   punchMinTemplateMatches: parseEnvInt("FACE_PUNCH_MIN_TEMPLATE_MATCHES", 1),
 };
 

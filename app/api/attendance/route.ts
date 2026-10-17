@@ -25,6 +25,7 @@ import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { formatInTimeZone } from "date-fns-tz";
 import { FACE_DESCRIPTOR_LENGTH, parseFaceDescriptor } from "@/lib/faceMatch";
 import { matchFaceHybrid } from "@/lib/faceMatchHybrid";
+import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 import { isValidFacePreviewUrl } from "@/lib/facePreviewValidation";
 import {
   enqueueMvsAttendanceIfEnabled,
@@ -258,17 +259,23 @@ export async function POST(req: Request) {
       purpose: "punch",
     });
     if (!match.matched) {
+      const pct = match.confidencePercent;
+      const minPct = resolveFaceIdentityPolicy().punchMinConfidencePercent;
+      const lowConfidence = Number.isFinite(pct) && pct > 0 && pct < minPct;
       const body: Record<string, unknown> = {
-        error:
-          type === "CHECK_IN"
+        error: lowConfidence
+          ? type === "CHECK_IN"
+            ? `얼굴 일치율이 ${pct}%입니다. ${minPct}% 이상이어야 출근할 수 있습니다. 밝은 곳에서 정면을 맞춰 주세요.`
+            : `얼굴 일치율이 ${pct}%입니다. ${minPct}% 이상이어야 퇴근할 수 있습니다. 밝은 곳에서 정면을 맞춰 주세요.`
+          : type === "CHECK_IN"
             ? "등록된 얼굴과 일치하지 않습니다. 본인만 출근할 수 있습니다."
             : "등록된 얼굴과 일치하지 않습니다. 본인만 퇴근할 수 있습니다.",
-        code: "FACE_NOT_MATCHED",
+        code: lowConfidence ? "FACE_LOW_CONFIDENCE" : "FACE_NOT_MATCHED",
         matchPath: match.path,
+        confidencePercent: pct,
       };
       if (process.env.NODE_ENV === "development") {
         body.distance = match.distance;
-        body.confidencePercent = match.confidencePercent;
       }
       return NextResponse.json(body, { status: 403 });
     }

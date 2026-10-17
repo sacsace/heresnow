@@ -1,4 +1,4 @@
-import { parseFaceDescriptor } from "@/lib/faceMatch";
+import { distanceToConfidencePercent, parseFaceDescriptor } from "@/lib/faceMatch";
 import { verifyEmployeeTemplates } from "@/lib/faceIdentityMatch";
 import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
 import { prisma } from "@/lib/prisma";
@@ -48,15 +48,31 @@ export function matchFaceCredentials(
   };
 }
 
-/** 출퇴근용 1:1 — 세션 직원 고정, 템플릿 1개만 통과해도 인정 */
+/** 출퇴근용 1:1 — 세션 직원 고정, 최소 인식률(기본 60%) 미만은 거절 */
 export function matchFaceCredentialsForPunch(
   credentials: FaceCredentialRow[],
   probe: number[]
 ): FaceMatchResult {
   const policy = resolveFaceIdentityPolicy();
-  return matchFaceCredentials(credentials, probe, policy.punchMatchThreshold, {
+  const result = matchFaceCredentials(credentials, probe, policy.punchMatchThreshold, {
     minTemplateMatches: policy.punchMinTemplateMatches,
   });
+  const confidencePercent = distanceToConfidencePercent(
+    result.distance,
+    policy.punchConfidenceReference
+  );
+  if (!result.matched) {
+    return { ...result, confidencePercent };
+  }
+  if (confidencePercent < policy.punchMinConfidencePercent) {
+    return {
+      ...result,
+      matched: false,
+      confidencePercent,
+      reason: "LOW_CONFIDENCE",
+    };
+  }
+  return { ...result, confidencePercent };
 }
 
 /** Employee.faceDescriptor 등 레거시 필드를 credential 테이블과 동기화 */

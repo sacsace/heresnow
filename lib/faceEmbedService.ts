@@ -119,14 +119,12 @@ export function matchDescriptorV2Gallery(
     if (s > best) best = s;
   }
   const matched = best >= threshold;
-  const confidencePercent = Math.max(
-    0,
-    Math.min(100, Math.round(((best - (threshold - 0.15)) / 0.3) * 100))
-  );
+  /** 코사인 유사도를 0~100%로 — 약한 매칭을 50%로 부풀리지 않음 */
+  const confidencePercent = Math.max(0, Math.min(100, Math.round(best * 100)));
   return {
     matched,
     bestSimilarity: best,
-    confidencePercent: matched ? Math.max(confidencePercent, 50) : confidencePercent,
+    confidencePercent,
     model: FACE_EMBED_MODEL_DEFAULT,
   };
 }

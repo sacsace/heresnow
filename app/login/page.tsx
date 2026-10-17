@@ -361,6 +361,8 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                /** 비밀번호 관리자 확장(data-sharkid 등)이 속성을 주입해도 hydration 경고가 뜨지 않게 */
+                suppressHydrationWarning
               />
             </div>
             <div className={authFieldGroup}>

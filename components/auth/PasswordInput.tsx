@@ -45,6 +45,7 @@ export function PasswordInput({ inputClassName, className, disabled, ...props }:
         type={visible ? "text" : "password"}
         disabled={disabled}
         className={`${inputClassName} pr-11`}
+        suppressHydrationWarning
       />
       <button
         type="button"

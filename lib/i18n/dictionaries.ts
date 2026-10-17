@@ -105,7 +105,8 @@ export const ko = {
     faceDeleted: "안면 등록이 삭제되었습니다.",
     faceTestButton: "인식 테스트",
     faceTestLead:
-      "카메라에 얼굴을 맞추면 등록된 안면과 비교해 인식률(%)을 표시합니다. 출근·로그인과 동일한 기준입니다.",
+      "카메라에 얼굴을 맞추고 아래 버튼을 누르면 등록된 안면과 비교해 인식률(%)만 표시합니다. 출근·퇴근은 기록되지 않습니다.",
+    faceTestVerifyButton: "인식률 확인",
     faceTestOk: "등록된 얼굴과 일치합니다. 로그인에 사용할 수 있습니다.",
     faceTestFail: "등록된 얼굴과 일치하지 않습니다. 밝은 곳에서 정면을 맞춰 다시 등록해 주세요.",
     faceTestOkPercent: "일치합니다. 인식률 {percent}%",
@@ -1500,13 +1501,14 @@ export const en = {
     faceDeleted: "Face enrollment deleted.",
     faceTestButton: "Test recognition",
     faceTestLead:
-      "Align your face in the camera to compare against enrollments and show a match score (%). Same criteria as check-in and sign-in.",
+      "Align your face and tap the button below to see a match score (%) only. Check-in/out is not recorded.",
+    faceTestVerifyButton: "Check recognition rate",
     faceTestOk: "Your face matches the enrolled data. You can use it to sign in.",
     faceTestFail:
       "Your face does not match the enrolled data. Re-enroll facing the camera in good light.",
     faceTestOkPercent: "Match confirmed. Recognition {percent}%",
     faceTestFailPercent: "No match. Recognition {percent}%",
-    faceCancelTest: "Cancel test",
+    faceCancelTest: "End test",
     faceDisabledNote: "Face recognition is not used by this company.",
     faceLoadFail: "Could not load face enrollment status.",
     faceViewButton: "View enrolled face",

@@ -88,8 +88,8 @@ const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const AUTO_SCAN_INITIAL_DELAY_MS_FAST = 50;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
 const HIGH_ACCURACY_FRAME_COUNT_LOGIN = 5;
-/** 출퇴근은 1프레임 즉시 검증 — 안정화 대기로 「인식 중」에 멈추지 않음 */
-const HIGH_ACCURACY_FRAME_COUNT_PUNCH = 1;
+/** 출퇴근: 2프레임 평균으로 인식률↑, spread 거절 없음(대기 고착 방지) */
+const HIGH_ACCURACY_FRAME_COUNT_PUNCH = 2;
 const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 5;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
 const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.17;
@@ -712,7 +712,17 @@ export function FaceCapture({
               : kind === "login"
                 ? LOGIN_FACE_EXTRACT_OPTIONS
                 : undefined;
-          const extracted = await extractFaceDetection(v, extractOpts);
+          if (v.readyState < 2 || (v.videoWidth ?? 0) < 16) {
+            setStatus(scanIdleLabel ?? tRef.current("employee.faceScanIdle"));
+            return;
+          }
+
+          let extracted: Awaited<ReturnType<typeof extractFaceDetection>> = null;
+          try {
+            extracted = await extractFaceDetection(v, extractOpts);
+          } catch {
+            extracted = null;
+          }
           const faceVisible = !!extracted;
           if (cancelled || scanStoppedRef.current) return;
 
