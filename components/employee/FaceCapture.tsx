@@ -723,14 +723,14 @@ export function FaceCapture({
           } catch {
             extracted = null;
           }
-          const faceVisible = !!extracted;
           if (cancelled || scanStoppedRef.current) return;
 
           const wasInFrame = faceInFrameRef.current;
+          const faceVisible = extracted != null;
           faceInFrameRef.current = faceVisible;
           setFaceInFrame(faceVisible);
 
-          if (!faceVisible) {
+          if (!extracted) {
             if (wasInFrame) {
               onFaceAbsentRef.current?.();
             }
