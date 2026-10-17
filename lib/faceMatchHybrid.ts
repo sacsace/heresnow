@@ -16,9 +16,9 @@ export type HybridFaceMatchInput = {
   credentials: Array<FaceCredentialRow & { descriptorV2?: unknown }>;
   /** face-api 128-d probe (항상 권장) */
   probe128: number[] | null;
-  /** 얼굴 JPEG data URL — 서버 임베딩용 (V1 실패 시 보조) */
+  /** 얼굴 JPEG data URL — InsightFace 서버 임베딩용 */
   faceImageDataUrl?: string | null;
-  /** punch: 출퇴근 1:1 — V1 우선, 최소 인식률 60% */
+  /** punch: 출퇴근 1:1 — V1·V2 중 높은 인식률 채택, 최소 60% */
   purpose?: "punch" | "default";
 };
 
@@ -31,76 +31,63 @@ export type HybridFaceMatchResult = {
 };
 
 /**
- * 출퇴근은 기존 face-api(V1) 등록을 우선 매칭해 배포/임베딩 변경으로
- * 기존 사용자가 깨지지 않게 한다. V2는 V1 실패 시에만 보조.
+ * V1(face-api)과 V2(InsightFace)를 함께 평가해 더 높은 인식률을 채택.
+ * 기존 128-d 등록만 있어도 V1으로 동작하고, V2가 있으면 정확도가 올라간다.
  */
 export async function matchFaceHybrid(input: HybridFaceMatchInput): Promise<HybridFaceMatchResult> {
   const punch = input.purpose === "punch";
   const minConf = punch ? resolveFaceIdentityPolicy().punchMinConfidencePercent : 0;
 
-  let v1Fail: HybridFaceMatchResult | null = null;
-
-  if (input.probe128) {
-    const v1 = punch
-      ? matchFaceCredentialsForPunch(input.credentials, input.probe128)
-      : matchFaceCredentials(input.credentials, input.probe128);
-    if (v1.matched && v1.confidencePercent >= minConf) {
-      return {
-        matched: true,
-        confidencePercent: v1.confidencePercent,
-        distance: v1.distance,
-        path: "client_v1",
-      };
-    }
-    v1Fail = {
-      matched: false,
-      confidencePercent: v1.confidencePercent,
-      distance: v1.distance,
-      path: "client_v1",
-    };
-    /** 저신뢰(20~40%대)는 V2로도 우회 불가 — 본인 확인 강화 */
-    if (punch && v1.reason === "LOW_CONFIDENCE") {
-      return v1Fail;
-    }
-  }
-
   const galleryV2 = input.credentials
     .map((c) => parseDescriptorV2(c.descriptorV2))
     .filter((v): v is number[] => v != null);
 
-  const v2Threshold = punch ? 0.45 : undefined;
+  const v2Threshold = punch ? 0.42 : undefined;
 
-  if (
-    galleryV2.length > 0 &&
-    input.faceImageDataUrl &&
-    isFaceEmbedServiceConfigured()
-  ) {
-    const emb = await requestFaceEmbedding(input.faceImageDataUrl);
-    if (emb) {
-      const server = matchDescriptorV2Gallery(
-        galleryV2,
-        emb.embedding,
-        v2Threshold
-      );
-      if (server.matched && server.confidencePercent >= minConf) {
-        return {
-          matched: true,
-          confidencePercent: server.confidencePercent,
-          path: "server_v2",
-          server,
-        };
-      }
-      return {
-        matched: false,
-        confidencePercent: Math.max(server.confidencePercent, v1Fail?.confidencePercent ?? 0),
-        distance: v1Fail?.distance,
-        path: "server_v2",
-        server,
-      };
+  const v1Task = (async (): Promise<HybridFaceMatchResult | null> => {
+    if (!input.probe128) return null;
+    const v1 = punch
+      ? matchFaceCredentialsForPunch(input.credentials, input.probe128)
+      : matchFaceCredentials(input.credentials, input.probe128);
+    return {
+      matched: v1.matched && v1.confidencePercent >= minConf,
+      confidencePercent: v1.confidencePercent,
+      distance: v1.distance,
+      path: "client_v1",
+    };
+  })();
+
+  const v2Task = (async (): Promise<HybridFaceMatchResult | null> => {
+    if (
+      galleryV2.length === 0 ||
+      !input.faceImageDataUrl ||
+      !isFaceEmbedServiceConfigured()
+    ) {
+      return null;
     }
-  }
+    const emb = await requestFaceEmbedding(input.faceImageDataUrl);
+    if (!emb) return null;
+    const server = matchDescriptorV2Gallery(galleryV2, emb.embedding, v2Threshold);
+    return {
+      matched: server.matched && server.confidencePercent >= minConf,
+      confidencePercent: server.confidencePercent,
+      path: "server_v2",
+      server,
+    };
+  })();
 
-  if (v1Fail) return v1Fail;
+  const [v1, v2] = await Promise.all([v1Task, v2Task]);
+
+  const passed = [v1, v2]
+    .filter((r): r is HybridFaceMatchResult => r != null && r.matched)
+    .sort((a, b) => b.confidencePercent - a.confidencePercent);
+  if (passed[0]) return passed[0];
+
+  const failed = [v1, v2]
+    .filter((r): r is HybridFaceMatchResult => r != null)
+    .sort((a, b) => b.confidencePercent - a.confidencePercent);
+  if (failed[0]) return { ...failed[0], matched: false };
+
   return { matched: false, confidencePercent: 0, path: "none" };
 }
 
@@ -124,4 +111,35 @@ export async function attachDescriptorV2ToCredentials(
     },
   });
   return { ok: true, model: emb.model };
+}
+
+/** previewUrl 있는 기존 등록에 descriptorV2 일괄 채움 (InsightFace 활성 시) */
+export async function backfillDescriptorV2FromPreviews(limit = 50): Promise<{
+  processed: number;
+  updated: number;
+  skipped: number;
+}> {
+  if (!isFaceEmbedServiceConfigured()) {
+    return { processed: 0, updated: 0, skipped: 0 };
+  }
+  const { prisma } = await import("@/lib/prisma");
+  const rows = await prisma.employeeFaceCredential.findMany({
+    where: { previewUrl: { not: null } },
+    select: { id: true, previewUrl: true, descriptorV2: true },
+    take: Math.min(400, Math.max(1, limit * 3)),
+    orderBy: { createdAt: "desc" },
+  });
+
+  const targets = rows
+    .filter((r) => parseDescriptorV2(r.descriptorV2) == null)
+    .slice(0, Math.min(200, Math.max(1, limit)));
+
+  let updated = 0;
+  let skipped = 0;
+  for (const row of targets) {
+    const r = await attachDescriptorV2ToCredentials([row.id], row.previewUrl);
+    if (r.ok) updated += 1;
+    else skipped += 1;
+  }
+  return { processed: targets.length, updated, skipped };
 }

@@ -3,20 +3,30 @@
 ## 단계
 
 ### A (앱에 포함됨) — 클라이언트 강화
-- 감지: **SSD MobileNet v1** (로그인·등록·검증), Tiny는 존재 여부용
+- 감지: **SSD MobileNet v1** + 출퇴근 시 Tiny **폴백**
 - 등록 품질 게이트 강화 (밝기·크기·detection)
-- 매칭 임계값·마진·로그인 신뢰도 기본값 소폭 강화
+- 출퇴근 **4프레임 평균** + 최소 인식률 **60%**
+- 매칭: face-api(V1)와 InsightFace(V2) 중 **더 높은 인식률** 채택
 
-### B1 — 서버 InsightFace (선택, 환경변수로 활성)
+### B1 — 서버 InsightFace (권장, 환경변수로 활성)
 1. `services/face-embed` 사이드카 기동 (InsightFace `buffalo_l`, 512-d)
 2. Railway/호스트에 `FACE_EMBED_SERVICE_URL` (+ 선택 `FACE_EMBED_SERVICE_SECRET`) 설정
 3. 등록 시 `previewUrl`로 서버 임베딩 → `EmployeeFaceCredential.descriptorV2` 저장
-4. 검증·출근: `descriptorV2`가 있으면 **서버 코사인 유사도** 우선, 없으면 face-api 128-d
+4. root **메뉴 설정**에서 「기존 등록에 V2 임베딩 채우기」로 백필 가능
 
-### 하이브리드
-- 기기: SSD로 얼굴 품질·크롭 (빠름)
-- 서버: InsightFace 임베딩·매칭 (정확)
-- 서비스 미설정/실패 시 자동으로 레거시 128-d 폴백
+## Railway에 face-embed 배포
+
+1. Railway 프로젝트에 **Empty Service** 추가 → Root Directory: `services/face-embed`
+2. Dockerfile 빌드 (`services/face-embed/railway.toml` 참고)
+3. 변수 (선택): `FACE_EMBED_SERVICE_SECRET=<긴-랜덤>`
+4. 공개 URL 확인 후 **heresnow** 서비스에:
+   ```
+   FACE_EMBED_SERVICE_URL=https://<face-embed-public-url>
+   FACE_EMBED_SERVICE_SECRET=<동일-시크릿>
+   FACE_EMBED_MATCH_THRESHOLD=0.42
+   ```
+5. heresnow 재배포 → root 메뉴 설정에서 V2 백필 실행
+6. 정확도 최대화를 위해 직원 **안면 재등록** 권장
 
 ## 로컬 face-embed
 
@@ -31,11 +41,11 @@ uvicorn app:app --host 0.0.0.0 --port 8090
 ```
 FACE_EMBED_SERVICE_URL=http://127.0.0.1:8090
 # FACE_EMBED_SERVICE_SECRET=
-# FACE_EMBED_MATCH_THRESHOLD=0.38
+# FACE_EMBED_MATCH_THRESHOLD=0.42
 ```
 
 DB 마이그레이션: `20261017120000_face_descriptor_v2`
 
 ## 재등록
-- 기존 직원은 `descriptor`(128-d)만 있으면 레거시 경로로 계속 동작
+- 기존 직원은 `descriptor`(128-d)만 있으면 V1으로 계속 동작
 - **정확도 최대화**를 위해 서버 활성 후 **안면 재등록** 권장 (descriptorV2 채움)

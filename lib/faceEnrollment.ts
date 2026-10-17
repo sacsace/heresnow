@@ -14,12 +14,12 @@ export function enrollmentSamePersonMaxDistance(): number {
 export const ENROLLMENT_DUPLICATE_MAX_DISTANCE = 0.16;
 export const ENROLLMENT_FRONT_VARIATION_MIN_DISTANCE = 0.12;
 
-/** 3단계 등록 — 완료가 막히지 않도록 품질 게이트를 완화 */
-export const ENROLLMENT_MIN_QUALITY = 0.28;
-export const ENROLLMENT_MIN_DETECTION = 0.35;
-export const ENROLLMENT_MIN_AREA_RATIO = 0.025;
+/** 3단계 등록 — 저품질 템플릿이 인식률을 깎지 않도록 게이트 강화 */
+export const ENROLLMENT_MIN_QUALITY = 0.38;
+export const ENROLLMENT_MIN_DETECTION = 0.45;
+export const ENROLLMENT_MIN_AREA_RATIO = 0.04;
 export const ENROLLMENT_MAX_AREA_RATIO = 0.58;
-export const ENROLLMENT_MIN_BRIGHTNESS = 0.12;
+export const ENROLLMENT_MIN_BRIGHTNESS = 0.18;
 export const ENROLLMENT_MAX_BRIGHTNESS = 0.93;
 
 export type EnrollmentPoseType =

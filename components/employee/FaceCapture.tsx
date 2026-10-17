@@ -88,8 +88,8 @@ const AUTO_SCAN_INITIAL_DELAY_MS = 120;
 const AUTO_SCAN_INITIAL_DELAY_MS_FAST = 50;
 const HIGH_ACCURACY_FRAME_COUNT = 2;
 const HIGH_ACCURACY_FRAME_COUNT_LOGIN = 5;
-/** 출퇴근: 2프레임 평균으로 인식률↑, spread 거절 없음(대기 고착 방지) */
-const HIGH_ACCURACY_FRAME_COUNT_PUNCH = 2;
+/** 출퇴근: 4프레임 평균으로 인식률↑, spread 거절 없음(대기 고착 방지) */
+const HIGH_ACCURACY_FRAME_COUNT_PUNCH = 4;
 const HIGH_ACCURACY_FRAME_COUNT_KIOSK = 5;
 const HIGH_ACCURACY_MAX_SPREAD = 0.2;
 const HIGH_ACCURACY_MAX_SPREAD_LOGIN = 0.17;

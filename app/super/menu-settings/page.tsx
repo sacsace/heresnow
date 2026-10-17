@@ -5,6 +5,7 @@ import { useI18n } from "@/components/LanguageProvider";
 import {
   bodySection,
   btnPrimary,
+  btnSecondary,
   errorText,
   filterCheckboxLabel,
   groupedCard,
@@ -32,12 +33,18 @@ export default function SuperMenuSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [embedConfigured, setEmbedConfigured] = useState<boolean | null>(null);
+  const [backfillBusy, setBackfillBusy] = useState(false);
+  const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch("/api/super/platform-settings");
+      const [r, emb] = await Promise.all([
+        fetch("/api/super/platform-settings"),
+        fetch("/api/super/face-embed/backfill"),
+      ]);
       if (!r.ok) {
         setError(t("super.menuSettingsForbidden"));
         setFlags(null);
@@ -47,6 +54,12 @@ export default function SuperMenuSettingsPage() {
       const j = (await r.json()) as Flags;
       setFlags(j);
       setDraft(j);
+      if (emb.ok) {
+        const ej = (await emb.json()) as { configured?: boolean };
+        setEmbedConfigured(Boolean(ej.configured));
+      } else {
+        setEmbedConfigured(false);
+      }
     } catch {
       setError(t("super.menuSettingsLoadFail"));
     } finally {
@@ -81,6 +94,38 @@ export default function SuperMenuSettingsPage() {
       setError(t("super.menuSettingsSaveFail"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function runBackfill() {
+    setBackfillBusy(true);
+    setBackfillMsg(null);
+    try {
+      const r = await fetch("/api/super/face-embed/backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 40 }),
+      });
+      const j = (await r.json().catch(() => ({}))) as {
+        processed?: number;
+        updated?: number;
+        skipped?: number;
+        message?: string;
+      };
+      if (!r.ok) {
+        setBackfillMsg(j.message ?? t("super.faceEmbedBackfillFail"));
+        return;
+      }
+      setBackfillMsg(
+        t("super.faceEmbedBackfillOk")
+          .replace("{processed}", String(j.processed ?? 0))
+          .replace("{updated}", String(j.updated ?? 0))
+          .replace("{skipped}", String(j.skipped ?? 0))
+      );
+    } catch {
+      setBackfillMsg(t("super.faceEmbedBackfillFail"));
+    } finally {
+      setBackfillBusy(false);
     }
   }
 
@@ -160,6 +205,27 @@ export default function SuperMenuSettingsPage() {
         >
           {saving ? t("common.processing") : t("super.menuSettingsSave")}
         </button>
+      </div>
+
+      <div className={`${bodySection} ${groupedCard} mt-4 space-y-3 p-4`}>
+        <p className="text-sm font-semibold text-[var(--foreground)]">{t("super.faceEmbedTitle")}</p>
+        <p className={hintBox}>{t("super.faceEmbedLead")}</p>
+        <p className="text-sm text-[var(--apple-label-secondary)]">
+          {embedConfigured
+            ? t("super.faceEmbedConfigured")
+            : t("super.faceEmbedNotConfigured")}
+        </p>
+        <button
+          type="button"
+          className={btnSecondary}
+          disabled={!embedConfigured || backfillBusy}
+          onClick={() => void runBackfill()}
+        >
+          {backfillBusy ? t("common.processing") : t("super.faceEmbedBackfill")}
+        </button>
+        {backfillMsg ? (
+          <p className="text-sm text-[var(--apple-label-secondary)]">{backfillMsg}</p>
+        ) : null}
       </div>
     </div>
   );

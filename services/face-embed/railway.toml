@@ -1,0 +1,14 @@
+# Railway — InsightFace 임베딩 사이드카
+# 배포 후 heresnow 서비스에 설정:
+#   FACE_EMBED_SERVICE_URL=https://<이-서비스-공개-URL>
+#   FACE_EMBED_SERVICE_SECRET=<동일 시크릿>
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+startCommand = "uvicorn app:app --host 0.0.0.0 --port $PORT"

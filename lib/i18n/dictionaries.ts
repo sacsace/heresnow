@@ -1041,6 +1041,14 @@ export const ko = {
     menuSettingsLoadFail: "설정을 불러오지 못했습니다.",
     menuSettingsSaveFail: "저장에 실패했습니다.",
     menuSettingsForbidden: "root 계정만 이 설정을 변경할 수 있습니다.",
+    faceEmbedTitle: "InsightFace 서버 (인식률 향상)",
+    faceEmbedLead:
+      "FACE_EMBED_SERVICE_URL 이 설정되면 등록·출근에 512-d 임베딩을 사용해 인식률이 올라갑니다.",
+    faceEmbedConfigured: "임베딩 서비스 연결됨",
+    faceEmbedNotConfigured: "미설정 — Railway에 face-embed 서비스를 배포한 뒤 URL을 넣으세요.",
+    faceEmbedBackfill: "기존 등록에 V2 임베딩 채우기",
+    faceEmbedBackfillOk: "처리 {processed}건 · 성공 {updated} · 실패 {skipped}",
+    faceEmbedBackfillFail: "백필에 실패했습니다.",
     companiesTitle: "회사 (테넌트)",
     platformLead:
       "슈퍼관리자(SUPER_ADMIN)로 로그인한 계정이 HeresNow를 사용하는 모든 회사의 구독 만료·사용자 수(상한)를 조정합니다.",
@@ -2462,6 +2470,14 @@ export const en = {
     menuSettingsLoadFail: "Could not load settings.",
     menuSettingsSaveFail: "Save failed.",
     menuSettingsForbidden: "Only the root account can change these settings.",
+    faceEmbedTitle: "InsightFace server (higher accuracy)",
+    faceEmbedLead:
+      "When FACE_EMBED_SERVICE_URL is set, enroll/punch use 512-d embeddings for higher match scores.",
+    faceEmbedConfigured: "Embed service connected",
+    faceEmbedNotConfigured: "Not configured — deploy face-embed on Railway, then set the URL.",
+    faceEmbedBackfill: "Backfill V2 embeddings for existing enrollments",
+    faceEmbedBackfillOk: "Processed {processed} · updated {updated} · failed {skipped}",
+    faceEmbedBackfillFail: "Backfill failed.",
     companiesTitle: "Companies (tenants)",
     platformLead:
       "Signed in as a super admin (SUPER_ADMIN), you can adjust subscription end dates and per-company user limits.",
