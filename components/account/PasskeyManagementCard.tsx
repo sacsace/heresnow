@@ -1,6 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
+import { useAppleConfirm } from "@/hooks/useAppleConfirm";
 import {
   bannerInfo,
   bannerSuccess,
@@ -31,6 +32,7 @@ type Props = {
 
 export function PasskeyManagementCard({ className = "" }: Props) {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useAppleConfirm();
   const [mounted, setMounted] = useState(false);
   const [supported, setSupported] = useState(false);
   const [items, setItems] = useState<PasskeyItem[]>([]);
@@ -105,7 +107,14 @@ export function PasskeyManagementCard({ className = "" }: Props) {
   }
 
   async function deletePasskey(id: string) {
-    if (!window.confirm(t("account.passkeyDeleteConfirm"))) return;
+    const ok = await confirm({
+      title: t("account.passkeyDeleteConfirmTitle"),
+      message: t("account.passkeyDeleteConfirm"),
+      confirmLabel: t("account.passkeyDelete"),
+      cancelLabel: t("common.cancel"),
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -189,6 +198,7 @@ export function PasskeyManagementCard({ className = "" }: Props) {
           {busy ? t("account.passkeyRegistering") : t("account.passkeyRegister")}
         </button>
       </div>
+      {confirmDialog}
     </section>
   );
 }

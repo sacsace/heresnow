@@ -1,6 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
+import { useAppleConfirm } from "@/hooks/useAppleConfirm";
 import {
   btnDanger,
   btnGhost,
@@ -39,6 +40,7 @@ type Props = {
  */
 export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: Props) {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useAppleConfirm();
   const [mounted, setMounted] = useState(false);
   const [departments, setDepartments] = useState<Department[] | null>(null);
   const [canEdit, setCanEdit] = useState(false);
@@ -175,8 +177,13 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
   }
 
   async function removeDepartment(d: Department) {
-    if (typeof window === "undefined") return;
-    const ok = window.confirm(t("admin.departmentsDeleteConfirm").replace("{name}", d.name));
+    const ok = await confirm({
+      title: t("admin.departmentsDeleteConfirmTitle"),
+      message: t("admin.departmentsDeleteConfirm").replace("{name}", d.name),
+      confirmLabel: t("admin.departmentsDeleteButton"),
+      cancelLabel: t("common.cancel"),
+      destructive: true,
+    });
     if (!ok) return;
     setBusy(true);
     setError(null);
@@ -195,7 +202,7 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
     }
   }
 
-  if (!open || !mounted) return null;
+  if (!open || !mounted) return confirmDialog;
 
   const overlay = (
     <div
@@ -355,5 +362,10 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
     </div>
   );
 
-  return createPortal(overlay, document.body);
+  return (
+    <>
+      {createPortal(overlay, document.body)}
+      {confirmDialog}
+    </>
+  );
 }

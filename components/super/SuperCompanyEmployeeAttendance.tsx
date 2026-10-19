@@ -2,6 +2,7 @@
 
 import { AttendanceByEmployeeView } from "@/components/admin/attendance/ByEmployeeView";
 import { useI18n } from "@/components/LanguageProvider";
+import { useAppleConfirm } from "@/hooks/useAppleConfirm";
 import type { AdminAttendanceDayRow } from "@/lib/adminAttendanceByDay";
 import { emptyState, errorText, inputCompact, label, sectionLabelCompact } from "@/lib/uiStyles";
 import { useSession } from "next-auth/react";
@@ -25,6 +26,7 @@ function defaultRange(): { from: string; to: string } {
 
 export function SuperCompanyEmployeeAttendance({ companyId }: Props) {
   const { t, locale } = useI18n();
+  const { confirm, dialog: confirmDialog } = useAppleConfirm();
   const dateLocale = locale === "en" ? "en-US" : "ko-KR";
   const { data: session } = useSession();
   const isRoot =
@@ -94,7 +96,14 @@ export function SuperCompanyEmployeeAttendance({ companyId }: Props) {
     const confirmText = t("super.attendanceDeleteConfirm")
       .replace("{name}", row.employeeName)
       .replace("{date}", row.date);
-    if (typeof window !== "undefined" && !window.confirm(confirmText)) return;
+    const ok = await confirm({
+      title: t("super.attendanceDeleteConfirmTitle"),
+      message: confirmText,
+      confirmLabel: t("super.delete"),
+      cancelLabel: t("common.cancel"),
+      destructive: true,
+    });
+    if (!ok) return;
 
     setDeleteError(null);
     setDeletingDayId(row.id);
@@ -199,6 +208,7 @@ export function SuperCompanyEmployeeAttendance({ companyId }: Props) {
           onDeleteDay={(row) => void deleteDay(row)}
         />
       )}
+      {confirmDialog}
     </section>
   );
 }

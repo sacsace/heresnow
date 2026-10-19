@@ -4,6 +4,7 @@ import { GooglePlaceAutocompleteInput } from "@/components/admin/GooglePlaceAuto
 import { StaticMap } from "@/components/admin/StaticMap";
 import { LocaleTimeInput } from "@/components/LocaleTimeInput";
 import { useI18n } from "@/components/LanguageProvider";
+import { useAppleConfirm } from "@/hooks/useAppleConfirm";
 import { DEFAULT_SITE_RADIUS_M } from "@/lib/siteGeofence";
 import { SHIFT_CODES } from "@/lib/shiftPresets";
 import {
@@ -82,6 +83,7 @@ function scheduleSummary(site: SiteRow, t: (k: string) => string): string {
 
 export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useAppleConfirm();
   const companyQs = siteApiQuery(companyId);
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -293,7 +295,14 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
 
   async function deleteSite(site: SiteRow) {
     if (!canEdit || deletingId) return;
-    if (!window.confirm(t("admin.siteDeleteConfirm").replace("{name}", site.name))) return;
+    const ok = await confirm({
+      title: t("admin.siteDeleteConfirmTitle"),
+      message: t("admin.siteDeleteConfirm").replace("{name}", site.name),
+      confirmLabel: t("admin.siteDelete"),
+      cancelLabel: t("common.cancel"),
+      destructive: true,
+    });
+    if (!ok) return;
     setDeletingId(site.id);
     setError(null);
     setSaved(false);
@@ -628,6 +637,7 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
           )}
         </div>
       </div>
+      {confirmDialog}
     </section>
   );
 }

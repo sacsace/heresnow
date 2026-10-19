@@ -31,6 +31,7 @@ import {
   th,
 } from "@/lib/uiStyles";
 import { usePunchStatus } from "@/hooks/usePunchStatus";
+import { useAppleConfirm } from "@/hooks/useAppleConfirm";
 import { formatDurationMinutes } from "@/components/admin/attendance/helpers";
 import {
   DEFAULT_COMPANY_TIMEZONE,
@@ -85,6 +86,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
   const embedded = variant === "embedded";
   const showRecords = showRecentRecords ?? !embedded;
   const { t, locale } = useI18n();
+  const { confirm, dialog: confirmDialog } = useAppleConfirm();
   const dateLocale = locale === "en" ? "en-US" : "ko-KR";
   const photoInputRef = useRef<HTMLInputElement>(null);
   const enrollSectionRef = useRef<HTMLDivElement>(null);
@@ -420,7 +422,13 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         .replace("{site}", siteName)
         .replace("{distance}", String(distance))
         .replace("{radius}", String(allowed));
-      if (window.confirm(confirmMsg)) {
+      const ok = await confirm({
+        title: t("employee.geofenceConfirmTitle"),
+        message: confirmMsg,
+        confirmLabel: t("common.confirm"),
+        cancelLabel: t("common.cancel"),
+      });
+      if (ok) {
         return postAttendance(body, true);
       }
       return {
@@ -1289,6 +1297,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         </div>
       </section>
       )}
+      {confirmDialog}
     </div>
   );
 }
