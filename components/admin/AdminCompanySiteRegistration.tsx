@@ -5,6 +5,10 @@ import { StaticMap } from "@/components/admin/StaticMap";
 import { LocaleTimeInput } from "@/components/LocaleTimeInput";
 import { useI18n } from "@/components/LanguageProvider";
 import { useAppleConfirm } from "@/hooks/useAppleConfirm";
+import {
+  isLikelyGoogleMapsUrl,
+  parseGoogleMapsCoords,
+} from "@/lib/parseGoogleMapsUrl";
 import { DEFAULT_SITE_RADIUS_M } from "@/lib/siteGeofence";
 import { SHIFT_CODES } from "@/lib/shiftPresets";
 import {
@@ -93,6 +97,7 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [latInput, setLatInput] = useState("");
   const [lngInput, setLngInput] = useState("");
+  const [mapsLinkInput, setMapsLinkInput] = useState("");
   const [allowedRadius, setAllowedRadius] = useState(String(DEFAULT_SITE_RADIUS_M));
   const [departmentIds, setDepartmentIds] = useState<Set<string>>(new Set());
   const [workScheduleMode, setWorkScheduleMode] = useState<WorkScheduleMode>("COMPANY");
@@ -101,6 +106,7 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
   const [workEndTime, setWorkEndTime] = useState("18:00");
   const [loading, setLoading] = useState(true);
   const [locating, setLocating] = useState(false);
+  const [resolvingMapsLink, setResolvingMapsLink] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +164,7 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
   function resetFormFields() {
     setName(t("admin.siteDefaultName"));
     setCoordFields(null, null);
+    setMapsLinkInput("");
     setAllowedRadius(String(DEFAULT_SITE_RADIUS_M));
     setDepartmentIds(new Set());
     setWorkScheduleMode("COMPANY");
@@ -177,6 +184,7 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
     setFormMode({ kind: "edit", id: site.id });
     setName(site.name);
     setCoordFields(site.latitude, site.longitude);
+    setMapsLinkInput("");
     setAllowedRadius(String(site.allowedRadius));
     setDepartmentIds(new Set(site.departmentIds));
     setWorkScheduleMode(
@@ -196,8 +204,56 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
   function closeForm() {
     setFormMode({ kind: "closed" });
     setCoordFields(null, null);
+    setMapsLinkInput("");
     setError(null);
     setSaved(false);
+  }
+
+  async function applyMapsLink() {
+    if (!canEdit || resolvingMapsLink || saving) return;
+    const raw = mapsLinkInput.trim();
+    if (!raw) {
+      setError(t("admin.siteMapsLinkRequired"));
+      return;
+    }
+
+    const local = parseGoogleMapsCoords(raw);
+    if (local) {
+      setCoordFields(local.lat, local.lng);
+      setError(null);
+      setSaved(false);
+      return;
+    }
+
+    if (!isLikelyGoogleMapsUrl(raw)) {
+      setError(t("admin.siteMapsLinkInvalid"));
+      return;
+    }
+
+    setResolvingMapsLink(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const r = await fetch("/api/admin/site/resolve-maps-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: raw }),
+      });
+      const j = (await r.json().catch(() => ({}))) as {
+        latitude?: number;
+        longitude?: number;
+        error?: string;
+      };
+      if (!r.ok || typeof j.latitude !== "number" || typeof j.longitude !== "number") {
+        setError(t("admin.siteMapsLinkResolveFail"));
+        return;
+      }
+      setCoordFields(j.latitude, j.longitude);
+    } catch {
+      setError(t("admin.siteMapsLinkResolveFail"));
+    } finally {
+      setResolvingMapsLink(false);
+    }
   }
 
   function toggleDepartment(id: string) {
@@ -440,6 +496,42 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
                     />
                   </div>
 
+                  <div>
+                    <label className={label} htmlFor="site-maps-link">
+                      {t("admin.siteMapsLinkLabel")}
+                    </label>
+                    <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                      <input
+                        id="site-maps-link"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        className={`${input} min-w-0 flex-1`}
+                        value={mapsLinkInput}
+                        onChange={(e) => setMapsLinkInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void applyMapsLink();
+                          }
+                        }}
+                        disabled={!canEdit || saving || resolvingMapsLink}
+                        placeholder={t("admin.siteMapsLinkPlaceholder")}
+                      />
+                      <button
+                        type="button"
+                        className={`${btnSecondary} shrink-0 sm:self-auto`}
+                        onClick={() => void applyMapsLink()}
+                        disabled={!canEdit || saving || resolvingMapsLink || !mapsLinkInput.trim()}
+                      >
+                        {resolvingMapsLink
+                          ? t("admin.siteMapsLinkResolving")
+                          : t("admin.siteMapsLinkApply")}
+                      </button>
+                    </div>
+                    <p className={`mt-1.5 text-[0.75rem] ${hint}`}>{t("admin.siteMapsLinkHint")}</p>
+                  </div>
+
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className={label} htmlFor="site-lat">
@@ -598,7 +690,7 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
                         type="button"
                         className={btnSecondary}
                         onClick={() => void captureCurrentLocation()}
-                        disabled={locating || saving}
+                        disabled={locating || saving || resolvingMapsLink}
                       >
                         {locating ? t("admin.siteLocating") : t("admin.siteUseCurrentLocation")}
                       </button>
@@ -606,7 +698,7 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
                         type="button"
                         className={btnPrimary}
                         onClick={() => void saveSite()}
-                        disabled={saving || locating}
+                        disabled={saving || locating || resolvingMapsLink}
                       >
                         {saving
                           ? t("admin.siteSaving")

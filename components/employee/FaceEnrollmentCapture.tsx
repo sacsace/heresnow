@@ -425,13 +425,13 @@ export function FaceEnrollmentCapture({
             }}
           />
           <div
-            className={`pointer-events-none absolute inset-8 rounded-[50%] border-2 border-dashed transition-colors duration-200 ${
+            className={`pointer-events-none absolute left-1/2 top-1/2 h-[78%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-dashed transition-colors duration-200 ${
               captureFlash ? "border-[var(--apple-green)] border-solid" : "border-white/70"
             }`}
             aria-hidden
           />
           {captureFlash && (
-            <div className="pointer-events-none absolute inset-8 flex items-center justify-center">
+            <div className="pointer-events-none absolute left-1/2 top-1/2 flex h-[78%] w-[46%] -translate-x-1/2 -translate-y-1/2 items-center justify-center">
               <span className="rounded-full bg-[var(--apple-green)]/90 px-2 py-0.5 text-lg text-white">
                 ✓
               </span>

@@ -957,7 +957,7 @@ export function FaceCapture({
             }}
           />
           <div
-            className="pointer-events-none absolute inset-8 rounded-[50%] border-2 border-dashed border-white/70"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[78%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-dashed border-white/70"
             aria-hidden
           />
           {phase === "loading" && !previewReady && (

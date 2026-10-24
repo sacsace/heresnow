@@ -975,6 +975,16 @@ export const ko = {
     siteLatitudeLabel: "위도",
     siteLongitudeLabel: "경도",
     siteCoordsManualHint: "위·경도를 직접 입력하거나 현재 위치·지도로 확인할 수 있습니다.",
+    siteMapsLinkLabel: "Google 지도 링크",
+    siteMapsLinkPlaceholder: "https://maps.app.goo.gl/…",
+    siteMapsLinkHint:
+      "Google 지도에서 공유한 링크(단축·전체)를 붙여 넣고 「좌표 적용」을 누르면 위·경도가 채워집니다.",
+    siteMapsLinkApply: "좌표 적용",
+    siteMapsLinkResolving: "링크 해석 중…",
+    siteMapsLinkRequired: "Google 지도 링크를 입력해 주세요.",
+    siteMapsLinkInvalid: "유효한 Google 지도 링크를 입력해 주세요.",
+    siteMapsLinkResolveFail:
+      "지도 링크에서 좌표를 찾지 못했습니다. 링크를 다시 확인하거나 위·경도를 직접 입력해 주세요.",
     siteGeoUnsupported: "이 브라우저는 위치 정보를 지원하지 않습니다.",
     siteGeoFail: "위치를 가져오지 못했습니다.",
     siteCoordsHint: "위도 {lat}, 경도 {lng}",
@@ -2408,6 +2418,16 @@ export const en = {
     siteLatitudeLabel: "Latitude",
     siteLongitudeLabel: "Longitude",
     siteCoordsManualHint: "Type coordinates directly, or use current location and the map preview.",
+    siteMapsLinkLabel: "Google Maps link",
+    siteMapsLinkPlaceholder: "https://maps.app.goo.gl/…",
+    siteMapsLinkHint:
+      "Paste a shared Google Maps link (short or full) and tap “Apply coordinates” to fill latitude and longitude.",
+    siteMapsLinkApply: "Apply coordinates",
+    siteMapsLinkResolving: "Resolving link…",
+    siteMapsLinkRequired: "Enter a Google Maps link.",
+    siteMapsLinkInvalid: "Enter a valid Google Maps link.",
+    siteMapsLinkResolveFail:
+      "Could not read coordinates from that Maps link. Check the link or enter latitude/longitude manually.",
     siteGeoUnsupported: "This browser does not support geolocation.",
     siteGeoFail: "Could not get your location.",
     siteCoordsHint: "Latitude: {lat} · Longitude: {lng}",
