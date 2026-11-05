@@ -290,8 +290,8 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
                           {st === "complete" && "✓"}
                           {st === "partial" && (
                             <>
-                              <span>{d.checkIn ? "출" : "·"}</span>
-                              <span>{d.checkOut ? "퇴" : "·"}</span>
+                              <span>{d.checkIn ? t("admin.monthlyInMark") : "·"}</span>
+                              <span>{d.checkOut ? t("admin.monthlyOutMark") : "·"}</span>
                             </>
                           )}
                           {st === "pending" && "!"}
