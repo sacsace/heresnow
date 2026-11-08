@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import type { Locale } from "@/lib/i18n/dictionaries";
 import { getRequestLocale } from "@/lib/i18n/requestLocale";
+
+const GTM_ID = "GTM-59P3F6VN";
 
 const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
@@ -178,6 +181,26 @@ export default async function RootLayout({
   return (
     <html lang={locale}>
       <body className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased">
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
+            height={0}
+            width={0}
+            style={{ display: "none", visibility: "hidden" }}
+            title="Google Tag Manager"
+          />
+        </noscript>
+        <Script id="gtm-datalayer" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+          `}
+        </Script>
+        <Script
+          src={`https://www.googletagmanager.com/gtm.js?id=${GTM_ID}`}
+          strategy="afterInteractive"
+        />
         <Providers initialLocale={locale}>{children}</Providers>
         <script type="application/ld+json">{toSafeJsonLd(organizationLd)}</script>
         <script type="application/ld+json">{toSafeJsonLd(softwareLd)}</script>

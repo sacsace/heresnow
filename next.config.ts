@@ -26,12 +26,12 @@ function buildContentSecurityPolicy(): string {
     "object-src 'none'",
     `script-src ${scriptSrc}`,
     `style-src ${styleSrc}`,
-    "img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://unpkg.com",
+    "img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://unpkg.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.googletagmanager.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self' https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://vitals.vercel-insights.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://unpkg.com",
+    "connect-src 'self' https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://vitals.vercel-insights.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://unpkg.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
     "worker-src 'self' blob:",
     "media-src 'self' blob:",
-    "frame-src 'self' https://www.google.com https://maps.google.com https://www.google.com/maps",
+    "frame-src 'self' https://www.google.com https://maps.google.com https://www.google.com/maps https://www.googletagmanager.com",
   ];
   if (process.env.NODE_ENV === "production") {
     directives.push("upgrade-insecure-requests");
