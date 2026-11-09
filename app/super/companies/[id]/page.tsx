@@ -2,6 +2,7 @@
 
 import { AdminCompanySettings } from "@/components/admin/AdminCompanySettings";
 import { AdminCompanySiteRegistration } from "@/components/admin/AdminCompanySiteRegistration";
+import { AdminMvsIntegrationHint } from "@/components/admin/AdminMvsIntegrationHint";
 import { AdminTodayOverview } from "@/components/admin/AdminTodayOverview";
 import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceOverview";
 import { SuperCompanyAttendanceStats } from "@/components/super/SuperCompanyAttendanceStats";
@@ -335,6 +336,7 @@ export default function SuperCompanyUsersPage() {
           <MonthlyAttendanceOverview companyId={id} hideViewAllLink />
           <AdminCompanySiteRegistration companyId={id} />
           <AdminCompanySettings companyId={id} />
+          <AdminMvsIntegrationHint companyId={id} />
         </div>
       )}
 

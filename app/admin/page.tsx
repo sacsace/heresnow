@@ -2,6 +2,7 @@
 
 import { AdminTodayOverview } from "@/components/admin/AdminTodayOverview";
 import { AdminSubscriptionBanner } from "@/components/admin/AdminSubscriptionBanner";
+import { AdminMvsIntegrationHint } from "@/components/admin/AdminMvsIntegrationHint";
 import { MonthlyAttendanceOverview } from "@/components/admin/MonthlyAttendanceOverview";
 import { AttendanceTrustHero } from "@/components/ui/AttendanceTrustHero";
 import { useI18n } from "@/components/LanguageProvider";
@@ -23,6 +24,8 @@ export default function AdminHomePage() {
       <AdminTodayOverview />
 
       <MonthlyAttendanceOverview />
+
+      <AdminMvsIntegrationHint />
     </div>
   );
 }

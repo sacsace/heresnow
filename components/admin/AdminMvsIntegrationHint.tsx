@@ -45,7 +45,12 @@ function currentMonthYyyyMm(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export function AdminMvsIntegrationHint() {
+type Props = {
+  /** SUPER_ADMIN이 다른 회사 대시보드에서 관리할 때 전달 */
+  companyId?: string;
+};
+
+export function AdminMvsIntegrationHint({ companyId }: Props = {}) {
   const { t, locale } = useI18n();
   const [status, setStatus] = useState<MvsStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,14 +65,16 @@ export function AdminMvsIntegrationHint() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<MvsPreviewResponse | null>(null);
 
+  const apiQs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
+
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await fetch("/api/admin/integrations/mvs", { cache: "no-store" });
+    const r = await fetch(`/api/admin/integrations/mvs${apiQs}`, { cache: "no-store" });
     const j = await r.json().catch(() => ({}));
     setLoading(false);
     if (r.ok) setStatus(j as MvsStatus);
     else setStatus(null);
-  }, []);
+  }, [apiQs]);
 
   useEffect(() => {
     void load();
@@ -84,7 +91,7 @@ export function AdminMvsIntegrationHint() {
     setActionError(null);
     setNewApiKey(null);
     try {
-      const r = await fetch("/api/admin/integrations/mvs/key", {
+      const r = await fetch(`/api/admin/integrations/mvs/key${apiQs}`, {
         method: "POST",
       });
       const j = await r.json().catch(() => ({}));
@@ -128,6 +135,7 @@ export function AdminMvsIntegrationHint() {
     setPreviewError(null);
     try {
       const q = new URLSearchParams({ month });
+      if (companyId) q.set("companyId", companyId);
       const r = await fetch(`/api/admin/integrations/mvs/preview?${q.toString()}`, {
         cache: "no-store",
       });

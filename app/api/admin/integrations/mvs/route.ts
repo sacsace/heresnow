@@ -6,18 +6,36 @@ import { prisma } from "@/lib/prisma";
 import { IntegrationProvider } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-/** 회사 관리자: MVS 연동 상태 조회 */
-export async function GET() {
+const viewRoles = new Set(["COMPANY_ADMIN", "HR_MANAGER", "SUPER_ADMIN"]);
+
+function resolveCompanyId(
+  role: string | undefined,
+  sessionCompanyId: string | null | undefined,
+  url: URL
+): { companyId: string } | { error: string; status: number } {
+  if (role === "SUPER_ADMIN") {
+    const q = url.searchParams.get("companyId");
+    if (q) return { companyId: q };
+    if (sessionCompanyId) return { companyId: sessionCompanyId };
+    return { error: "companyId required", status: 400 };
+  }
+  if (!sessionCompanyId) return { error: "No company", status: 400 };
+  return { companyId: sessionCompanyId };
+}
+
+/** 회사 관리자·슈퍼관리자: MVS 연동 상태 조회 */
+export async function GET(req: Request) {
   const session = await auth();
   const role = session?.user?.role;
-  const companyId = session?.user?.companyId;
-  if (
-    !session?.user?.id ||
-    !companyId ||
-    (role !== "COMPANY_ADMIN" && role !== "HR_MANAGER" && role !== "SUPER_ADMIN")
-  ) {
+  if (!session?.user?.id || !role || !viewRoles.has(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const resolved = resolveCompanyId(role, session.user.companyId, new URL(req.url));
+  if ("error" in resolved) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  }
+  const { companyId } = resolved;
 
   const integration = await prisma.companyIntegration.findUnique({
     where: {
