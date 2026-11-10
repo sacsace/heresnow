@@ -439,11 +439,33 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     }
 
     if (!res.ok) {
-      if (j.code === "EARLY_LEAVE_REASON_REQUIRED") {
+      const code = typeof j.code === "string" ? j.code : "";
+      if (code === "EARLY_LEAVE_REASON_REQUIRED") {
         return { ok: false, message: t("employee.earlyLeaveReasonRequired") };
       }
-      if (j.code === "RECHECK_IN_REASON_REQUIRED") {
+      if (code === "OVERTIME_REASON_REQUIRED") {
+        return { ok: false, message: t("employee.overtimeReasonRequired") };
+      }
+      if (code === "RECHECK_IN_REASON_REQUIRED") {
         return { ok: false, message: t("employee.reCheckInReasonRequired") };
+      }
+      if (code === "MIN_INTERVAL" || code === "CHECK_OUT_BLOCKED") {
+        return { ok: false, message: t("employee.checkOutCooldown") };
+      }
+      if (code === "ALREADY_CHECKED_IN") {
+        return { ok: false, message: t("employee.alreadyCheckedIn") };
+      }
+      if (code === "COOLDOWN") {
+        return { ok: false, message: t("employee.cooldownBlocked") };
+      }
+      if (code === "NOT_CHECKED_IN") {
+        return { ok: false, message: t("employee.notCheckedIn") };
+      }
+      if (code === "CHECK_IN_BLOCKED") {
+        return { ok: false, message: t("employee.checkInBlocked") };
+      }
+      if (code === "PUNCH_STATE_CHANGED") {
+        return { ok: false, message: t("employee.punchStateChanged") };
       }
       const err = j.error as unknown;
       return {
@@ -458,6 +480,18 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
     }
 
     return { ok: true, data: j };
+  }
+
+  function punchSuccessMessage(data: Record<string, unknown>): string {
+    const code = typeof data.messageCode === "string" ? data.messageCode : "";
+    if (code === "EARLY_LEAVE_PENDING") return t("employee.earlyLeavePending");
+    if (code === "OVERTIME_PENDING") return t("employee.overtimePending");
+    if (code === "RECHECK_IN_PENDING") return t("employee.reCheckInPending");
+    if (code === "OUTSIDE_GEOFENCE") return t("employee.outsideGeofenceRecorded");
+    if (code === "LATE_CHECK_OUT" && typeof data.message === "string") {
+      return data.message;
+    }
+    return t("employee.punchOk");
   }
 
   async function submitCheckIn(
@@ -512,7 +546,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         return false;
       }
       const j = result.data;
-      setMsg(typeof j.message === "string" ? j.message : t("employee.saved"));
+      setMsg(punchSuccessMessage(j));
       setMemo("");
       setBusinessTripLocation("");
       setBusinessTripReason("");
@@ -531,7 +565,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       if (e && typeof e === "object" && "message" in e) {
         setMsg(String((e as { message?: string }).message));
       } else {
-        setMsg("네트워크 오류가 발생했습니다.");
+        setMsg(t("employee.networkError"));
       }
       setBusy(false);
       return false;
@@ -582,7 +616,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
         return false;
       }
       const j = result.data;
-      setMsg(typeof j.message === "string" ? j.message : t("employee.saved"));
+      setMsg(punchSuccessMessage(j));
       setMemo("");
       setEarlyLeaveReason("");
       setOvertimeReason("");
@@ -598,7 +632,7 @@ export function PunchCard({ variant = "full", showRecentRecords }: PunchCardProp
       if (e && typeof e === "object" && "message" in e) {
         setMsg(String((e as { message?: string }).message));
       } else {
-        setMsg(t("employee.saveFail"));
+        setMsg(t("employee.networkError"));
       }
       setBusy(false);
       return false;

@@ -82,8 +82,16 @@ export function isWithinSiteRadius(
   return { ok: false, distanceMeters: distance, allowedRadius: site.allowedRadius };
 }
 
-export function geofenceErrorMessage(distance: number, allowedRadius: number): string {
-  return `근무지 반경 ${Math.round(allowedRadius)}m 밖입니다. 현재 위치는 약 ${Math.round(distance)}m 떨어져 있습니다.`;
+export function geofenceErrorMessage(
+  distance: number,
+  allowedRadius: number,
+  locale: "ko" | "en" = "ko"
+): string {
+  const radius = Math.round(allowedRadius);
+  const dist = Math.round(distance);
+  return locale === "en"
+    ? `Outside the worksite radius (${radius}m). You are about ${dist}m away.`
+    : `근무지 반경 ${radius}m 밖입니다. 현재 위치는 약 ${dist}m 떨어져 있습니다.`;
 }
 
 export type GeofenceCheckResult =

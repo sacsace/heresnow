@@ -45,6 +45,7 @@ import {
   geofenceErrorMessage,
   parseGeofenceMode,
 } from "@/lib/siteGeofence";
+import { getRequestLocale } from "@/lib/i18n/requestLocale";
 import { AttendanceType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -102,17 +103,25 @@ function checkOutBlockCode(block: ReturnType<typeof evaluatePunchEligibility>["c
  * 출근/퇴근: 회사 geofenceMode에 따라 반경 밖 경고·차단. 출장 출근은 반경 검사 생략.
  */
 export async function POST(req: Request) {
+  const locale = await getRequestLocale();
+  const en = locale === "en";
   const session = await auth();
   const seatDenied = await seatLoginForbiddenResponse(session);
   if (seatDenied) return seatDenied;
   const subscriptionDenied = await subscriptionPunchForbiddenResponse(session?.user?.companyId);
   if (subscriptionDenied) return subscriptionDenied;
   if (!session?.user?.id || !session.user.employeeId) {
-    return NextResponse.json({ error: "직원 프로필이 필요합니다." }, { status: 403 });
+    return NextResponse.json(
+      { error: en ? "Employee profile is required." : "직원 프로필이 필요합니다." },
+      { status: 403 }
+    );
   }
 
   if (!session.user.companyId) {
-    return NextResponse.json({ error: "회사 정보가 없습니다." }, { status: 400 });
+    return NextResponse.json(
+      { error: en ? "Company information is missing." : "회사 정보가 없습니다." },
+      { status: 400 }
+    );
   }
 
   let json: unknown;
@@ -292,7 +301,9 @@ export async function POST(req: Request) {
 
   if (type === "CHECK_IN") {
     if (!eligibility.canCheckIn) {
-      const msg = checkInErrorMessage(eligibility.checkInBlock) ?? "출근할 수 없습니다.";
+      const msg =
+        checkInErrorMessage(eligibility.checkInBlock, locale) ??
+        (en ? "You cannot check in right now." : "출근할 수 없습니다.");
       return NextResponse.json(
         {
           error: msg,
@@ -304,7 +315,9 @@ export async function POST(req: Request) {
     }
   } else {
     if (!eligibility.canCheckOut) {
-      const msg = checkOutErrorMessage(eligibility.checkOutBlock) ?? "퇴근할 수 없습니다.";
+      const msg =
+        checkOutErrorMessage(eligibility.checkOutBlock, locale) ??
+        (en ? "You cannot check out right now." : "퇴근할 수 없습니다.");
       return NextResponse.json(
         {
           error: msg,
@@ -346,7 +359,7 @@ export async function POST(req: Request) {
   if (geofence.action === "block") {
     return NextResponse.json(
       {
-        error: geofenceErrorMessage(geofence.distanceMeters, geofence.allowedRadius),
+        error: geofenceErrorMessage(geofence.distanceMeters, geofence.allowedRadius, locale),
         code: "GEOFENCE_BLOCKED",
         siteName: geofence.siteName,
         distanceMeters: geofence.distanceMeters,
@@ -359,7 +372,7 @@ export async function POST(req: Request) {
   if (geofence.action === "warn") {
     return NextResponse.json(
       {
-        error: geofenceErrorMessage(geofence.distanceMeters, geofence.allowedRadius),
+        error: geofenceErrorMessage(geofence.distanceMeters, geofence.allowedRadius, locale),
         code: "GEOFENCE_WARNING",
         siteName: geofence.siteName,
         distanceMeters: geofence.distanceMeters,
@@ -456,7 +469,9 @@ export async function POST(req: Request) {
   if (earlyLeavePending && !trimmedEarlyReason) {
     return NextResponse.json(
       {
-        error: "조퇴 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
+        error: en
+          ? "An early-leave reason is required. After you enter a reason, manager approval is needed."
+          : "조퇴 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
         code: "EARLY_LEAVE_REASON_REQUIRED",
       },
       { status: 400 }
@@ -466,7 +481,9 @@ export async function POST(req: Request) {
   if (overtimePending && !trimmedOvertimeReason) {
     return NextResponse.json(
       {
-        error: "초과 근무 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
+        error: en
+          ? "An overtime reason is required. After you enter a reason, manager approval is needed."
+          : "초과 근무 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
         code: "OVERTIME_REASON_REQUIRED",
       },
       { status: 400 }
@@ -479,7 +496,9 @@ export async function POST(req: Request) {
   if (reCheckInPending && !trimmedReCheckInReason) {
     return NextResponse.json(
       {
-        error: "재출근 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
+        error: en
+          ? "A re-check-in reason is required. After you enter a reason, manager approval is needed."
+          : "재출근 사유가 필요합니다. 사유를 입력하면 관리자 승인 후 처리됩니다.",
         code: "RECHECK_IN_REASON_REQUIRED",
       },
       { status: 400 }
@@ -557,14 +576,18 @@ export async function POST(req: Request) {
       );
       if (type === "CHECK_IN" && !txEligibility.canCheckIn) {
         throw {
-          code: "CHECK_IN_BLOCKED",
-          message: checkInErrorMessage(txEligibility.checkInBlock) ?? "출근할 수 없습니다.",
+          code: checkInBlockCode(txEligibility.checkInBlock),
+          message:
+            checkInErrorMessage(txEligibility.checkInBlock, locale) ??
+            (en ? "You cannot check in right now." : "출근할 수 없습니다."),
         } as const;
       }
       if (type === "CHECK_OUT" && !txEligibility.canCheckOut) {
         throw {
-          code: "CHECK_OUT_BLOCKED",
-          message: checkOutErrorMessage(txEligibility.checkOutBlock) ?? "퇴근할 수 없습니다.",
+          code: checkOutBlockCode(txEligibility.checkOutBlock),
+          message:
+            checkOutErrorMessage(txEligibility.checkOutBlock, locale) ??
+            (en ? "You cannot check out right now." : "퇴근할 수 없습니다."),
         } as const;
       }
 
@@ -623,14 +646,21 @@ export async function POST(req: Request) {
       if (code === "PUNCH_STATE_CHANGED") {
         return NextResponse.json(
           {
-            error: "직전 출퇴근 상태가 방금 변경되었습니다. 상태를 새로고침한 뒤 다시 시도해 주세요.",
+            error: en
+              ? "Your attendance status just changed. Refresh and try again."
+              : "직전 출퇴근 상태가 방금 변경되었습니다. 상태를 새로고침한 뒤 다시 시도해 주세요.",
             code,
           },
           { status: 409 }
         );
       }
       if (
-        (code === "CHECK_IN_BLOCKED" || code === "CHECK_OUT_BLOCKED") &&
+        (code === "CHECK_IN_BLOCKED" ||
+          code === "CHECK_OUT_BLOCKED" ||
+          code === "ALREADY_CHECKED_IN" ||
+          code === "COOLDOWN" ||
+          code === "NOT_CHECKED_IN" ||
+          code === "MIN_INTERVAL") &&
         "message" in error &&
         typeof (error as { message?: unknown }).message === "string"
       ) {
@@ -671,16 +701,39 @@ export async function POST(req: Request) {
     overtimeMinutes: result.record.overtimeMinutes,
     exceptionId: result.exceptionId,
     pendingApproval,
-    message: checkOutPastWindow && lateCheckOutResolved
-      ? `퇴근 처리되었습니다. 출근 후 48시간이 지나 퇴근 시각은 출근일 기준 ${formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko")}(${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")})으로 기록됩니다.`
+    messageCode: checkOutPastWindow && lateCheckOutResolved
+      ? "LATE_CHECK_OUT"
       : earlyLeavePending
-        ? "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+        ? "EARLY_LEAVE_PENDING"
         : overtimePending
-          ? "초과 근무 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+          ? "OVERTIME_PENDING"
           : reCheckInPending
-            ? "재출근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
-          : outsideGeofence
-            ? "근무지 반경 밖에서 기록되었습니다."
-            : "정상 처리되었습니다.",
+            ? "RECHECK_IN_PENDING"
+            : outsideGeofence
+              ? "OUTSIDE_GEOFENCE"
+              : "OK",
+    message: checkOutPastWindow && lateCheckOutResolved
+      ? en
+        ? `Check-out recorded. Because more than 48 hours passed since check-in, the recorded time is ${formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "en")} (${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")}).`
+        : `퇴근 처리되었습니다. 출근 후 48시간이 지나 퇴근 시각은 출근일 기준 ${formatLateCheckOutBasisLabel(lateCheckOutResolved.basis, "ko")}(${formatInTimeZone(lateCheckOutResolved.timestamp, tz, "HH:mm")})으로 기록됩니다.`
+      : earlyLeavePending
+        ? en
+          ? "Early-leave request submitted. It will be confirmed after manager approval."
+          : "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+        : overtimePending
+          ? en
+            ? "Overtime request submitted. It will be confirmed after manager approval."
+            : "초과 근무 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+          : reCheckInPending
+            ? en
+              ? "Re-check-in request submitted. It will be confirmed after manager approval."
+              : "재출근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다."
+            : outsideGeofence
+              ? en
+                ? "Recorded outside the worksite radius."
+                : "근무지 반경 밖에서 기록되었습니다."
+              : en
+                ? "Processed successfully."
+                : "정상 처리되었습니다.",
   });
 }

@@ -140,29 +140,41 @@ export function evaluatePunchEligibility(
 }
 
 export function checkInErrorMessage(
-  block: PunchEligibility["checkInBlock"]
+  block: PunchEligibility["checkInBlock"],
+  locale: "ko" | "en" = "ko"
 ): string | null {
+  const en = locale === "en";
   if (block === "ALREADY_CHECKED_IN") {
-    return "이미 출근하였습니다. 먼저 퇴근해 주세요.";
+    return en
+      ? "You are already checked in. Please check out first."
+      : "이미 출근하였습니다. 먼저 퇴근해 주세요.";
   }
   if (block === "COOLDOWN") {
-    return "퇴근 후 4시간이 지나거나 정규 출근 60분 전부터 다시 출근할 수 있습니다.";
+    return en
+      ? "You can check in again 4 hours after checking out, or starting 60 minutes before your next scheduled shift."
+      : "퇴근 후 4시간이 지나거나 정규 출근 60분 전부터 다시 출근할 수 있습니다.";
   }
   return null;
 }
 
-export function checkOutWindowErrorMessage(): string {
-  return "출근 후 48시간이 지났습니다. 퇴근은 가능하며, 퇴근 시각은 출근일 기준 출근 후 최대 21시간 또는 23:59 중 이른 시각으로 기록됩니다.";
+export function checkOutWindowErrorMessage(locale: "ko" | "en" = "ko"): string {
+  return locale === "en"
+    ? "If 48 hours or more have passed since you checked in, you can still check out. Your recorded check-out time will be adjusted to the earlier of: 21 hours after check-in or 11:59 PM on the date you checked in."
+    : "출근 후 48시간이 지났습니다. 퇴근은 가능하며, 퇴근 시각은 출근일 기준 출근 후 최대 21시간 또는 23:59 중 이른 시각으로 기록됩니다.";
 }
 
 export function checkOutErrorMessage(
-  block: PunchEligibility["checkOutBlock"]
+  block: PunchEligibility["checkOutBlock"],
+  locale: "ko" | "en" = "ko"
 ): string | null {
+  const en = locale === "en";
   if (block === "NOT_CHECKED_IN") {
-    return "먼저 출근해 주세요.";
+    return en ? "Please check in first." : "먼저 출근해 주세요.";
   }
   if (block === "MIN_INTERVAL") {
-    return "출근 처리 직후에는 바로 퇴근할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+    return en
+      ? "You cannot check out immediately after checking in. Please try again shortly."
+      : "출근 처리 직후에는 바로 퇴근할 수 없습니다. 잠시 후 다시 시도해 주세요.";
   }
   return null;
 }

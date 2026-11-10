@@ -1340,7 +1340,20 @@ export const ko = {
     seatUnavailableAdminNote:
       "회사 관리자·인사 담당자는 사용자 수 제한 없이 관리자 화면에 로그인할 수 있습니다.",
     saved: "저장되었습니다.",
+    punchOk: "정상 처리되었습니다.",
     saveFail: "저장에 실패했습니다.",
+    networkError: "네트워크 오류가 발생했습니다.",
+    checkOutCooldown:
+      "출근 처리 직후에는 바로 퇴근할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    notCheckedIn: "먼저 출근해 주세요.",
+    checkInBlocked: "출근할 수 없습니다.",
+    checkOutBlocked: "퇴근할 수 없습니다.",
+    punchStateChanged:
+      "직전 출퇴근 상태가 방금 변경되었습니다. 상태를 새로고침한 뒤 다시 시도해 주세요.",
+    earlyLeavePending: "조퇴 요청이 접수되었습니다. 관리자 승인 후 확정됩니다.",
+    overtimePending: "초과 근무 요청이 접수되었습니다. 관리자 승인 후 확정됩니다.",
+    reCheckInPending: "재출근 요청이 접수되었습니다. 관리자 승인 후 확정됩니다.",
+    outsideGeofenceRecorded: "근무지 반경 밖에서 기록되었습니다.",
     geofenceConfirmTitle: "근무지 반경 확인",
     geofenceConfirm:
       "「{site}」 근무지 허용 반경({radius}m) 밖입니다(약 {distance}m). 그래도 출퇴근을 기록할까요?",
@@ -2790,7 +2803,20 @@ export const en = {
     seatUnavailableAdminNote:
       "Company admins and HR managers can sign in to the admin area without user limits.",
     saved: "Saved.",
+    punchOk: "Processed successfully.",
     saveFail: "Could not save.",
+    networkError: "A network error occurred.",
+    checkOutCooldown:
+      "You cannot check out immediately after checking in. Please try again shortly.",
+    notCheckedIn: "Please check in first.",
+    checkInBlocked: "You cannot check in right now.",
+    checkOutBlocked: "You cannot check out right now.",
+    punchStateChanged:
+      "Your attendance status just changed. Refresh and try again.",
+    earlyLeavePending: "Early-leave request submitted. It will be confirmed after manager approval.",
+    overtimePending: "Overtime request submitted. It will be confirmed after manager approval.",
+    reCheckInPending: "Re-check-in request submitted. It will be confirmed after manager approval.",
+    outsideGeofenceRecorded: "Recorded outside the worksite radius.",
     geofenceConfirmTitle: "Worksite radius",
     geofenceConfirm:
       "You are about {distance}m from 「{site}」(allowed {radius}m). Record attendance anyway?",
