@@ -1,7 +1,12 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
-import type { MonthlyDayCell, MonthlyEmployeeRow } from "@/lib/adminMonthlyAttendance";
+import {
+  summarizeMonthlyEmployeeWork,
+  type MonthlyDayCell,
+  type MonthlyEmployeeRow,
+} from "@/lib/adminMonthlyAttendance";
+import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
 import { formatCheckOutDisplay } from "@/lib/autoCheckOutDisplay";
 import { btnSecondary, emptyStateCompact, hint } from "@/lib/uiStyles";
 import { useEffect, useMemo, useState } from "react";
@@ -13,6 +18,8 @@ type Props = {
   employee: MonthlyEmployeeRow | null;
   monthLabel: string;
   dateLocale?: string;
+  workDays?: string | null;
+  timeZone?: string;
 };
 
 function dayStatus(d: MonthlyDayCell): "complete" | "partial" | "pending" | "empty" {
@@ -38,10 +45,13 @@ export function MonthlyEmployeeDetailModal({
   employee,
   monthLabel,
   dateLocale,
+  workDays = null,
+  timeZone,
 }: Props) {
   const { t, locale } = useI18n();
   const dl = dateLocale ?? (locale === "en" ? "en-US" : "ko-KR");
   const [mounted, setMounted] = useState(false);
+  const tz = timeZone?.trim() || DEFAULT_COMPANY_TIMEZONE;
 
   useEffect(() => {
     setMounted(true);
@@ -61,6 +71,13 @@ export function MonthlyEmployeeDetailModal({
     };
   }, [open, onClose]);
 
+  const workSummary = useMemo(() => {
+    if (!employee) {
+      return { scheduledDays: 0, workedDays: 0, absentDays: 0, absentDates: [] as string[] };
+    }
+    return summarizeMonthlyEmployeeWork(employee.days, workDays, tz);
+  }, [employee, workDays, tz]);
+
   const summary = useMemo(() => {
     if (!employee) return { complete: 0, partial: 0, pending: 0, empty: 0, recorded: 0 };
     let complete = 0;
@@ -77,10 +94,17 @@ export function MonthlyEmployeeDetailModal({
     return { complete, partial, pending, empty, recorded: complete + partial + pending };
   }, [employee]);
 
-  const recordedDays = useMemo(() => {
-    if (!employee) return [];
-    return employee.days.filter((d) => d.checkIn || d.checkOut);
-  }, [employee]);
+  const listDays = useMemo(() => {
+    if (!employee) return [] as Array<MonthlyDayCell & { kind: "recorded" | "absent" }>;
+    const absentSet = new Set(workSummary.absentDates);
+    const recorded = employee.days
+      .filter((d) => d.checkIn || d.checkOut)
+      .map((d) => ({ ...d, kind: "recorded" as const }));
+    const absent = employee.days
+      .filter((d) => absentSet.has(d.date))
+      .map((d) => ({ ...d, kind: "absent" as const }));
+    return [...recorded, ...absent].sort((a, b) => a.date.localeCompare(b.date));
+  }, [employee, workSummary.absentDates]);
 
   if (!open || !mounted || !employee) return null;
 
@@ -135,21 +159,36 @@ export function MonthlyEmployeeDetailModal({
         </header>
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-[var(--separator)] bg-[var(--fill-tertiary)]/40 px-5 py-2.5 text-[0.8125rem] sm:px-6">
+          <span className="text-[var(--foreground)]">
+            {t("admin.monthlyEmployeeStatScheduled")}:{" "}
+            <strong className="tabular-nums">{workSummary.scheduledDays}</strong>
+          </span>
           <span className="text-[var(--apple-green-dark)]">
+            {t("admin.monthlyEmployeeStatWorked")}:{" "}
+            <strong className="tabular-nums">{workSummary.workedDays}</strong>
+          </span>
+          <span className="text-[var(--apple-red)]">
+            {t("admin.monthlyEmployeeStatAbsent")}:{" "}
+            <strong className="tabular-nums">{workSummary.absentDays}</strong>
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-[var(--separator)] px-5 py-2 text-[0.75rem] text-[var(--apple-label-secondary)] sm:px-6">
+          <span>
             {t("admin.monthlyComplete")}: {summary.complete}
           </span>
-          <span className="text-amber-700">
+          <span>
             {t("admin.monthlyPartial")}: {summary.partial}
           </span>
           {summary.pending > 0 && (
-            <span className="text-amber-800">
+            <span>
               {t("admin.monthlyPending")}: {summary.pending}
             </span>
           )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-2 sm:px-6">
-          {recordedDays.length === 0 ? (
+          {listDays.length === 0 ? (
             <p className={emptyStateCompact}>{t("admin.monthlyEmployeeDetailEmpty")}</p>
           ) : (
             <table className="w-full border-collapse text-[0.8125rem]">
@@ -167,7 +206,26 @@ export function MonthlyEmployeeDetailModal({
                 </tr>
               </thead>
               <tbody>
-                {recordedDays.map((d) => {
+                {listDays.map((d) => {
+                  if (d.kind === "absent") {
+                    return (
+                      <tr
+                        key={`absent-${d.date}`}
+                        className="border-b border-[var(--separator)] last:border-b-0 bg-[color-mix(in_srgb,var(--apple-red)_6%,transparent)]"
+                        title={t("admin.monthlyEmployeeAbsentMark")}
+                      >
+                        <td className="py-2.5 pr-3 font-medium text-[var(--foreground)]">
+                          {formatDayDate(d.date, dl)}
+                        </td>
+                        <td
+                          colSpan={2}
+                          className="py-2.5 text-center text-[0.8125rem] font-semibold text-[var(--apple-red)]"
+                        >
+                          {t("admin.monthlyEmployeeAbsentMark")}
+                        </td>
+                      </tr>
+                    );
+                  }
                   const st = dayStatus(d);
                   const rowTint =
                     st === "partial"

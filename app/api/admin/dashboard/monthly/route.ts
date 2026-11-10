@@ -52,7 +52,7 @@ export async function GET(req: Request) {
 
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { timezone: true, name: true },
+    select: { timezone: true, name: true, workDays: true },
   });
   if (!company) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
@@ -102,6 +102,7 @@ export async function GET(req: Request) {
     year: ym.year,
     month: ym.month,
     timezone: tz,
+    workDays: company.workDays ?? null,
     companyName: company.name,
     daysInMonth: daysInMonth(ym.year, ym.month),
     summary: {

@@ -12,6 +12,7 @@ type ApiPayload = {
   year: number;
   month: number;
   timezone: string;
+  workDays?: string | null;
   daysInMonth: number;
   summary: {
     employeeCount: number;
@@ -334,6 +335,8 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
         onClose={() => setSelectedEmployee(null)}
         employee={selectedEmployee}
         monthLabel={monthLabel}
+        workDays={data?.workDays ?? null}
+        timeZone={data?.timezone}
       />
 
       {mapOpen && selectedDate && (

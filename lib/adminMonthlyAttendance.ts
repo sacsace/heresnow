@@ -1,4 +1,5 @@
 import { isAutoCheckOutMemo } from "@/lib/autoCheckOutDisplay";
+import { parseWorkDays } from "@/lib/companyWorkSchedule";
 import { recordDisplayTimezone } from "@/lib/companyTimezones";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import type { AttendanceStatus, AttendanceType } from "@prisma/client";
@@ -132,4 +133,52 @@ export function buildMonthlyRows(
       };
     }),
   }));
+}
+
+function calendarWeekday(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y!, (m ?? 1) - 1, d ?? 1)).getUTCDay();
+}
+
+export type MonthlyEmployeeWorkSummary = {
+  /** 회사 근무 요일 기준 총 근무일(오늘 이전) */
+  scheduledDays: number;
+  /** 출근·퇴근 기록이 있는 근무일 */
+  workedDays: number;
+  /** 기록 없는 근무일 = 결근 */
+  absentDays: number;
+  /** 결근으로 표시할 날짜 */
+  absentDates: string[];
+};
+
+/**
+ * 월간 직원 상세 — 총 근무일·근무일수·결근일수.
+ * 회사 근무 요일 중 오늘 이전만 집계(엑셀 내보내기와 동일).
+ */
+export function summarizeMonthlyEmployeeWork(
+  days: MonthlyDayCell[],
+  workDays: string | null | undefined,
+  timeZone: string,
+  now: Date = new Date()
+): MonthlyEmployeeWorkSummary {
+  const workDaySet = parseWorkDays(workDays);
+  const todayStr = calendarDayInTz(now, timeZone.trim() || "UTC");
+  let scheduledDays = 0;
+  let workedDays = 0;
+  let absentDays = 0;
+  const absentDates: string[] = [];
+
+  for (const d of days) {
+    if (d.date > todayStr) continue;
+    if (!workDaySet.has(calendarWeekday(d.date))) continue;
+    scheduledDays += 1;
+    if (d.checkIn || d.checkOut) {
+      workedDays += 1;
+    } else {
+      absentDays += 1;
+      absentDates.push(d.date);
+    }
+  }
+
+  return { scheduledDays, workedDays, absentDays, absentDates };
 }
