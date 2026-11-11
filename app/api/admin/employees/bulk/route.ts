@@ -66,23 +66,33 @@ export async function POST(req: Request) {
   const failures: BulkImportFailure[] = [];
   let created = 0;
   const seenEmails = new Set<string>();
+  const seenExternalIds = new Set<string>();
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   for (const row of rows) {
     const email = row.email.trim().toLowerCase();
+    const externalEmployeeId = row.externalEmployeeId.trim();
     const empName = row.name.trim();
     const password = row.password;
     const deptName = row.departmentName.trim();
 
-    if (!email || !empName || !password || !deptName) {
+    if (!empName || !password || !deptName) {
       failures.push({
         row: row.rowNumber,
         email: email || undefined,
-        error: "이메일, 이름, 임시 비밀번호, 부서는 필수입니다.",
+        error: "이름, 임시 비밀번호, 부서는 필수입니다.",
       });
       continue;
     }
-    if (!emailRe.test(email)) {
+    if (!email && !externalEmployeeId) {
+      failures.push({
+        row: row.rowNumber,
+        email: undefined,
+        error: "이메일 또는 직원 ID 중 하나는 필요합니다.",
+      });
+      continue;
+    }
+    if (email && !emailRe.test(email)) {
       failures.push({ row: row.rowNumber, email, error: "이메일 형식이 올바르지 않습니다." });
       continue;
     }
@@ -102,11 +112,26 @@ export async function POST(req: Request) {
       });
       continue;
     }
-    if (seenEmails.has(email)) {
-      failures.push({ row: row.rowNumber, email, error: "파일 내 이메일이 중복됩니다." });
-      continue;
+    if (email) {
+      if (seenEmails.has(email)) {
+        failures.push({ row: row.rowNumber, email, error: "파일 내 이메일이 중복됩니다." });
+        continue;
+      }
+      seenEmails.add(email);
     }
-    seenEmails.add(email);
+
+    if (externalEmployeeId) {
+      const idKey = externalEmployeeId.toLowerCase();
+      if (seenExternalIds.has(idKey)) {
+        failures.push({
+          row: row.rowNumber,
+          email: email || undefined,
+          error: "파일 내 직원 ID가 중복됩니다.",
+        });
+        continue;
+      }
+      seenExternalIds.add(idKey);
+    }
 
     const departmentId = deptByName.get(deptName.toLowerCase());
     if (!departmentId) {
@@ -131,11 +156,12 @@ export async function POST(req: Request) {
     const result = await createCompanyEmployee(
       {
         companyId,
-        email,
+        email: email || null,
         name: empName,
         password,
         departmentId,
         role: role as Role,
+        externalEmployeeId: externalEmployeeId || null,
       },
       {
         callerRole: session.user.role!,

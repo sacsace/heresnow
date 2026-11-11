@@ -9,6 +9,7 @@ export type EmployeeBulkTemplateLabels = {
   sheetEmployees: string;
   sheetDepartments: string;
   colEmail: string;
+  colExternalId: string;
   colName: string;
   colPassword: string;
   colDepartment: string;
@@ -22,6 +23,7 @@ export const EMPLOYEE_BULK_LABELS_KO: EmployeeBulkTemplateLabels = {
   sheetEmployees: "직원 등록",
   sheetDepartments: "부서 목록",
   colEmail: "이메일",
+  colExternalId: "직원 ID",
   colName: "이름",
   colPassword: "임시 비밀번호",
   colDepartment: "부서",
@@ -35,6 +37,7 @@ export const EMPLOYEE_BULK_LABELS_EN: EmployeeBulkTemplateLabels = {
   sheetEmployees: "Employees",
   sheetDepartments: "Departments",
   colEmail: "Email",
+  colExternalId: "Employee ID",
   colName: "Name",
   colPassword: "Temporary Password",
   colDepartment: "Department",
@@ -47,6 +50,7 @@ export const EMPLOYEE_BULK_LABELS_EN: EmployeeBulkTemplateLabels = {
 export type ParsedEmployeeBulkRow = {
   rowNumber: number;
   email: string;
+  externalEmployeeId: string;
   name: string;
   password: string;
   departmentName: string;
@@ -98,6 +102,7 @@ function normalizeHeader(h: string): string {
 
 type HeaderMap = {
   email?: number;
+  externalId?: number;
   name?: number;
   password?: number;
   department?: number;
@@ -110,14 +115,23 @@ function mapHeaders(headerRow: ExcelJS.Row): HeaderMap {
     const h = normalizeHeader(cellText(cell.value));
     if (!h) return;
     if (h === "email" || h === "이메일" || h.includes("email")) map.email = col;
-    else if (h === "name" || h === "이름") map.name = col;
+    else if (
+      h === "employee id" ||
+      h === "직원 id" ||
+      h === "직원id" ||
+      h === "사번" ||
+      h.includes("external") ||
+      h.includes("employee id")
+    ) {
+      map.externalId = col;
+    } else if (h === "name" || h === "이름") map.name = col;
     else if (h === "password" || h.includes("password") || h.includes("비밀번호")) map.password = col;
     else if (h === "department" || h === "부서" || h.includes("department")) map.department = col;
     else if (h === "role" || h === "역할") map.role = col;
   });
   // 기본 열 순서 (헤더 없을 때)
   if (!map.email && !map.name) {
-    return { email: 1, name: 2, password: 3, department: 4, role: 5 };
+    return { email: 1, externalId: 2, name: 3, password: 4, department: 5, role: 6 };
   }
   return map;
 }
@@ -134,6 +148,7 @@ export async function buildEmployeeBulkTemplate(
   });
   ws.columns = [
     { header: labels.colEmail, key: "email", width: 28 },
+    { header: labels.colExternalId, key: "externalId", width: 16 },
     { header: labels.colName, key: "name", width: 18 },
     { header: labels.colPassword, key: "password", width: 18 },
     { header: labels.colDepartment, key: "department", width: 22 },
@@ -141,6 +156,7 @@ export async function buildEmployeeBulkTemplate(
   ];
   ws.addRow({
     email: "employee@example.com",
+    externalId: "E001",
     name: labels.exampleNote,
     password: "ChangeMe123",
     department: departmentNames[0] ?? "Department",
@@ -180,10 +196,12 @@ export async function parseEmployeeBulkWorkbook(
 
   const headerRow = ws.getRow(1);
   const map = mapHeaders(headerRow);
-  if (!map.email || !map.name || !map.password || !map.department) {
+  if (!map.name || !map.password || !map.department || (!map.email && !map.externalId)) {
     return {
       rows: [],
-      errors: ["필수 열(이메일, 이름, 임시 비밀번호, 부서)을 찾을 수 없습니다."],
+      errors: [
+        "필수 열(이름, 임시 비밀번호, 부서)과 이메일 또는 직원 ID 열을 찾을 수 없습니다.",
+      ],
     };
   }
 
@@ -193,13 +211,16 @@ export async function parseEmployeeBulkWorkbook(
 
   for (let r = 2; r <= maxRow; r++) {
     const row = ws.getRow(r);
-    const email = cellText(row.getCell(map.email!).value).toLowerCase();
+    const email = map.email ? cellText(row.getCell(map.email).value).toLowerCase() : "";
+    const externalEmployeeId = map.externalId
+      ? cellText(row.getCell(map.externalId).value)
+      : "";
     const name = cellText(row.getCell(map.name!).value);
     const password = cellText(row.getCell(map.password!).value);
     const departmentName = cellText(row.getCell(map.department!).value);
     const roleRaw = map.role ? cellText(row.getCell(map.role).value) : "";
 
-    if (!email && !name && !password && !departmentName) continue;
+    if (!email && !name && !password && !departmentName && !externalEmployeeId) continue;
     if (name === EMPLOYEE_BULK_LABELS_KO.exampleNote || name === EMPLOYEE_BULK_LABELS_EN.exampleNote) {
       continue;
     }
@@ -207,6 +228,7 @@ export async function parseEmployeeBulkWorkbook(
     rows.push({
       rowNumber: r,
       email,
+      externalEmployeeId,
       name,
       password,
       departmentName,

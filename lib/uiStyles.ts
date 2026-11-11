@@ -43,7 +43,7 @@ export const navBarInnerEmployee =
 
 /** Segmented nav track (admin header) */
 export const navSegmentedWrap =
-  "inline-flex h-9 min-w-0 max-w-full overflow-x-auto rounded-[0.625rem] border border-[var(--separator)] bg-white p-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+  "inline-flex h-9 min-w-0 max-w-full overflow-x-auto rounded-[0.625rem] bg-white p-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 export const navSegmentedBtn = (active: boolean) =>
   `inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-[0.4375rem] px-2.5 text-[0.75rem] font-semibold transition-colors sm:px-3 sm:text-[0.8125rem] ${

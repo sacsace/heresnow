@@ -1,6 +1,11 @@
 import type { CompanyWorkSchedule } from "@/lib/companyWorkSchedule";
 import { normalizeWorkScheduleByDay } from "@/lib/companyWorkSchedule";
 import {
+  departmentOverridesCompanySchedule,
+  resolveDepartmentAsCompanySchedule,
+  type DepartmentScheduleFields,
+} from "@/lib/departmentWorkSchedule";
+import {
   localizedShiftPresetLabel,
   normalizeShiftPresets,
   shiftPresetToSchedule,
@@ -21,6 +26,8 @@ export type EmployeeScheduleFields = {
   workStartTime?: string | null;
   workEndTime?: string | null;
   workScheduleByDay?: unknown;
+  /** include 시 부서 근무시간 상속용 */
+  department?: DepartmentScheduleFields | null;
 };
 
 export type CompanyScheduleFields = {
@@ -40,17 +47,36 @@ export function isShiftCode(code: string | null | undefined): code is ShiftCode 
   return code === "A" || code === "B" || code === "C";
 }
 
-/** 직원·회사 설정을 합쳐 출퇴근 판정에 쓸 스케줄 반환. 지점 오버라이드는 직원이 COMPANY 모드일 때만 적용 */
+function applyInheritedBase(
+  company: CompanyScheduleFields,
+  department?: DepartmentScheduleFields | null,
+  site?: SiteScheduleFields | null
+): CompanyScheduleFields {
+  let base = company;
+  if (departmentOverridesCompanySchedule(department)) {
+    base = { ...base, ...resolveDepartmentAsCompanySchedule(department!, company) };
+  }
+  if (siteOverridesCompanySchedule(site)) {
+    base = { ...base, ...resolveSiteAsCompanySchedule(site!, base) };
+  }
+  return base;
+}
+
+/**
+ * 직원·회사·부서·지점 설정을 합쳐 출퇴근 판정에 쓸 스케줄 반환.
+ * 상속: Company → Department → Site (직원이 COMPANY일 때만).
+ * 직원 SHIFT/CUSTOM/FREE는 최우선.
+ */
 export function resolveEmployeeWorkSchedule(
   employee: EmployeeScheduleFields,
   company: CompanyScheduleFields,
-  site?: SiteScheduleFields | null
+  site?: SiteScheduleFields | null,
+  department?: DepartmentScheduleFields | null
 ): CompanyWorkSchedule {
   const type = parseWorkScheduleType(employee.workScheduleType);
+  const dept = department ?? employee.department ?? null;
   const companyBase =
-    type === "COMPANY" && siteOverridesCompanySchedule(site)
-      ? { ...company, ...resolveSiteAsCompanySchedule(site!, company) }
-      : company;
+    type === "COMPANY" ? applyInheritedBase(company, dept, site) : company;
   const workDays = companyBase.workDays;
 
   if (type === "SHIFT" && isShiftCode(employee.shiftCode)) {
@@ -103,10 +129,22 @@ export type EmployeeScheduleSummary = {
 export function employeeScheduleSummary(
   employee: EmployeeScheduleFields,
   company: CompanyScheduleFields,
-  locale: ShiftLocale = "ko"
+  locale: ShiftLocale = "ko",
+  department?: DepartmentScheduleFields | null
 ): EmployeeScheduleSummary {
   const type = parseWorkScheduleType(employee.workScheduleType);
+  const dept = department ?? employee.department ?? null;
   if (type === "COMPANY") {
+    if (departmentOverridesCompanySchedule(dept)) {
+      const resolved = resolveDepartmentAsCompanySchedule(dept!, company);
+      const start = resolved.workStartTime ?? "09:00";
+      const end = resolved.workEndTime ?? "18:00";
+      return {
+        workScheduleType: "COMPANY",
+        shiftCode: null,
+        label: locale === "en" ? `Dept ${start}–${end}` : `부서 ${start}–${end}`,
+      };
+    }
     return {
       workScheduleType: "COMPANY",
       shiftCode: null,
@@ -123,7 +161,7 @@ export function employeeScheduleSummary(
       label: `${shiftName} (${p.workStartTime}–${p.workEndTime})`,
     };
   }
-  const resolved = resolveEmployeeWorkSchedule(employee, company);
+  const resolved = resolveEmployeeWorkSchedule(employee, company, null, dept);
   const start = resolved.workStartTime ?? "09:00";
   const end = resolved.workEndTime ?? "18:00";
   if (type === "FREE") {

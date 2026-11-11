@@ -42,7 +42,7 @@ type Props = {
 export function AttendanceRequestsPage({ hidePageLead = false }: Props) {
   const { t, locale } = useI18n();
   const [canReceive, setCanReceive] = useState(false);
-  const [tab, setTab] = useState<Tab>("mine");
+  const [tab, setTab] = useState<Tab>("received");
   const [filters, setFilters] = useState<WorkRequestListFilters>(() => defaultWorkRequestListFilters());
   const [applying, setApplying] = useState(false);
   const [mineRefreshKey, setMineRefreshKey] = useState(0);
@@ -54,8 +54,11 @@ export function AttendanceRequestsPage({ hidePageLead = false }: Props) {
       policy?: { overtimeApplicationEnabled?: boolean; canReceiveRequests?: boolean };
     };
     if (r.ok) {
+      const receive = Boolean(j.policy?.canReceiveRequests);
       setOvertimeApplicationEnabled(j.policy?.overtimeApplicationEnabled !== false);
-      setCanReceive(Boolean(j.policy?.canReceiveRequests));
+      setCanReceive(receive);
+      // 승인권자: 받은 결재를 기본 탭으로. 수신 권한이 없으면 내 신청만.
+      setTab(receive ? "received" : "mine");
     }
   }, []);
 
@@ -68,12 +71,11 @@ export function AttendanceRequestsPage({ hidePageLead = false }: Props) {
   }, [tab]);
 
   const scopeTabs = useMemo(() => {
-    const list: Array<{ id: Tab; label: string }> = [
-      { id: "mine", label: t("approvals.tabSubmitted") },
-    ];
+    const list: Array<{ id: Tab; label: string }> = [];
     if (canReceive) {
       list.push({ id: "received", label: t("approvals.tabReceived") });
     }
+    list.push({ id: "mine", label: t("approvals.tabSubmitted") });
     return list;
   }, [canReceive, t]);
 

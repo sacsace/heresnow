@@ -4,6 +4,7 @@ import type { WorkRequestType } from "@prisma/client";
 export const WORK_REQUEST_TYPES: WorkRequestType[] = [
   "OVERTIME",
   "EARLY_LEAVE",
+  "EARLY_CHECK_IN",
   "REMOTE_WORK",
   "VACATION",
   "HALF_DAY_LEAVE",
@@ -25,6 +26,7 @@ export function parseWorkRequestTypeParam(
 const TYPE_I18N_KEY: Record<WorkRequestType, string> = {
   OVERTIME: "approvals.workRequestTypeOvertime",
   EARLY_LEAVE: "approvals.workRequestTypeEarlyLeave",
+  EARLY_CHECK_IN: "approvals.workRequestTypeEarlyCheckIn",
   REMOTE_WORK: "approvals.workRequestTypeRemoteWork",
   VACATION: "approvals.workRequestTypeVacation",
   HALF_DAY_LEAVE: "approvals.workRequestTypeHalfDayLeave",

@@ -2,6 +2,7 @@
 
 import type { Department } from "@/components/admin/DepartmentManagerModal";
 import { useI18n } from "@/components/LanguageProvider";
+import { displayEmployeeEmail } from "@/lib/employeeIdentity";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
 import { emptyStateCompact, tableHead, trDivider } from "@/lib/uiStyles";
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 export type EmployeeRow = {
   id: string;
   name: string;
+  externalEmployeeId?: string | null;
   user: { id: string; email: string; role: string };
   department: { id: string; name: string } | null;
   scheduleSummary?: string;
@@ -32,14 +34,14 @@ const rowControlStatic =
 const rowInput =
   "h-7 w-full min-w-0 rounded-[0.4375rem] bg-[var(--fill-secondary)] px-2 text-[0.75rem] leading-none text-[var(--foreground)] outline-none transition-[box-shadow,background-color] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-60";
 const empTable = "w-full min-w-full text-left text-[0.8125rem] sm:text-[0.875rem]";
-const empTh = "px-2 py-2 whitespace-nowrap sm:px-2.5";
-const empTd = "px-2 py-1.5 align-middle text-[var(--foreground)] sm:px-2.5 sm:py-2";
+const empTh = "px-1.5 py-2 sm:px-2";
+const empTd = "px-1.5 py-1.5 align-middle text-[var(--foreground)] sm:px-2 sm:py-2";
 const empThLabel =
   "text-[0.6875rem] font-semibold leading-snug text-[var(--apple-label-secondary)] sm:text-[0.75rem]";
 const empBtnDanger =
   "inline-flex h-7 touch-manipulation items-center justify-center rounded-md bg-[var(--apple-red)]/10 px-2.5 text-[0.75rem] font-medium text-[var(--apple-red)] transition-colors hover:bg-[var(--apple-red)]/16 disabled:opacity-40";
 
-const WIDTH_STORAGE_KEY = "heresnow_employee_col_widths_v7";
+const WIDTH_STORAGE_KEY = "heresnow_employee_col_widths_v8";
 
 type ResizableCol = "name" | "email" | "password" | "role" | "department";
 type SortKey = ResizableCol;
@@ -48,28 +50,29 @@ type SortDir = "asc" | "desc";
 type ColWidths = Record<ResizableCol, number> & { actions: number };
 
 const DEFAULT_WIDTHS: ColWidths = {
-  name: 104,
-  email: 136,
-  password: 72,
-  role: 100,
-  department: 96,
-  actions: 68,
-};
-
-const MIN_WIDTHS: ColWidths = {
-  name: 80,
-  email: 108,
+  name: 96,
+  email: 128,
   password: 64,
-  role: 88,
-  department: 80,
+  role: 92,
+  department: 88,
   actions: 56,
 };
 
-const LOGIN_COL_WIDTH = 84;
-const SCHEDULE_COL_WIDTH = 116;
-const SELECT_COL_WIDTH = 48;
-const TEAM_LEADER_COL_WIDTH = 72;
-const PUNCH_WITHOUT_FACE_COL_WIDTH = 88;
+const MIN_WIDTHS: ColWidths = {
+  name: 72,
+  email: 96,
+  password: 56,
+  role: 80,
+  department: 72,
+  actions: 48,
+};
+
+const LOGIN_COL_WIDTH = 64;
+const SCHEDULE_COL_WIDTH = 96;
+const SELECT_COL_WIDTH = 44;
+const TEAM_LEADER_COL_WIDTH = 44;
+const PUNCH_WITHOUT_FACE_COL_WIDTH = 48;
+const EXTERNAL_ID_COL_WIDTH = 72;
 
 const ROLE_ORDER: Role[] = ["EMPLOYEE", "DOOR", "APPROVER", "HR_MANAGER", "COMPANY_ADMIN"];
 
@@ -121,6 +124,7 @@ type Props = {
   onPasswordEditCancel: () => void;
   onSaveName: (emp: EmployeeRow, value: string) => void;
   onSaveEmail: (emp: EmployeeRow, value: string) => void;
+  onSaveExternalEmployeeId?: (emp: EmployeeRow, value: string) => void;
   onChangeRole: (emp: EmployeeRow, role: Role) => void;
   onChangeDepartment: (empId: string, deptId: string) => void;
   onDelete: (emp: EmployeeRow) => void;
@@ -153,6 +157,7 @@ export function EmployeeListTable({
   onPasswordEditCancel,
   onSaveName,
   onSaveEmail,
+  onSaveExternalEmployeeId,
   onChangeRole,
   onChangeDepartment,
   onDelete,
@@ -264,15 +269,20 @@ export function EmployeeListTable({
 
   const fixedHeaderCell = (
     label: string,
-    minWidth: number,
-    opts?: { align?: "left" | "center"; title?: string }
+    _minWidth: number,
+    opts?: { align?: "left" | "center"; title?: string; wrap?: boolean }
   ) => (
     <th
       className={`${empTh} ${opts?.align === "center" ? "text-center" : "text-left"}`}
-      style={{ minWidth }}
       title={opts?.title ?? label}
     >
-      <span className={`block whitespace-nowrap ${empThLabel}`}>{label}</span>
+      <span
+        className={`block leading-tight ${empThLabel} ${
+          opts?.wrap ? "whitespace-normal break-keep px-0.5" : "whitespace-nowrap"
+        }`}
+      >
+        {label}
+      </span>
     </th>
   );
 
@@ -280,7 +290,6 @@ export function EmployeeListTable({
     <th
       key={key}
       className={`${empTh} relative select-none text-left`}
-      style={{ minWidth: MIN_WIDTHS[key] }}
       aria-sort={
         key !== "password" && sortKey === key
           ? sortDir === "asc"
@@ -326,9 +335,10 @@ export function EmployeeListTable({
   const allSelected =
     showSelect && employees.length > 0 && employees.every((e) => selectedIds!.has(e.id));
 
-  const tableMinWidth =
+  const tableWeight =
     widths.name +
     widths.email +
+    EXTERNAL_ID_COL_WIDTH +
     widths.role +
     widths.department +
     widths.password +
@@ -339,18 +349,16 @@ export function EmployeeListTable({
     (onChangeTeamLeader ? TEAM_LEADER_COL_WIDTH : 0) +
     (onChangePunchWithoutFace ? PUNCH_WITHOUT_FACE_COL_WIDTH : 0);
 
-  const colPct = (px: number) => `${(px / tableMinWidth) * 100}%`;
+  const colPct = (px: number) => `${(px / tableWeight) * 100}%`;
 
   return (
-    <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-      <table
-        className={empTable}
-        style={{ tableLayout: "fixed", width: "100%", minWidth: tableMinWidth }}
-      >
+    <div className="w-full min-w-0 overflow-x-hidden">
+      <table className={empTable} style={{ tableLayout: "fixed", width: "100%" }}>
         <colgroup>
           {showSelect && <col style={{ width: colPct(SELECT_COL_WIDTH) }} />}
           <col style={{ width: colPct(widths.name) }} />
           <col style={{ width: colPct(widths.email) }} />
+          <col style={{ width: colPct(EXTERNAL_ID_COL_WIDTH) }} />
           <col style={{ width: colPct(widths.role) }} />
           <col style={{ width: colPct(widths.department) }} />
           {showLoginStatus && <col style={{ width: colPct(LOGIN_COL_WIDTH) }} />}
@@ -365,10 +373,10 @@ export function EmployeeListTable({
         <thead className={tableHead}>
           <tr>
             {showSelect && (
-              <th className={`${empTh} text-center`} style={{ minWidth: SELECT_COL_WIDTH }}>
-                <div className="flex items-center justify-center gap-1.5">
+              <th className={`${empTh} text-center`}>
+                <div className="flex items-center justify-center gap-1">
                   <span
-                    className="w-4 shrink-0 text-center text-[0.6875rem] font-medium text-[var(--apple-label-tertiary)]"
+                    className="w-3.5 shrink-0 text-center text-[0.6875rem] font-medium text-[var(--apple-label-tertiary)]"
                     aria-hidden
                   >
                     #
@@ -384,6 +392,9 @@ export function EmployeeListTable({
             )}
             {headerCell("name", t("admin.employeesNameLabel"), true)}
             {headerCell("email", t("admin.employeesEmailLabel"), true)}
+            {fixedHeaderCell(t("admin.employeesExternalIdLabel"), EXTERNAL_ID_COL_WIDTH, {
+              title: t("admin.employeesExternalIdHint"),
+            })}
             {headerCell("role", t("admin.employeesRoleLabel"), true)}
             {headerCell("department", t("admin.employeesDepartmentLabel"), true)}
             {showLoginStatus &&
@@ -391,8 +402,10 @@ export function EmployeeListTable({
                 align: "center",
               })}
             {onChangeTeamLeader &&
-              fixedHeaderCell(t("admin.employeesTeamLeaderCol"), TEAM_LEADER_COL_WIDTH, {
+              fixedHeaderCell(t("admin.employeesTeamLeaderColShort"), TEAM_LEADER_COL_WIDTH, {
                 align: "center",
+                title: t("admin.employeesTeamLeaderCol"),
+                wrap: true,
               })}
             {onChangePunchWithoutFace &&
               fixedHeaderCell(
@@ -401,6 +414,7 @@ export function EmployeeListTable({
                 {
                   align: "center",
                   title: t("admin.employeesPunchWithoutFaceCol"),
+                  wrap: true,
                 }
               )}
             {fixedHeaderCell(
@@ -409,7 +423,7 @@ export function EmployeeListTable({
               { title: t("admin.empScheduleCol") }
             )}
             {headerCell("password", t("admin.employeesPasswordColLabel"), true)}
-            <th className={`${empTh} text-center`} style={{ minWidth: MIN_WIDTHS.actions }}>
+            <th className={`${empTh} text-center`}>
               <span className={`block whitespace-nowrap ${empThLabel}`}>
                 {t("admin.employeesColActions")}
               </span>
@@ -473,10 +487,11 @@ export function EmployeeListTable({
                       type="email"
                       autoComplete="off"
                       className={`${rowInput} truncate`}
-                      defaultValue={e.user.email}
+                      defaultValue={displayEmployeeEmail(e.user.email)}
                       key={`email-${e.id}-${e.user.email}`}
                       disabled={isBusy}
-                      title={e.user.email}
+                      title={displayEmployeeEmail(e.user.email) || undefined}
+                      placeholder={t("admin.employeesEmailOptionalPlaceholder")}
                       aria-label={t("admin.employeesEmailLabel")}
                       onBlur={(ev) => onSaveEmail(e, ev.target.value)}
                       onKeyDown={(ev) => {
@@ -484,8 +499,37 @@ export function EmployeeListTable({
                       }}
                     />
                   ) : (
-                    <p className={`${rowControlStatic} truncate`} title={e.user.email}>
-                      {e.user.email}
+                    <p
+                      className={`${rowControlStatic} truncate`}
+                      title={displayEmployeeEmail(e.user.email) || undefined}
+                    >
+                      {displayEmployeeEmail(e.user.email) || "—"}
+                    </p>
+                  )}
+                </td>
+                <td className={empTd}>
+                  {canEditProfile && onSaveExternalEmployeeId ? (
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      className={`${rowInput} truncate`}
+                      defaultValue={e.externalEmployeeId ?? ""}
+                      key={`ext-${e.id}-${e.externalEmployeeId ?? ""}`}
+                      disabled={isBusy}
+                      maxLength={80}
+                      title={e.externalEmployeeId ?? undefined}
+                      aria-label={t("admin.employeesExternalIdLabel")}
+                      onBlur={(ev) => onSaveExternalEmployeeId(e, ev.target.value)}
+                      onKeyDown={(ev) => {
+                        if (ev.key === "Enter") ev.currentTarget.blur();
+                      }}
+                    />
+                  ) : (
+                    <p
+                      className={`${rowControlStatic} truncate`}
+                      title={e.externalEmployeeId ?? undefined}
+                    >
+                      {e.externalEmployeeId?.trim() ? e.externalEmployeeId : "—"}
                     </p>
                   )}
                 </td>

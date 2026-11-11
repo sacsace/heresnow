@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { createCompanyEmployee } from "@/lib/employeeCreate";
 import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
@@ -9,14 +10,25 @@ import {
   isStrongPassword,
 } from "@/lib/passwordPolicy";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const postSchema = z.object({
-  email: z.string().email().transform((e) => e.toLowerCase().trim()),
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .transform((v) => (v && v.length > 0 ? v.toLowerCase() : null)),
   name: z.string().min(1).max(120),
   password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
+  externalEmployeeId: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .nullable()
+    .transform((v) => (v && v.length > 0 ? v : null)),
   role: z.enum(["COMPANY_ADMIN", "HR_MANAGER", "APPROVER", "EMPLOYEE", "DOOR"]),
 });
 
@@ -41,7 +53,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       role: true,
       consentGivenAt: true,
       createdAt: true,
-      employee: { select: { id: true, name: true } },
+      employee: { select: { id: true, name: true, externalEmployeeId: true } },
     },
   });
 
@@ -67,7 +79,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { email, name, password, role } = parsed.data;
+  const { email, name, password, role, externalEmployeeId } = parsed.data;
   if (!isStrongPassword(password)) {
     return NextResponse.json(
       { error: "WEAK_PASSWORD", message: WEAK_PASSWORD_MESSAGE },
@@ -80,32 +92,30 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const dup = await prisma.user.findUnique({ where: { email } });
-  if (dup) {
-    return NextResponse.json({ error: "이미 등록된 이메일입니다." }, { status: 409 });
-  }
+  const result = await createCompanyEmployee(
+    {
+      companyId,
+      email,
+      name,
+      password,
+      departmentId: null,
+      role,
+      externalEmployeeId,
+    },
+    { callerRole: "SUPER_ADMIN" }
+  );
 
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          companyId,
-          email,
-          passwordHash,
-          role,
-          consentGivenAt: null,
-          consentVersion: null,
-        },
-      });
-      await tx.employee.create({
-        data: { companyId, userId: user.id, name: name.trim() },
-      });
-    });
-  } catch (e) {
-    console.error("[super companies users POST]", e);
-    return NextResponse.json({ error: "생성 실패" }, { status: 500 });
+  if (!result.ok) {
+    const status =
+      result.code === "EMAIL_TAKEN" || result.code === "EXTERNAL_ID_TAKEN"
+        ? 409
+        : result.code === "CREATE_FAILED"
+          ? 500
+          : 400;
+    return NextResponse.json(
+      { error: result.message, code: result.code, message: result.message },
+      { status }
+    );
   }
 
   return NextResponse.json({ ok: true });

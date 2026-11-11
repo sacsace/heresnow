@@ -12,6 +12,7 @@ import {
   EmployeeWorkScheduleModal,
   type EmployeeScheduleTarget,
 } from "@/components/admin/EmployeeWorkScheduleModal";
+import { SettingsDropdownSection } from "@/components/admin/SettingsDropdownSection";
 import { employeeScheduleSummary } from "@/lib/employeeWorkSchedule";
 import {
   DEFAULT_SHIFT_PRESETS,
@@ -26,8 +27,6 @@ import {
   bannerWarning,
   btnPrimary,
   btnSecondary,
-  card,
-  cardBody,
   errorText,
   successText,
   emptyStateCompact,
@@ -39,7 +38,6 @@ import {
   searchFieldCol,
   searchFieldWrap,
   searchFiltersRow,
-  sectionLabel,
   select,
   tableToolbar,
 } from "@/lib/uiStyles";
@@ -47,6 +45,7 @@ import {
   assignableRolesForCaller,
   canDeleteEmployee,
 } from "@/lib/roleHierarchy";
+import { displayEmployeeEmail, emailLocalPart } from "@/lib/employeeIdentity";
 import { annotateEmployeesWithLoginAccess, bypassesSeatLimit } from "@/lib/seatAccessShared";
 import type { Role } from "@prisma/client";
 import { useSession } from "next-auth/react";
@@ -55,8 +54,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 type Emp = {
   id: string;
   name: string;
+  externalEmployeeId?: string | null;
   user: { id: string; email: string; role: string };
-  department: { id: string; name: string } | null;
+  department: {
+    id: string;
+    name: string;
+    workScheduleMode?: string | null;
+    shiftCode?: string | null;
+    workStartTime?: string | null;
+    workEndTime?: string | null;
+  } | null;
   workScheduleType?: string | null;
   shiftCode?: string | null;
   workStartTime?: string | null;
@@ -101,6 +108,8 @@ export default function AdminEmployeesPage() {
   } | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [email, setEmail] = useState("");
+  const [externalEmployeeId, setExternalEmployeeId] = useState("");
+  const [externalIdManual, setExternalIdManual] = useState(false);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [showCreatePassword, setShowCreatePassword] = useState(false);
@@ -176,7 +185,12 @@ export default function AdminEmployeesPage() {
         setEmployees(
           rows.map((e) => ({
             ...e,
-            scheduleSummary: employeeScheduleSummary(e, companySchedule, loc).label,
+            scheduleSummary: employeeScheduleSummary(
+              e,
+              companySchedule,
+              loc,
+              e.department ?? null
+            ).label,
           }))
         );
         const seatLimit =
@@ -249,6 +263,10 @@ export default function AdminEmployeesPage() {
     e.preventDefault();
     setError(null);
     setAddSuccess(null);
+    if (!email.trim() && !externalEmployeeId.trim()) {
+      setError(t("admin.employeesEmailOrIdRequired"));
+      return;
+    }
     if (!isStrongPassword(password)) {
       setError(t("admin.employeesPasswordHint"));
       return;
@@ -257,7 +275,8 @@ export default function AdminEmployeesPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email,
+        email: email.trim() || null,
+        externalEmployeeId: externalEmployeeId.trim() || null,
         name,
         password,
         departmentId,
@@ -267,15 +286,21 @@ export default function AdminEmployeesPage() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       setError(
-        typeof j.message === "string"
-          ? j.message
-          : typeof j.error === "string"
-            ? j.error
-            : t("admin.employeesAddFail")
+        j.code === "EXTERNAL_ID_TAKEN"
+          ? t("admin.employeesExternalIdTaken")
+          : j.code === "EMAIL_OR_ID_REQUIRED"
+            ? t("admin.employeesEmailOrIdRequired")
+            : typeof j.message === "string"
+              ? j.message
+              : typeof j.error === "string"
+                ? j.error
+                : t("admin.employeesAddFail")
       );
       return;
     }
     setEmail("");
+    setExternalEmployeeId("");
+    setExternalIdManual(false);
     setName("");
     setPassword("");
     setShowCreatePassword(false);
@@ -298,7 +323,13 @@ export default function AdminEmployeesPage() {
         return false;
       }
       if (!q) return true;
-      const haystack = [e.name, e.user.email, e.department?.name ?? "", e.scheduleSummary ?? ""]
+      const haystack = [
+        e.name,
+        displayEmployeeEmail(e.user.email),
+        e.externalEmployeeId ?? "",
+        e.department?.name ?? "",
+        e.scheduleSummary ?? "",
+      ]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
@@ -456,15 +487,21 @@ export default function AdminEmployeesPage() {
 
   async function saveEmail(emp: Emp, raw: string) {
     const next = raw.trim().toLowerCase();
-    if (!next || next === emp.user.email.toLowerCase()) return;
+    const prevDisplay = displayEmployeeEmail(emp.user.email);
+    if (next === prevDisplay.toLowerCase()) return;
+    if (!next && !emp.externalEmployeeId?.trim()) {
+      setRowError(t("admin.employeesEmailOrIdRequired"));
+      return;
+    }
     const prev = emp.user.email;
+    const optimisticEmail = next || emp.externalEmployeeId || prev;
     await patchEmployee(
       emp.id,
-      { email: next },
+      { email: next || null },
       {
         optimistic: (list) =>
           list.map((x) =>
-            x.id === emp.id ? { ...x, user: { ...x.user, email: next } } : x
+            x.id === emp.id ? { ...x, user: { ...x.user, email: optimisticEmail } } : x
           ),
         revert: () =>
           setEmployees((list) =>
@@ -474,6 +511,31 @@ export default function AdminEmployeesPage() {
           ),
       }
     );
+  }
+
+  async function saveExternalEmployeeId(emp: Emp, raw: string) {
+    const next = raw.trim() || null;
+    const prev = emp.externalEmployeeId ?? null;
+    if ((next ?? null) === (prev ?? null)) return;
+    if (!next && !displayEmployeeEmail(emp.user.email)) {
+      setRowError(t("admin.employeesEmailOrIdRequired"));
+      return;
+    }
+    const ok = await patchEmployee(
+      emp.id,
+      { externalEmployeeId: next },
+      {
+        optimistic: (list) =>
+          list.map((x) => (x.id === emp.id ? { ...x, externalEmployeeId: next } : x)),
+        revert: () =>
+          setEmployees((list) =>
+            list.map((x) => (x.id === emp.id ? { ...x, externalEmployeeId: prev } : x))
+          ),
+      }
+    );
+    if (!ok) {
+      setRowError(t("admin.employeesExternalIdTaken"));
+    }
   }
 
   async function savePassword(empId: string): Promise<boolean> {
@@ -756,9 +818,11 @@ export default function AdminEmployeesPage() {
         }
       />
 
-      <section>
-        <div className="mb-3 flex items-center justify-between gap-3 px-1">
-          <p className={`${sectionLabel} mb-0`}>{t("admin.employeesAddTitle")}</p>
+      <SettingsDropdownSection
+        title={t("admin.employeesAddTitle")}
+        defaultOpen
+        className="!border-[#1d1d1f]/40 shadow-none"
+        headerRight={
           <button
             type="button"
             className={btnSecondary}
@@ -766,9 +830,8 @@ export default function AdminEmployeesPage() {
           >
             {t("admin.employeesDepartmentManage")}
           </button>
-        </div>
-        <div className={card}>
-          <div className={cardBody}>
+        }
+      >
             {noDepartments && (
               <p className={`${bannerWarning} mb-4`}>{t("admin.employeesNoDepartmentsYet")}</p>
             )}
@@ -777,17 +840,36 @@ export default function AdminEmployeesPage() {
               className="grid w-full grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-3"
             >
               <div>
-                <label className={label}>
-                  {t("admin.employeesEmailLabel")}{" "}
-                  <span aria-hidden className="text-[var(--apple-red)]">*</span>
-                </label>
+                <label className={label}>{t("admin.employeesEmailLabel")}</label>
                 <input
-                  required
                   type="email"
                   className={`${input} mt-1.5`}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setEmail(next);
+                    if (!externalIdManual) {
+                      setExternalEmployeeId(emailLocalPart(next));
+                    }
+                  }}
+                  placeholder="name@company.com"
                 />
+                <p className={`mt-1 text-[0.75rem] ${hint}`}>{t("admin.employeesEmailHint")}</p>
+              </div>
+              <div>
+                <label className={label}>{t("admin.employeesExternalIdLabel")}</label>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  className={`${input} mt-1.5`}
+                  value={externalEmployeeId}
+                  onChange={(e) => {
+                    setExternalIdManual(true);
+                    setExternalEmployeeId(e.target.value);
+                  }}
+                  maxLength={80}
+                />
+                <p className={`mt-1 text-[0.75rem] ${hint}`}>{t("admin.employeesExternalIdHint")}</p>
               </div>
               <div>
                 <label className={label}>
@@ -894,15 +976,23 @@ export default function AdminEmployeesPage() {
               {error && <p className={`${errorText} sm:col-span-3`}>{error}</p>}
               {addSuccess && <p className={`${successText} sm:col-span-3`}>{addSuccess}</p>}
             </form>
-          </div>
-        </div>
-        {canBulkAdd && !noDepartments && (
-          <EmployeeBulkImportPanel onImported={() => void loadAll()} />
-        )}
-      </section>
+      </SettingsDropdownSection>
 
-      <section>
-        <p className={sectionLabel}>{t("admin.employeesListTitle")}</p>
+      {canBulkAdd && !noDepartments && (
+        <SettingsDropdownSection
+          title={t("admin.employeesBulkTitle")}
+          description={t("admin.employeesBulkLead")}
+          className="!border-[#1d1d1f]/40 shadow-none"
+        >
+          <EmployeeBulkImportPanel onImported={() => void loadAll()} />
+        </SettingsDropdownSection>
+      )}
+
+      <SettingsDropdownSection
+        title={t("admin.employeesListTitle")}
+        defaultOpen
+        className="!border-[#1d1d1f]/40 shadow-none"
+      >
         {canEditProfile && (
           <EmployeeWorkScheduleBulkBar
             selectedCount={selectedIds.size}
@@ -917,7 +1007,7 @@ export default function AdminEmployeesPage() {
         )}
         {rowError && <p className={`mb-3 ${errorText}`}>{rowError}</p>}
 
-        <div className={`${card} min-w-0`}>
+        <div className="min-w-0">
           <div className={tableToolbar}>
             <div className={`${searchFiltersRow} w-full`}>
               <div className={`${searchFieldCol} ${searchFieldWrap}`}>
@@ -1032,6 +1122,7 @@ export default function AdminEmployeesPage() {
             }}
             onSaveName={(emp, value) => void saveName(emp, value)}
             onSaveEmail={(emp, value) => void saveEmail(emp, value)}
+            onSaveExternalEmployeeId={(emp, value) => void saveExternalEmployeeId(emp, value)}
             onChangeRole={(emp, role) => void changeRole(emp, role)}
             onChangeDepartment={(empId, deptId) => void changeDepartment(empId, deptId)}
             onDelete={(emp) => void deleteEmployee(emp)}
@@ -1080,7 +1171,7 @@ export default function AdminEmployeesPage() {
             </div>
           )}
         </div>
-      </section>
+      </SettingsDropdownSection>
 
       <EmployeeWorkScheduleModal
         open={scheduleModalOpen}

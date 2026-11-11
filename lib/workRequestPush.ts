@@ -8,6 +8,7 @@ import type { Role, WorkRequestType } from "@prisma/client";
 const TYPE_I18N_KEY: Record<WorkRequestType, string> = {
   OVERTIME: "approvals.workRequestTypeOvertime",
   EARLY_LEAVE: "approvals.workRequestTypeEarlyLeave",
+  EARLY_CHECK_IN: "approvals.workRequestTypeEarlyCheckIn",
   REMOTE_WORK: "approvals.workRequestTypeRemoteWork",
   VACATION: "approvals.workRequestTypeVacation",
   HALF_DAY_LEAVE: "approvals.workRequestTypeHalfDayLeave",

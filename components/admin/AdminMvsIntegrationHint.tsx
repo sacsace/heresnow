@@ -1,8 +1,9 @@
 "use client";
 
+import { SettingsDropdownSection } from "@/components/admin/SettingsDropdownSection";
 import { useI18n } from "@/components/LanguageProvider";
 import { statusBadge } from "@/lib/statusBadge";
-import { btnPrimary, groupedCard, hint, sectionLabel } from "@/lib/uiStyles";
+import { btnPrimary, hint } from "@/lib/uiStyles";
 import { useCallback, useEffect, useState } from "react";
 
 type MvsStatus = {
@@ -160,18 +161,15 @@ export function AdminMvsIntegrationHint({ companyId }: Props = {}) {
   }
 
   return (
-    <section>
-      <p className={sectionLabel}>{t("admin.mvsTitle")}</p>
-      <div className={groupedCard}>
-        <div className="px-5 py-4 sm:px-6 sm:py-5">
-          <p className="text-[0.9375rem] leading-relaxed text-[var(--apple-label-secondary)]">
-            {t("admin.mvsLead")}
-          </p>
-
+    <>
+      <SettingsDropdownSection
+        title={t("admin.mvsTitle")}
+        description={t("admin.mvsLead")}
+      >
           {loading ? (
-            <p className={`mt-3 text-[0.875rem] ${hint}`}>{t("common.loading")}</p>
+            <p className={`text-[0.875rem] ${hint}`}>{t("common.loading")}</p>
           ) : status ? (
-            <div className="mt-4 space-y-3">
+            <div className="space-y-3">
               <p className="flex flex-wrap items-center gap-2 text-[0.875rem]">
                 <span className={badgeClass}>
                   {status.enabled ? t("admin.mvsEnabled") : t("admin.mvsDisabled")}
@@ -268,8 +266,7 @@ export function AdminMvsIntegrationHint({ companyId }: Props = {}) {
             </ol>
             <p className={`mt-3 text-[0.8125rem] ${hint}`}>{t("admin.mvsNote")}</p>
           </details>
-        </div>
-      </div>
+      </SettingsDropdownSection>
 
       {previewOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -373,6 +370,6 @@ export function AdminMvsIntegrationHint({ companyId }: Props = {}) {
           </div>
         </div>
       ) : null}
-    </section>
+    </>
   );
 }

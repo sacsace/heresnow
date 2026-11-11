@@ -52,6 +52,8 @@ enum WorkRequestType {
   REMOTE_WORK
   VACATION
   HALF_DAY_LEAVE
+  /// 정규 출근 가능 시각 전 출근 승인 요청
+  EARLY_CHECK_IN
 }
 
 enum OvertimeMode {
@@ -271,6 +273,11 @@ model Department {
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   name      String
+  /// COMPANY=회사 기본, SHIFT=교대(A/B/C), CUSTOM=부서 지정 시간
+  workScheduleMode String  @default("COMPANY")
+  shiftCode        String?
+  workStartTime    String?
+  workEndTime      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -377,7 +384,7 @@ model Employee {
   /// 소속 부서 — 부서 삭제 시 직원은 미배정으로 남김(SetNull)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  /// MVS 등 외부 시스템 직원 ID
+  /// 회사 내부 직원번호(선택). MVS 연동 키는 이메일(User.email)
   externalEmployeeId String?
   /// 128차원 안면 임베딩(JSON 배열). 출근 시 본인 확인용
   faceDescriptor Json?

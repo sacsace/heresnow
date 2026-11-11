@@ -1,5 +1,6 @@
 import type { AttendanceRecord, Company, Employee, User } from "@prisma/client";
 import { DEFAULT_COMPANY_TIMEZONE, recordDisplayTimezone } from "@/lib/companyTimezones";
+import { displayEmployeeEmail } from "@/lib/employeeIdentity";
 import { formatInTimeZone } from "date-fns-tz";
 import {
   MVS_ATTENDANCE_EVENT_VERSION,
@@ -36,7 +37,7 @@ export function buildMvsAttendancePayload(
     employee: {
       id: record.employee.id,
       name: record.employee.name,
-      email: record.employee.user.email,
+      email: displayEmployeeEmail(record.employee.user.email),
       externalEmployeeId: record.employee.externalEmployeeId,
     },
     type: record.type,

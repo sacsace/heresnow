@@ -214,7 +214,7 @@ export function AdminChrome({
             <MobileNavDrawer items={links} />
             <AppLogo href="/admin" title={t("login.title")} className="min-w-0" />
             <nav
-              className="hidden min-w-0 flex-1 overflow-hidden rounded-lg border border-[var(--separator)] bg-white px-2 py-1.5 lg:flex"
+              className="hidden min-w-0 flex-1 overflow-hidden rounded-lg bg-white px-2 py-1.5 lg:flex"
               aria-label={t("admin.navDashboard")}
             >
               <div

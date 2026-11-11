@@ -168,6 +168,14 @@ export async function POST(req: Request) {
       workEndTime: true,
       workScheduleByDay: true,
       punchWithoutFace: true,
+      department: {
+        select: {
+          workScheduleMode: true,
+          shiftCode: true,
+          workStartTime: true,
+          workEndTime: true,
+        },
+      },
     },
   });
   if (!employee) {
@@ -291,7 +299,12 @@ export async function POST(req: Request) {
     faceMatched = true;
   }
 
-  const effectiveScheduleForEligibility = resolveEmployeeWorkSchedule(employee, company);
+  const effectiveScheduleForEligibility = resolveEmployeeWorkSchedule(
+    employee,
+    company,
+    null,
+    employee.department
+  );
   const punchOptions = { workSchedule: effectiveScheduleForEligibility };
   const lastPunch = lastRecord
     ? { type: lastRecord.type, timestamp: lastRecord.timestamp }
@@ -385,7 +398,8 @@ export async function POST(req: Request) {
   const effectiveSchedule = resolveEmployeeWorkSchedule(
     employee,
     company,
-    siteCtx.nearestSite
+    siteCtx.nearestSite,
+    employee.department
   );
 
   let lateCheckOutResolved: ReturnType<typeof resolveLateCheckOutTimestamp> | null =

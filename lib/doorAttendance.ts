@@ -9,16 +9,30 @@ import {
   resolveLateCheckOutTimestamp,
 } from "@/lib/attendancePunchRules";
 import { acquireAttendanceEmployeeLock } from "@/lib/attendanceLock";
+import { matchFaceCredentialsForPunch } from "@/lib/faceCredentials";
 import {
   confirmMultiFrameIdentity,
   identifyEmployeeAmongCandidates,
 } from "@/lib/faceIdentityMatch";
 import { resolveFaceIdentityPolicy } from "@/lib/faceIdentityPolicy";
-import { FACE_DESCRIPTOR_LENGTH, parseFaceDescriptor } from "@/lib/faceMatch";
+import {
+  averageFaceDescriptors,
+  FACE_DESCRIPTOR_LENGTH,
+  parseFaceDescriptor,
+} from "@/lib/faceMatch";
+import { dedupeFaceProbes } from "@/lib/faceProbeDedupe";
 import type { AttendanceType, Role } from "@prisma/client";
 
-/** 출입문 단말에서 출퇴근 기록 가능한 역할 */
-export const DOOR_PUNCHABLE_ROLES: Role[] = ["EMPLOYEE", "APPROVER"];
+/**
+ * 출입문 단말에서 안면 매칭·출퇴근 기록 가능한 역할.
+ * 회사 소속 직원 전원 (DOOR 단말 계정·플랫폼 SUPER_ADMIN 제외).
+ */
+export const DOOR_PUNCHABLE_ROLES: Role[] = [
+  "COMPANY_ADMIN",
+  "HR_MANAGER",
+  "APPROVER",
+  "EMPLOYEE",
+];
 
 export function isDoorRole(role: Role | string | null | undefined): boolean {
   return role === "DOOR";
@@ -217,11 +231,17 @@ export async function createDoorAttendanceRecord(input: {
   return record;
 }
 
+/**
+ * 출입문 1:N — 안면 로그인과 동일하게 식별 후 출퇴근 1:1 검증.
+ * (기존 doorMatchThreshold 단독은 로그인보다 엄격해 동일 얼굴이 거절될 수 있었음)
+ */
 export async function matchFaceDoorEmployee(
   probe: number[],
   companyId: string
 ): Promise<{ id: string; name: string } | null> {
   const employees = await getDoorEmployeesForMatch(companyId);
+  if (employees.length === 0) return null;
+
   const policy = resolveFaceIdentityPolicy();
   const candidates = employees.map((e) => ({
     id: e.id,
@@ -231,33 +251,55 @@ export async function matchFaceDoorEmployee(
 
   const result = identifyEmployeeAmongCandidates(candidates, probe, policy, {
     purpose: "door",
-    thresholdOverride: policy.doorMatchThreshold,
+    thresholdOverride: policy.loginMatchThreshold,
   });
   if (result.status !== "PASS") return null;
+
   const emp = employees.find((e) => e.id === result.employeeId);
-  return emp ? { id: emp.id, name: emp.name } : null;
+  if (!emp) return null;
+
+  const verify = matchFaceCredentialsForPunch(
+    emp.descriptors.map((descriptor, index) => ({
+      id: `${emp.id}:${index}`,
+      descriptor,
+    })),
+    probe
+  );
+  if (!verify.matched) return null;
+
+  return { id: emp.id, name: emp.name };
 }
 
-/** Multi-frame door identification — all frames must agree on same employee */
+/** Multi-frame door identification — 합의 실패 시 평균 단일 프레임으로 폴백(로그인과 동일 경로) */
 export async function matchFaceDoorEmployeeMultiFrame(
   probes: number[][],
   companyId: string
 ): Promise<{ id: string; name: string } | null> {
-  const employees = await getDoorEmployeesForMatch(companyId);
+  const unique = dedupeFaceProbes(probes);
   const policy = resolveFaceIdentityPolicy();
-  const candidates = employees.map((e) => ({
-    id: e.id,
-    name: e.name,
-    descriptors: e.descriptors,
-  }));
 
-  const mf = confirmMultiFrameIdentity(probes, candidates, policy, {
-    purpose: "door",
-    thresholdOverride: policy.doorMatchThreshold,
-  });
-  if (mf.status !== "PASS") return null;
-  const emp = employees.find((e) => e.id === mf.employeeId);
-  return emp ? { id: emp.id, name: emp.name } : null;
+  if (unique.length >= policy.multiFrameRequiredMatches) {
+    const employees = await getDoorEmployeesForMatch(companyId);
+    const candidates = employees.map((e) => ({
+      id: e.id,
+      name: e.name,
+      descriptors: e.descriptors,
+    }));
+
+    const mf = confirmMultiFrameIdentity(unique, candidates, policy, {
+      purpose: "door",
+      thresholdOverride: policy.loginMatchThreshold,
+      minConfidencePercent: policy.loginMinConfidencePercent,
+    });
+    if (mf.status === "PASS") {
+      const emp = employees.find((e) => e.id === mf.employeeId);
+      if (emp) return { id: emp.id, name: emp.name };
+    }
+  }
+
+  const averaged = averageFaceDescriptors(unique.length > 0 ? unique : probes);
+  if (!averaged) return null;
+  return matchFaceDoorEmployee(averaged, companyId);
 }
 
 export function parseDoorFaceDescriptor(raw: unknown): number[] | null {

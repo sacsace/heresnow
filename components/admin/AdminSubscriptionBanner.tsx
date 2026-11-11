@@ -1,14 +1,12 @@
 "use client";
 
 import { useI18n } from "@/components/LanguageProvider";
-import { card, cardBody, hint, link } from "@/lib/uiStyles";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 type SubscriptionInfo = {
   subscriptionEndsAt: string | null;
   timezone: string;
-  seatLimit: number;
 };
 
 type Props = {
@@ -36,6 +34,7 @@ function daysUntil(iso: string): number | null {
   return Math.ceil((d.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
+/** 대시보드 우측 상단용 간결한 구독 만료일 표시 */
 export function AdminSubscriptionBanner({ companyId }: Props = {}) {
   const { t, locale } = useI18n();
   const [info, setInfo] = useState<SubscriptionInfo | null>(null);
@@ -49,7 +48,6 @@ export function AdminSubscriptionBanner({ companyId }: Props = {}) {
       subscriptionEndsAt:
         typeof j.subscriptionEndsAt === "string" ? j.subscriptionEndsAt : null,
       timezone: typeof j.timezone === "string" ? j.timezone : "Asia/Kolkata",
-      seatLimit: typeof j.seatLimit === "number" ? j.seatLimit : 0,
     });
   }, [companyId]);
 
@@ -62,58 +60,45 @@ export function AdminSubscriptionBanner({ companyId }: Props = {}) {
   const endsLabel = info.subscriptionEndsAt
     ? formatSubscriptionDate(info.subscriptionEndsAt, info.timezone, locale)
     : "—";
-
   const days = info.subscriptionEndsAt ? daysUntil(info.subscriptionEndsAt) : null;
   const expired = days !== null && days < 0;
   const expiringSoon = days !== null && days >= 0 && days <= 14;
-  const numberLocale = locale === "en" ? "en-IN" : "ko-KR";
-  const formatCount = (n: number) => n.toLocaleString(numberLocale);
 
-  const accent = expired
-    ? "border-[var(--apple-red)]/35 bg-[var(--apple-red)]/[0.06]"
-    : expiringSoon
-      ? "border-[var(--apple-orange)]/35 bg-[var(--apple-orange)]/[0.06]"
-      : "border-[var(--separator)] bg-[var(--grouped-bg)]";
-
-  const valueClass = expired
+  const tone = expired
     ? "text-[var(--apple-red)]"
     : expiringSoon
       ? "text-[var(--apple-orange)]"
       : "text-[var(--foreground)]";
 
-  return (
-    <div className={`${card} ${accent}`}>
-      <div className={`${cardBody} flex flex-wrap items-center justify-between gap-3 py-4 sm:py-5`}>
-        <div className="min-w-0">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-[var(--apple-label-secondary)]">
-            {expired
-              ? t("admin.dashboardSubscriptionLabelExpired")
-              : t("admin.dashboardSubscriptionLabelActive")}
-          </p>
-          <p className={`mt-1 text-[1.125rem] font-semibold tracking-tight ${valueClass}`}>
-            {endsLabel}
-          </p>
-          {days !== null && (
-            <p className={`${hint} mt-1`}>
-              {expired
-                ? t("admin.dashboardSubscriptionExpired")
-                : t("admin.dashboardSubscriptionDaysLeft").replace("{n}", formatCount(days))}
-              {info.seatLimit > 0 &&
-                ` · ${t("admin.dashboardSubscriptionSeats").replace("{n}", formatCount(info.seatLimit))}`}
-            </p>
-          )}
-          {days === null && info.seatLimit > 0 && (
-            <p className={`${hint} mt-1`}>
-              {t("admin.dashboardSubscriptionSeats").replace("{n}", formatCount(info.seatLimit))}
-            </p>
-          )}
-        </div>
-        {!companyId && (
-          <Link href="/admin/billing" className={`${link} shrink-0 text-[0.875rem] font-medium`}>
-            {t("admin.billingRenewTitle")} →
-          </Link>
-        )}
-      </div>
+  const body = (
+    <div className="text-right">
+      <p className="text-[0.6875rem] font-medium text-[var(--apple-label-secondary)]">
+        {expired
+          ? t("admin.dashboardSubscriptionLabelExpired")
+          : t("admin.dashboardSubscriptionLabel")}
+      </p>
+      <p className={`mt-0.5 text-[0.875rem] font-semibold tracking-tight ${tone}`}>
+        {endsLabel}
+        {days !== null && !expired ? (
+          <span className="ml-1.5 text-[0.75rem] font-medium text-[var(--apple-label-secondary)]">
+            ({t("admin.dashboardSubscriptionDaysLeft").replace("{n}", String(days))})
+          </span>
+        ) : null}
+      </p>
     </div>
+  );
+
+  if (companyId) {
+    return <div className="shrink-0">{body}</div>;
+  }
+
+  return (
+    <Link
+      href="/admin/billing"
+      className="shrink-0 rounded-lg outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[var(--apple-blue)]/30"
+      title={t("admin.billingRenewTitle")}
+    >
+      {body}
+    </Link>
   );
 }

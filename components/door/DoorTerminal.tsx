@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLogo } from "@/components/AppLogo";
+import { DoorEarlyCheckInDialog } from "@/components/door/DoorEarlyCheckInDialog";
 import { FaceCapture } from "@/components/employee/FaceCapture";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useI18n } from "@/components/LanguageProvider";
@@ -45,6 +46,12 @@ export function DoorTerminal() {
   const punchLockRef = useRef(false);
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [earlyDialog, setEarlyDialog] = useState<{
+    employeeId: string;
+    employeeName: string;
+    nextCheckInAt: string | null;
+    alreadyRequested: boolean;
+  } | null>(null);
 
   const loadMode = useCallback(async () => {
     try {
@@ -95,7 +102,8 @@ export function DoorTerminal() {
         return t("door.checkoutTooEarly");
       }
       if (code === "CHECK_IN_TOO_EARLY" || fallback === "checkin_too_early") {
-        return t("door.checkInTooEarly");
+        // 팝업으로 안내 — 인라인 에러 문구는 사용하지 않음
+        return "";
       }
       if (code === "CHECK_IN_COOLDOWN" || fallback === "checkin_cooldown") {
         return t("door.checkInCooldown");
@@ -112,7 +120,7 @@ export function DoorTerminal() {
   );
 
   const handleVerified = useCallback(
-    async (descriptor: number[], context?: { frameDescriptors?: number[][] }) => {
+    async (descriptor: number[]) => {
       if (punchLockRef.current || busy) return false;
 
       punchLockRef.current = true;
@@ -121,28 +129,43 @@ export function DoorTerminal() {
       setMsg(null);
 
       try {
-        const frames = context?.frameDescriptors?.filter((f) => f.length > 0) ?? [];
+        // 안면 로그인과 동일: 평균 단일 descriptor.
+        // (다중 프레임+다양성 요구는 가만히 서면 서버 거절, 움직이면 클라이언트 고착)
         const r = await fetch("/api/door/punch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            frames.length >= 3
-              ? { faceDescriptors: frames.slice(0, 8) }
-              : { faceDescriptor: descriptor }
-          ),
+          body: JSON.stringify({ faceDescriptor: descriptor }),
         });
         const j = (await r.json().catch(() => ({}))) as {
           ok?: boolean;
           info?: string;
           error?: string;
           code?: string;
-          employee?: { name?: string };
+          employee?: { id?: string; name?: string };
           mode?: DoorMode;
           lastTimestamp?: string | null;
+          nextCheckInAt?: string | null;
+          earlyRequestStatus?: "PENDING" | "APPROVED" | null;
         };
 
         if (!r.ok) {
-          setError(mapPunchError(j.code, j.error ?? ""));
+          if (
+            (j.code === "CHECK_IN_TOO_EARLY" || j.error === "checkin_too_early") &&
+            typeof j.employee?.id === "string"
+          ) {
+            setError(null);
+            setEarlyDialog({
+              employeeId: j.employee.id,
+              employeeName: j.employee.name ?? "",
+              nextCheckInAt:
+                typeof j.nextCheckInAt === "string" ? j.nextCheckInAt : null,
+              alreadyRequested: j.earlyRequestStatus === "PENDING",
+            });
+            punchLockRef.current = false;
+            return false;
+          }
+          const mapped = mapPunchError(j.code, j.error ?? "");
+          if (mapped) setError(mapped);
           punchLockRef.current = false;
           return false;
         }
@@ -250,6 +273,7 @@ export function DoorTerminal() {
                   scanWhenFaceVisible
                   scanIdleLabel={t("door.faceAwait")}
                   profileKind="kiosk"
+                  intent="punch"
                   fastScan
                   highAccuracyScan
                   disabled={busy}
@@ -292,6 +316,28 @@ export function DoorTerminal() {
           })}
         </p>
       </main>
+
+      <DoorEarlyCheckInDialog
+        open={earlyDialog != null}
+        employeeId={earlyDialog?.employeeId ?? ""}
+        employeeName={earlyDialog?.employeeName ?? ""}
+        nextCheckInAt={earlyDialog?.nextCheckInAt ?? null}
+        alreadyRequested={earlyDialog?.alreadyRequested ?? false}
+        onClose={() => {
+          setEarlyDialog(null);
+          punchLockRef.current = false;
+          setCaptureKey((k) => k + 1);
+        }}
+        onSubmitted={() => {
+          setEarlyDialog(null);
+          setMsg(t("door.earlyCheckInRequestDone"));
+          punchLockRef.current = false;
+          window.setTimeout(() => {
+            setMsg(null);
+            setCaptureKey((k) => k + 1);
+          }, 3500);
+        }}
+      />
     </div>
   );
 }

@@ -132,7 +132,16 @@ export async function GET(req: Request) {
       workStartTime: true,
       workEndTime: true,
       workScheduleByDay: true,
-      department: { select: { id: true, name: true } },
+      department: {
+        select: {
+          id: true,
+          name: true,
+          workScheduleMode: true,
+          shiftCode: true,
+          workStartTime: true,
+          workEndTime: true,
+        },
+      },
     },
     orderBy: { name: "asc" },
   });

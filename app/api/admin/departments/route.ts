@@ -42,6 +42,10 @@ export async function GET(req: Request) {
       select: {
         id: true,
         name: true,
+        workScheduleMode: true,
+        shiftCode: true,
+        workStartTime: true,
+        workEndTime: true,
         createdAt: true,
         _count: { select: { employees: true } },
       },
@@ -51,6 +55,10 @@ export async function GET(req: Request) {
       departments: departments.map((d) => ({
         id: d.id,
         name: d.name,
+        workScheduleMode: d.workScheduleMode,
+        shiftCode: d.shiftCode,
+        workStartTime: d.workStartTime,
+        workEndTime: d.workEndTime,
         createdAt: d.createdAt,
         employeeCount: d._count.employees,
       })),

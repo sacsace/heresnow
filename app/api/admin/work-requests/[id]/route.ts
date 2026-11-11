@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { createCheckInFromEarlyCheckInApproval } from "@/lib/earlyCheckInRequest";
 import { prisma } from "@/lib/prisma";
 import { canApproveWorkRequest } from "@/lib/workRequestAccess";
 import { notifyEmployeeOfWorkRequestResult } from "@/lib/workRequestPush";
@@ -57,13 +58,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const approved = parsed.data.action === "approve";
+  const resolvedAt = new Date();
 
   await prisma.$transaction(async (tx) => {
     await tx.workRequest.update({
       where: { id: item.id },
       data: {
         status: approved ? "APPROVED" : "REJECTED",
-        resolvedAt: new Date(),
+        resolvedAt,
         resolverUserId: session.user.id,
       },
     });
@@ -78,6 +80,23 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     });
   });
 
+  let attendanceCreated = false;
+  if (approved && item.type === "EARLY_CHECK_IN") {
+    try {
+      const result = await createCheckInFromEarlyCheckInApproval({
+        companyId: item.companyId,
+        employeeId: item.employeeId,
+        workRequestId: item.id,
+        workDate: item.workDate,
+        reason: item.reason,
+        timestamp: resolvedAt,
+      });
+      attendanceCreated = result.created;
+    } catch (err) {
+      console.error("[early-check-in attendance]", err);
+    }
+  }
+
   void notifyEmployeeOfWorkRequestResult({
     employeeUserId: item.employee.userId,
     requestId: item.id,
@@ -89,5 +108,5 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     console.error("[work-request result push]", err);
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, attendanceCreated });
 }

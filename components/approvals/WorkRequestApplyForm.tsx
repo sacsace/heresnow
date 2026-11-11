@@ -151,6 +151,7 @@ export function WorkRequestApplyForm({
   function reasonPlaceholder(type: WorkRequestType) {
     if (type === "OVERTIME") return t("employee.overtimeReasonPlaceholder");
     if (type === "EARLY_LEAVE") return t("employee.earlyLeaveReasonPlaceholder");
+    if (type === "EARLY_CHECK_IN") return t("approvals.earlyCheckInReasonPlaceholder");
     if (type === "REMOTE_WORK") return t("approvals.remoteWorkReasonPlaceholder");
     if (type === "VACATION") return t("approvals.vacationReasonPlaceholder");
     if (type === "HALF_DAY_LEAVE") return t("approvals.halfDayReasonPlaceholder");
@@ -160,6 +161,7 @@ export function WorkRequestApplyForm({
   function formLead(type: WorkRequestType) {
     if (type === "OVERTIME") return t("employee.overtimeRequestLead");
     if (type === "EARLY_LEAVE") return t("employee.earlyLeaveRequestLead");
+    if (type === "EARLY_CHECK_IN") return t("approvals.earlyCheckInRequestLead");
     if (type === "REMOTE_WORK") return t("approvals.remoteWorkRequestLead");
     if (type === "VACATION") return t("approvals.vacationRequestLead");
     if (type === "HALF_DAY_LEAVE") return t("approvals.halfDayRequestLead");

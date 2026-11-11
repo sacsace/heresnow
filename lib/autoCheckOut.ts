@@ -168,6 +168,14 @@ export async function applyPendingAutoCheckOutForEmployee(
         workStartTime: true,
         workEndTime: true,
         workScheduleByDay: true,
+        department: {
+          select: {
+            workScheduleMode: true,
+            shiftCode: true,
+            workStartTime: true,
+            workEndTime: true,
+          },
+        },
       },
     }),
     prisma.attendanceRecord.findFirst({

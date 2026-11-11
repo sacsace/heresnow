@@ -10,6 +10,7 @@ import { SuperCompanyEmployeeAttendance } from "@/components/super/SuperCompanyE
 import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
+import { emailLocalPart } from "@/lib/employeeIdentity";
 import { isStrongPassword } from "@/lib/passwordPolicy";
 import {
   btnDestructive,
@@ -71,6 +72,8 @@ export default function SuperCompanyUsersPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [users, setUsers] = useState<RowUser[]>([]);
   const [email, setEmail] = useState("");
+  const [externalEmployeeId, setExternalEmployeeId] = useState("");
+  const [externalIdManual, setExternalIdManual] = useState(false);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<(typeof ADD_ROLES)[number]>("EMPLOYEE");
@@ -140,6 +143,10 @@ export default function SuperCompanyUsersPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!email.trim() && !externalEmployeeId.trim()) {
+      setError(t("admin.employeesEmailOrIdRequired"));
+      return;
+    }
     if (!isStrongPassword(password)) {
       setError(t("account.errMinLength"));
       return;
@@ -148,21 +155,33 @@ export default function SuperCompanyUsersPage() {
     const r = await fetch(`/api/super/companies/${id}/users`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name, password, role }),
+      body: JSON.stringify({
+        email: email.trim() || null,
+        externalEmployeeId: externalEmployeeId.trim() || null,
+        name,
+        password,
+        role,
+      }),
     });
     const j = await r.json().catch(() => ({}));
     setLoading(false);
     if (!r.ok) {
       setError(
-        typeof j.message === "string"
-          ? j.message
-          : typeof j.error === "string"
-            ? j.error
-            : t("super.addUserFail")
+        j.code === "EXTERNAL_ID_TAKEN"
+          ? t("admin.employeesExternalIdTaken")
+          : j.code === "EMAIL_OR_ID_REQUIRED"
+            ? t("admin.employeesEmailOrIdRequired")
+            : typeof j.message === "string"
+              ? j.message
+              : typeof j.error === "string"
+                ? j.error
+              : t("super.addUserFail")
       );
       return;
     }
     setEmail("");
+    setExternalEmployeeId("");
+    setExternalIdManual(false);
     setName("");
     setPassword("");
     setRole("EMPLOYEE");
@@ -355,12 +374,38 @@ export default function SuperCompanyUsersPage() {
                 <label className={labelLg}>{t("super.addEmail")}</label>
                 <input
                   type="email"
-                  required
                   autoComplete="off"
                   className={`${inputLg} mt-1.5`}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setEmail(next);
+                    if (!externalIdManual) {
+                      setExternalEmployeeId(emailLocalPart(next));
+                    }
+                  }}
+                  placeholder="name@company.com"
                 />
+                <p className="mt-1 text-[0.75rem] text-[var(--apple-label-secondary)]">
+                  {t("super.addEmailHint")}
+                </p>
+              </div>
+              <div>
+                <label className={labelLg}>{t("super.addExternalId")}</label>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  className={`${inputLg} mt-1.5`}
+                  value={externalEmployeeId}
+                  onChange={(e) => {
+                    setExternalIdManual(true);
+                    setExternalEmployeeId(e.target.value);
+                  }}
+                  maxLength={80}
+                />
+                <p className="mt-1 text-[0.75rem] text-[var(--apple-label-secondary)]">
+                  {t("super.addExternalIdHint")}
+                </p>
               </div>
               <div>
                 <label className={labelLg}>{t("super.addName")}</label>

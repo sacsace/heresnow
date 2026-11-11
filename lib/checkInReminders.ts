@@ -138,6 +138,14 @@ export async function runCheckInReminders(now = new Date()): Promise<CheckInRemi
               workStartTime: true,
               workEndTime: true,
               workScheduleByDay: true,
+              department: {
+                select: {
+                  workScheduleMode: true,
+                  shiftCode: true,
+                  workStartTime: true,
+                  workEndTime: true,
+                },
+              },
               company: {
                 select: {
                   subscriptionEndsAt: true,

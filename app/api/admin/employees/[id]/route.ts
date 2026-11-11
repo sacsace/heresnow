@@ -5,6 +5,10 @@ import { auth } from "@/auth";
 import { employeeScheduleSummary } from "@/lib/employeeWorkSchedule";
 import { normalizeWorkScheduleByDay } from "@/lib/companyWorkSchedule";
 import {
+  buildSyntheticEmployeeEmail,
+  isSyntheticEmployeeEmail,
+} from "@/lib/employeeIdentity";
+import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   WEAK_PASSWORD_MESSAGE,
@@ -40,7 +44,22 @@ const patchSchema = z.object({
   /** null 로 보내면 부서 미배정 처리 */
   departmentId: z.string().min(1).max(40).nullable().optional(),
   name: z.string().trim().min(1).max(120).optional(),
-  email: z.string().email().transform((e) => e.toLowerCase().trim()).optional(),
+  /** 빈 문자열/null → 메일 제거(직원 ID가 있으면 합성 메일로 전환) */
+  email: z
+    .union([
+      z.string().email().transform((e) => e.toLowerCase().trim()),
+      z.literal("").transform(() => null),
+      z.null(),
+    ])
+    .optional(),
+  /** null/빈 문자열이면 직원 ID 제거(실제 이메일이 있을 때만) */
+  externalEmployeeId: z
+    .string()
+    .trim()
+    .max(80)
+    .nullable()
+    .optional()
+    .transform((v) => (v == null ? v : v.length > 0 ? v : null)),
   password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH).optional(),
   role: z.enum(COMPANY_ROLES).optional(),
   workScheduleType: z.enum(["COMPANY", "SHIFT", "CUSTOM", "FREE"]).optional(),
@@ -99,12 +118,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     select: {
       companyId: true,
       userId: true,
+      externalEmployeeId: true,
       user: { select: { id: true, role: true, email: true } },
     },
   });
   if (!existing || existing.companyId !== resolved.companyId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const companyId = resolved.companyId;
 
   // 부서가 들어왔다면 같은 회사 소속인지 검증
   if (parsed.data.departmentId !== undefined && parsed.data.departmentId !== null) {
@@ -138,17 +159,77 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
   }
 
-  const wantsEmailChange =
-    parsed.data.email !== undefined && parsed.data.email !== existing.user.email;
+  const nextExternalId =
+    parsed.data.externalEmployeeId !== undefined
+      ? parsed.data.externalEmployeeId
+      : existing.externalEmployeeId;
 
-  if (wantsEmailChange) {
+  let nextEmail: string | undefined;
+  if (parsed.data.email !== undefined) {
+    if (parsed.data.email === null) {
+      if (!nextExternalId) {
+        return NextResponse.json(
+          {
+            error: "EMAIL_OR_ID_REQUIRED",
+            message: "이메일 또는 직원 ID 중 하나는 필요합니다.",
+            code: "EMAIL_OR_ID_REQUIRED",
+          },
+          { status: 400 }
+        );
+      }
+      nextEmail = buildSyntheticEmployeeEmail(companyId, nextExternalId);
+    } else {
+      nextEmail = parsed.data.email;
+    }
+  } else if (
+    parsed.data.externalEmployeeId !== undefined &&
+    isSyntheticEmployeeEmail(existing.user.email)
+  ) {
+    if (!nextExternalId) {
+      return NextResponse.json(
+        {
+          error: "EMAIL_OR_ID_REQUIRED",
+          message: "이메일 또는 직원 ID 중 하나는 필요합니다.",
+          code: "EMAIL_OR_ID_REQUIRED",
+        },
+        { status: 400 }
+      );
+    }
+    nextEmail = buildSyntheticEmployeeEmail(companyId, nextExternalId);
+  }
+
+  const wantsEmailChange =
+    nextEmail !== undefined && nextEmail !== existing.user.email;
+
+  if (wantsEmailChange && nextEmail) {
     const taken = await prisma.user.findUnique({
-      where: { email: parsed.data.email! },
+      where: { email: nextEmail },
       select: { id: true },
     });
     if (taken && taken.id !== existing.userId) {
       return NextResponse.json(
         { error: "EMAIL_TAKEN", message: "이미 등록된 이메일입니다." },
+        { status: 409 }
+      );
+    }
+  }
+
+  if (
+    parsed.data.externalEmployeeId !== undefined &&
+    parsed.data.externalEmployeeId !== null &&
+    parsed.data.externalEmployeeId !== existing.externalEmployeeId
+  ) {
+    const idDup = await prisma.employee.findFirst({
+      where: {
+        companyId,
+        externalEmployeeId: parsed.data.externalEmployeeId,
+        NOT: { id },
+      },
+      select: { id: true },
+    });
+    if (idDup) {
+      return NextResponse.json(
+        { error: "EXTERNAL_ID_TAKEN", message: "이미 사용 중인 직원 ID입니다." },
         { status: 409 }
       );
     }
@@ -219,6 +300,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const employeeData: Prisma.EmployeeUpdateInput = {
     ...schedulePatch,
     ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+    ...(parsed.data.externalEmployeeId !== undefined
+      ? { externalEmployeeId: parsed.data.externalEmployeeId }
+      : {}),
     ...(parsed.data.isTeamLeader !== undefined
       ? { isTeamLeader: parsed.data.isTeamLeader }
       : {}),
@@ -240,7 +324,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         data: employeeData,
         include: {
           user: { select: { id: true, email: true, role: true } },
-          department: { select: { id: true, name: true } },
+          department: {
+            select: {
+              id: true,
+              name: true,
+              workScheduleMode: true,
+              shiftCode: true,
+              workStartTime: true,
+              workEndTime: true,
+            },
+          },
         },
       });
 
@@ -248,7 +341,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       let userRole = employee.user.role;
 
       const userUpdates: { email?: string; passwordHash?: string; role?: Role } = {};
-      if (wantsEmailChange) userUpdates.email = parsed.data.email;
+      if (wantsEmailChange) userUpdates.email = nextEmail;
       if (wantsPasswordChange) {
         userUpdates.passwordHash = await bcrypt.hash(parsed.data.password!, 10);
       }
@@ -309,7 +402,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         },
       });
       const scheduleSummary = company
-        ? employeeScheduleSummary(employee, company, "ko").label
+        ? employeeScheduleSummary(employee, company, "ko", employee.department).label
         : "";
 
       return {

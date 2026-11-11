@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  SettingsDropdownSection,
+  SettingsNestedDropdown,
+} from "@/components/admin/SettingsDropdownSection";
 import { useI18n } from "@/components/LanguageProvider";
 import { LocaleTimeInput } from "@/components/LocaleTimeInput";
 import { normalizeWorkScheduleByDay, weekdayShortLabel } from "@/lib/companyWorkSchedule";
@@ -19,10 +23,8 @@ import {
   btnPrimary,
   chipBtn,
   errorText,
-  groupedCard,
   hint,
   label,
-  sectionLabel,
   select,
   successText,
 } from "@/lib/uiStyles";
@@ -252,335 +254,301 @@ export function AdminCompanySettings({ companyId }: Props = {}) {
   }
 
   return (
-    <section>
-      <p className={sectionLabel}>{t("admin.settingsTitle")}</p>
-      <div className={groupedCard}>
-        <div className="px-5 py-4 sm:px-6 sm:py-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <p className="min-w-0 flex-1 text-[0.9375rem] leading-relaxed text-[var(--apple-label-secondary)]">
-              {t("admin.settingsLead")}
-            </p>
-            {!loading && settings?.canEdit ? (
-              <div className="shrink-0 sm:pt-0.5">{renderSaveWorkButton()}</div>
-            ) : null}
-          </div>
+    <SettingsDropdownSection
+      title={t("admin.settingsTitle")}
+      description={t("admin.settingsLead")}
+      headerRight={!loading && settings?.canEdit ? renderSaveWorkButton() : null}
+    >
+      {loading && (
+        <p className="text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
+      )}
+      {error && <p className={errorText}>{error}</p>}
+      {saved && !error && <p className={successText}>{t("admin.settingsSaved")}</p>}
 
-          {loading && (
-            <p className="mt-4 text-[0.9375rem] text-[var(--apple-label-secondary)]">{t("common.loading")}</p>
-          )}
-          {error && <p className={`mt-4 ${errorText}`}>{error}</p>}
-          {saved && !error && <p className={`mt-4 ${successText}`}>{t("admin.settingsSaved")}</p>}
-
-          {!loading && settings && (
-            <div className="mt-5 space-y-8">
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-[var(--fill-tertiary)] p-4 sm:items-center">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-0 bg-[var(--fill-secondary)] text-[var(--apple-blue)] accent-[var(--apple-blue)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-50 sm:mt-0"
-                  checked={settings.faceRecognitionEnabled}
-                  disabled={!settings.canEdit || saving}
-                  onChange={(e) => void patch({ faceRecognitionEnabled: e.target.checked })}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[0.9375rem] font-semibold text-[var(--foreground)]">
-                    {t("admin.settingsFaceRecognition")}
-                  </span>
-                  <span className="mt-0.5 block text-[0.8125rem] text-[var(--apple-label-secondary)]">
-                    {settings.faceRecognitionEnabled
-                      ? t("admin.settingsFaceOnHint")
-                      : t("admin.settingsFaceOffHint")}
-                  </span>
+      {!loading && settings && (
+        <div className="space-y-3">
+          <SettingsNestedDropdown title={t("admin.settingsFaceRecognition")}>
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3 sm:items-center">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-0 bg-[var(--fill-secondary)] text-[var(--apple-blue)] accent-[var(--apple-blue)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-50 sm:mt-0"
+                checked={settings.faceRecognitionEnabled}
+                disabled={!settings.canEdit || saving}
+                onChange={(e) => void patch({ faceRecognitionEnabled: e.target.checked })}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
+                  {t("admin.settingsFaceRecognition")}
                 </span>
-              </label>
+                <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
+                  {settings.faceRecognitionEnabled
+                    ? t("admin.settingsFaceOnHint")
+                    : t("admin.settingsFaceOffHint")}
+                </span>
+              </span>
+            </label>
+          </SettingsNestedDropdown>
 
-              <div className="rounded-xl bg-[var(--fill-tertiary)] p-4 sm:p-5">
+          <SettingsNestedDropdown title={t("admin.settingsGeofenceMode")}>
+            <label className="block">
+              <span className={label}>{t("admin.settingsGeofenceMode")}</span>
+              <select
+                className={`${select} mt-1.5 bg-[var(--fill-secondary)]`}
+                value={settings.geofenceMode}
+                disabled={!settings.canEdit || saving}
+                onChange={(e) => void patch({ geofenceMode: e.target.value })}
+              >
+                <option value="OFF">{t("admin.settingsGeofenceOff")}</option>
+                <option value="WARN">{t("admin.settingsGeofenceWarn")}</option>
+                <option value="BLOCK">{t("admin.settingsGeofenceBlock")}</option>
+              </select>
+              <p className={`mt-1.5 ${hint}`}>{t("admin.settingsGeofenceHint")}</p>
+            </label>
+          </SettingsNestedDropdown>
+
+          <div className="rounded-xl bg-[var(--fill-tertiary)] p-3.5 sm:p-4">
+            <h3 className="text-[0.875rem] font-semibold text-[var(--foreground)]">
+              {t("admin.settingsWorkTypeTitle")}
+            </h3>
+            <p className="mt-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
+              {t("admin.settingsWorkLead")}
+            </p>
+            <div className="mt-3 space-y-3">
+              <SettingsNestedDropdown title={`1. ${t("admin.settingsWorkHoursCardTitle")}`}>
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3 sm:items-center">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-0 bg-[var(--fill-secondary)] text-[var(--apple-blue)] accent-[var(--apple-blue)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-50 sm:mt-0"
+                    checked={settings.freePunchEnabled}
+                    disabled={!settings.canEdit || saving}
+                    onChange={(e) => void patch({ freePunchEnabled: e.target.checked })}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
+                      {t("admin.settingsFreePunch")}
+                    </span>
+                    <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
+                      {settings.freePunchEnabled
+                        ? t("admin.settingsFreePunchOnHint")
+                        : t("admin.settingsFreePunchOffHint")}
+                    </span>
+                  </span>
+                </label>
+                <label className="mt-3 block">
+                  <span className={label}>{t("admin.settingsFreePunchRequiredWorkTime")}</span>
+                  <LocaleTimeInput
+                    value={freePunchRequiredWorkTime}
+                    onChange={setFreePunchRequiredWorkTime}
+                    disabled={!settings.canEdit || saving}
+                    ariaLabel={t("admin.settingsFreePunchRequiredWorkTime")}
+                    className="mt-1.5"
+                  />
+                  <p className={`mt-1.5 ${hint}`}>{t("admin.settingsFreePunchRequiredWorkTimeHint")}</p>
+                </label>
+              </SettingsNestedDropdown>
+
+              <SettingsNestedDropdown title={`2. ${t("admin.settingsOvertimeModeTitle")}`}>
+                <div className="space-y-2">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3">
+                    <input
+                      type="radio"
+                      name="overtimeMode"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--apple-blue)]"
+                      checked={settings.overtimeMode === "AUTO"}
+                      disabled={!settings.canEdit || saving}
+                      onChange={() => void patch({ overtimeMode: "AUTO" })}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
+                        {t("admin.settingsOvertimeModeAuto")}
+                      </span>
+                      <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
+                        {t("admin.settingsOvertimeModeAutoHint")}
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3">
+                    <input
+                      type="radio"
+                      name="overtimeMode"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--apple-blue)]"
+                      checked={settings.overtimeMode === "AFTER_APPROVAL"}
+                      disabled={!settings.canEdit || saving}
+                      onChange={() => void patch({ overtimeMode: "AFTER_APPROVAL" })}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
+                        {t("admin.settingsOvertimeModeAfterApproval")}
+                      </span>
+                      <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
+                        {t("admin.settingsOvertimeModeAfterApprovalHint")}
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3">
+                    <input
+                      type="radio"
+                      name="overtimeMode"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--apple-blue)]"
+                      checked={settings.overtimeMode === "OFF"}
+                      disabled={!settings.canEdit || saving}
+                      onChange={() => void patch({ overtimeMode: "OFF" })}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
+                        {t("admin.settingsOvertimeModeOff")}
+                      </span>
+                      <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
+                        {t("admin.settingsOvertimeModeOffHint")}
+                      </span>
+                    </span>
+                  </label>
+                  <p className={`${hint} px-1`}>{t("admin.settingsOvertimeModeNote")}</p>
+                </div>
+              </SettingsNestedDropdown>
+
+              <SettingsNestedDropdown title={`3. ${t("admin.settingsWorkDays")}`}>
                 <label className="block">
-                  <span className={label}>{t("admin.settingsGeofenceMode")}</span>
+                  <span className={label}>{t("admin.settingsTimezone")}</span>
                   <select
                     className={`${select} mt-1.5 bg-[var(--fill-secondary)]`}
-                    value={settings.geofenceMode}
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
                     disabled={!settings.canEdit || saving}
-                    onChange={(e) => void patch({ geofenceMode: e.target.value })}
+                    aria-label={t("admin.settingsTimezone")}
                   >
-                    <option value="OFF">{t("admin.settingsGeofenceOff")}</option>
-                    <option value="WARN">{t("admin.settingsGeofenceWarn")}</option>
-                    <option value="BLOCK">{t("admin.settingsGeofenceBlock")}</option>
+                    {timezoneOptions.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {formatTimezoneOptionLabel(tz, dateLocale)}
+                      </option>
+                    ))}
                   </select>
-                  <p className={`mt-1.5 ${hint}`}>{t("admin.settingsGeofenceHint")}</p>
+                  <p className={`mt-1.5 ${hint}`}>{t("admin.settingsTimezoneHint")}</p>
                 </label>
-              </div>
 
-              <div className="rounded-xl bg-[var(--fill-tertiary)] p-4 sm:p-5">
-                <h3 className="text-[0.9375rem] font-semibold text-[var(--foreground)]">
-                  {t("admin.settingsWorkTypeTitle")}
-                </h3>
-                <p className="mt-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
-                  {t("admin.settingsWorkLead")}
-                </p>
-                <div className="mt-4 space-y-4">
-                  <section className="rounded-xl border border-[var(--separator)] bg-white">
-                    <div className="border-b border-[var(--separator)] px-3.5 py-3 sm:px-4">
-                      <p className="text-[0.875rem] font-semibold text-[var(--foreground)]">
-                        {t("admin.settingsWorkHoursCardTitle")}
-                      </p>
-                    </div>
-                    <div className="p-3.5 sm:p-4">
-                      <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3 sm:items-center">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-0 bg-[var(--fill-secondary)] text-[var(--apple-blue)] accent-[var(--apple-blue)] focus:ring-2 focus:ring-[var(--apple-blue)]/25 disabled:opacity-50 sm:mt-0"
-                          checked={settings.freePunchEnabled}
-                          disabled={!settings.canEdit || saving}
-                          onChange={(e) => void patch({ freePunchEnabled: e.target.checked })}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
-                            {t("admin.settingsFreePunch")}
-                          </span>
-                          <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
-                            {settings.freePunchEnabled
-                              ? t("admin.settingsFreePunchOnHint")
-                              : t("admin.settingsFreePunchOffHint")}
-                          </span>
-                        </span>
-                      </label>
-                      <label className="mt-3 block">
-                        <span className={label}>{t("admin.settingsFreePunchRequiredWorkTime")}</span>
-                        <LocaleTimeInput
-                          value={freePunchRequiredWorkTime}
-                          onChange={setFreePunchRequiredWorkTime}
-                          disabled={!settings.canEdit || saving}
-                          ariaLabel={t("admin.settingsFreePunchRequiredWorkTime")}
-                          className="mt-1.5"
-                        />
-                        <p className={`mt-1.5 ${hint}`}>{t("admin.settingsFreePunchRequiredWorkTimeHint")}</p>
-                      </label>
-                    </div>
-                  </section>
-
-                  <section className="rounded-xl border border-[var(--separator)] bg-white">
-                    <div className="border-b border-[var(--separator)] px-3.5 py-3 sm:px-4">
-                      <p className="text-[0.875rem] font-semibold text-[var(--foreground)]">
-                        {t("admin.settingsOvertimeModeTitle")}
-                      </p>
-                    </div>
-                    <div className="space-y-2 p-3.5 sm:p-4">
-                      <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3">
-                        <input
-                          type="radio"
-                          name="overtimeMode"
-                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--apple-blue)]"
-                          checked={settings.overtimeMode === "AUTO"}
-                          disabled={!settings.canEdit || saving}
-                          onChange={() => void patch({ overtimeMode: "AUTO" })}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
-                            {t("admin.settingsOvertimeModeAuto")}
-                          </span>
-                          <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
-                            {t("admin.settingsOvertimeModeAutoHint")}
-                          </span>
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3">
-                        <input
-                          type="radio"
-                          name="overtimeMode"
-                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--apple-blue)]"
-                          checked={settings.overtimeMode === "AFTER_APPROVAL"}
-                          disabled={!settings.canEdit || saving}
-                          onChange={() => void patch({ overtimeMode: "AFTER_APPROVAL" })}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
-                            {t("admin.settingsOvertimeModeAfterApproval")}
-                          </span>
-                          <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
-                            {t("admin.settingsOvertimeModeAfterApprovalHint")}
-                          </span>
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-[var(--fill-secondary)] p-3">
-                        <input
-                          type="radio"
-                          name="overtimeMode"
-                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--apple-blue)]"
-                          checked={settings.overtimeMode === "OFF"}
-                          disabled={!settings.canEdit || saving}
-                          onChange={() => void patch({ overtimeMode: "OFF" })}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[0.875rem] font-semibold text-[var(--foreground)]">
-                            {t("admin.settingsOvertimeModeOff")}
-                          </span>
-                          <span className="mt-0.5 block text-[0.75rem] text-[var(--apple-label-secondary)]">
-                            {t("admin.settingsOvertimeModeOffHint")}
-                          </span>
-                        </span>
-                      </label>
-                      <p className={`${hint} px-1`}>{t("admin.settingsOvertimeModeNote")}</p>
-                    </div>
-                  </section>
-
-                  <section className="rounded-xl border border-[var(--separator)] bg-white">
-                    <div className="border-b border-[var(--separator)] px-3.5 py-3 sm:px-4">
-                      <p className="text-[0.875rem] font-semibold text-[var(--foreground)]">
-                        {t("admin.settingsWorkDays")}
-                      </p>
-                    </div>
-                    <div className="p-3.5 sm:p-4">
-                      <label className="block">
-                        <span className={label}>{t("admin.settingsTimezone")}</span>
-                        <select
-                          className={`${select} mt-1.5 bg-[var(--fill-secondary)]`}
-                          value={timezone}
-                          onChange={(e) => setTimezone(e.target.value)}
-                          disabled={!settings.canEdit || saving}
-                          aria-label={t("admin.settingsTimezone")}
-                        >
-                          {timezoneOptions.map((tz) => (
-                            <option key={tz} value={tz}>
-                              {formatTimezoneOptionLabel(tz, dateLocale)}
-                            </option>
-                          ))}
-                        </select>
-                        <p className={`mt-1.5 ${hint}`}>{t("admin.settingsTimezoneHint")}</p>
-                      </label>
-
-                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                        <label className="block">
-                          <span className={label}>{t("admin.settingsWorkStart")}</span>
-                          <LocaleTimeInput
-                            value={workStart}
-                            onChange={setWorkStart}
-                            disabled={!settings.canEdit || saving}
-                            ariaLabel={t("admin.settingsWorkStart")}
-                            className="mt-1.5"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className={label}>{t("admin.settingsWorkEnd")}</span>
-                          <LocaleTimeInput
-                            value={workEnd}
-                            onChange={setWorkEnd}
-                            disabled={!settings.canEdit || saving}
-                            ariaLabel={t("admin.settingsWorkEnd")}
-                            className="mt-1.5"
-                          />
-                        </label>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {WEEKDAYS.map((d) => (
-                          <button
-                            key={d}
-                            type="button"
-                            disabled={!settings.canEdit || saving}
-                            onClick={() => toggleDay(d)}
-                            className={chipBtn(workDaySet.has(d))}
-                          >
-                            {weekdayShortLabel(d, locale)}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="mt-4 space-y-2">
-                        {WEEKDAYS.map((day) => {
-                          const dayWindow = workScheduleByDay[day] ?? {
-                            workStartTime: workStart,
-                            workEndTime: workEnd,
-                          };
-                          const active = workDaySet.has(day);
-                          return (
-                            <div
-                              key={`time-${day}`}
-                              className="grid items-center gap-2 rounded-lg bg-[var(--fill-secondary)] px-3 py-2 sm:grid-cols-[3rem_1fr_1fr]"
-                            >
-                              <span className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
-                                {weekdayShortLabel(day, locale)}
-                              </span>
-                              <LocaleTimeInput
-                                value={dayWindow.workStartTime}
-                                onChange={(v) => setDayTime(day, "workStartTime", v)}
-                                disabled={!settings.canEdit || saving || !active}
-                                ariaLabel={`${weekdayShortLabel(day, locale)} ${t("admin.settingsWorkStart")}`}
-                              />
-                              <LocaleTimeInput
-                                value={dayWindow.workEndTime}
-                                onChange={(v) => setDayTime(day, "workEndTime", v)}
-                                disabled={!settings.canEdit || saving || !active}
-                                ariaLabel={`${weekdayShortLabel(day, locale)} ${t("admin.settingsWorkEnd")}`}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="rounded-xl border border-[var(--separator)] bg-white">
-                    <div className="border-b border-[var(--separator)] px-3.5 py-3 sm:px-4">
-                      <p className="text-[0.875rem] font-semibold text-[var(--foreground)]">
-                        {t("admin.settingsShiftPresetsTitle")}
-                      </p>
-                      <p className="mt-1 text-[0.8125rem] text-[var(--apple-label-secondary)]">
-                        {t("admin.settingsShiftPresetsLead")}
-                      </p>
-                    </div>
-                    <div className="p-3.5 sm:p-4">
-                      <div className="space-y-3">
-                        {SHIFT_CODES.map((code) => (
-                          <div
-                            key={code}
-                            className="grid gap-2 rounded-lg bg-[var(--fill-secondary)] px-3 py-3 sm:grid-cols-[4rem_1fr_1fr_1fr]"
-                          >
-                            <span className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
-                              {code}
-                            </span>
-                            <input
-                              className="h-8 rounded-[0.5rem] bg-[var(--background)] px-2 text-[0.8125rem]"
-                              value={shiftPresets[code].label}
-                              onChange={(e) => setShiftPresetField(code, "label", e.target.value)}
-                              disabled={!settings.canEdit || saving}
-                              aria-label={t("admin.settingsShiftLabel")}
-                            />
-                            <LocaleTimeInput
-                              value={shiftPresets[code].workStartTime}
-                              onChange={(v) => setShiftPresetField(code, "workStartTime", v)}
-                              disabled={!settings.canEdit || saving}
-                              ariaLabel={`${code} ${t("admin.settingsWorkStart")}`}
-                            />
-                            <LocaleTimeInput
-                              value={shiftPresets[code].workEndTime}
-                              onChange={(v) => setShiftPresetField(code, "workEndTime", v)}
-                              disabled={!settings.canEdit || saving}
-                              ariaLabel={`${code} ${t("admin.settingsWorkEnd")}`}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </section>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className={label}>{t("admin.settingsWorkStart")}</span>
+                    <LocaleTimeInput
+                      value={workStart}
+                      onChange={setWorkStart}
+                      disabled={!settings.canEdit || saving}
+                      ariaLabel={t("admin.settingsWorkStart")}
+                      className="mt-1.5"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className={label}>{t("admin.settingsWorkEnd")}</span>
+                    <LocaleTimeInput
+                      value={workEnd}
+                      onChange={setWorkEnd}
+                      disabled={!settings.canEdit || saving}
+                      ariaLabel={t("admin.settingsWorkEnd")}
+                      className="mt-1.5"
+                    />
+                  </label>
                 </div>
 
-                <ul className="mt-3 list-inside list-disc text-[0.8125rem] text-[var(--apple-label-secondary)]">
-                  <li>{t("admin.settingsWorkRuleLate")}</li>
-                  <li>{t("admin.settingsWorkRuleEarly")}</li>
-                  <li>{t("admin.settingsWorkRuleOvertime")}</li>
-                  <li>{t("admin.settingsWorkRuleHoliday")}</li>
-                </ul>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {WEEKDAYS.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      disabled={!settings.canEdit || saving}
+                      onClick={() => toggleDay(d)}
+                      className={chipBtn(workDaySet.has(d))}
+                    >
+                      {weekdayShortLabel(d, locale)}
+                    </button>
+                  ))}
+                </div>
 
-                {settings.canEdit ? <div className="mt-4">{renderSaveWorkButton()}</div> : null}
-              </div>
+                <div className="mt-4 space-y-2">
+                  {WEEKDAYS.map((day) => {
+                    const dayWindow = workScheduleByDay[day] ?? {
+                      workStartTime: workStart,
+                      workEndTime: workEnd,
+                    };
+                    const active = workDaySet.has(day);
+                    return (
+                      <div
+                        key={`time-${day}`}
+                        className="grid items-center gap-2 rounded-lg bg-[var(--fill-secondary)] px-3 py-2 sm:grid-cols-[3rem_1fr_1fr]"
+                      >
+                        <span className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
+                          {weekdayShortLabel(day, locale)}
+                        </span>
+                        <LocaleTimeInput
+                          value={dayWindow.workStartTime}
+                          onChange={(v) => setDayTime(day, "workStartTime", v)}
+                          disabled={!settings.canEdit || saving || !active}
+                          ariaLabel={`${weekdayShortLabel(day, locale)} ${t("admin.settingsWorkStart")}`}
+                        />
+                        <LocaleTimeInput
+                          value={dayWindow.workEndTime}
+                          onChange={(v) => setDayTime(day, "workEndTime", v)}
+                          disabled={!settings.canEdit || saving || !active}
+                          ariaLabel={`${weekdayShortLabel(day, locale)} ${t("admin.settingsWorkEnd")}`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </SettingsNestedDropdown>
+
+              <SettingsNestedDropdown
+                title={`4. ${t("admin.settingsShiftPresetsTitle")}`}
+                description={t("admin.settingsShiftPresetsLead")}
+              >
+                <div className="space-y-3">
+                  {SHIFT_CODES.map((code) => (
+                    <div
+                      key={code}
+                      className="grid gap-2 rounded-lg bg-[var(--fill-secondary)] px-3 py-3 sm:grid-cols-[4rem_1fr_1fr_1fr]"
+                    >
+                      <span className="text-[0.8125rem] font-semibold text-[var(--foreground)]">
+                        {code}
+                      </span>
+                      <input
+                        className="h-8 rounded-[0.5rem] bg-[var(--background)] px-2 text-[0.8125rem]"
+                        value={shiftPresets[code].label}
+                        onChange={(e) => setShiftPresetField(code, "label", e.target.value)}
+                        disabled={!settings.canEdit || saving}
+                        aria-label={t("admin.settingsShiftLabel")}
+                      />
+                      <LocaleTimeInput
+                        value={shiftPresets[code].workStartTime}
+                        onChange={(v) => setShiftPresetField(code, "workStartTime", v)}
+                        disabled={!settings.canEdit || saving}
+                        ariaLabel={`${code} ${t("admin.settingsWorkStart")}`}
+                      />
+                      <LocaleTimeInput
+                        value={shiftPresets[code].workEndTime}
+                        onChange={(v) => setShiftPresetField(code, "workEndTime", v)}
+                        disabled={!settings.canEdit || saving}
+                        ariaLabel={`${code} ${t("admin.settingsWorkEnd")}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </SettingsNestedDropdown>
             </div>
-          )}
 
-          {settings && !settings.canEdit && !loading && !error && (
-            <p className="mt-3 text-[0.75rem] text-[var(--apple-label-tertiary)]">{t("admin.settingsReadOnly")}</p>
-          )}
+            <ul className="mt-3 list-inside list-disc text-[0.8125rem] text-[var(--apple-label-secondary)]">
+              <li>{t("admin.settingsWorkRuleLate")}</li>
+              <li>{t("admin.settingsWorkRuleEarly")}</li>
+              <li>{t("admin.settingsWorkRuleOvertime")}</li>
+              <li>{t("admin.settingsWorkRuleHoliday")}</li>
+            </ul>
+
+            {settings.canEdit ? <div className="mt-4">{renderSaveWorkButton()}</div> : null}
+          </div>
         </div>
-      </div>
-    </section>
+      )}
+
+      {settings && !settings.canEdit && !loading && !error && (
+        <p className="mt-3 text-[0.75rem] text-[var(--apple-label-tertiary)]">{t("admin.settingsReadOnly")}</p>
+      )}
+    </SettingsDropdownSection>
   );
 }

@@ -7,16 +7,34 @@ import { prisma } from "@/lib/prisma";
 export async function authorizeCredentials(
   credentials: Partial<Record<"email" | "password" | "staySignedIn", unknown>>
 ) {
-  const email = credentials?.email as string | undefined;
+  const loginId = ((credentials?.email as string | undefined) ?? "").trim();
   const password = credentials?.password as string | undefined;
-  if (!email || !password) return null;
+  if (!loginId || !password) return null;
+
+  const normalized = loginId.toLowerCase();
 
   let user;
   try {
     user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: normalized },
       include: { employee: true },
     });
+
+    // 이메일 대신 직원 ID로 로그인 (회사 간 동일 ID가 2건 이상이면 거부)
+    if (!user) {
+      const matches = await prisma.employee.findMany({
+        where: {
+          externalEmployeeId: { equals: loginId, mode: "insensitive" },
+        },
+        include: { user: true },
+        take: 3,
+      });
+      if (matches.length === 1) {
+        user = { ...matches[0].user, employee: matches[0] };
+      } else if (matches.length > 1) {
+        return null;
+      }
+    }
   } catch (e) {
     if (process.env.NODE_ENV === "development") {
       console.error("[auth] DB 연결 실패 — DATABASE_URL 확인", e);

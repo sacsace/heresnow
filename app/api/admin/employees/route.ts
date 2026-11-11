@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { createCompanyEmployee } from "@/lib/employeeCreate";
 import { annotateEmployeesWithLoginAccess, EMPLOYEE_SEAT_ORDER } from "@/lib/seatAccess";
 import {
   MAX_PASSWORD_LENGTH,
@@ -13,7 +14,6 @@ import { prisma } from "@/lib/prisma";
 import { normalizeShiftPresets } from "@/lib/shiftPresets";
 import { canAssignRole } from "@/lib/roleHierarchy";
 import { Role } from "@prisma/client";
-import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -68,7 +68,16 @@ export async function GET(req: Request) {
         orderBy: EMPLOYEE_SEAT_ORDER,
         include: {
           user: { select: { id: true, email: true, role: true } },
-          department: { select: { id: true, name: true } },
+          department: {
+            select: {
+              id: true,
+              name: true,
+              workScheduleMode: true,
+              shiftCode: true,
+              workStartTime: true,
+              workEndTime: true,
+            },
+          },
         },
       }),
     ]);
@@ -117,9 +126,23 @@ export async function GET(req: Request) {
 }
 
 const postSchema = z.object({
-  email: z.string().email().transform((e) => e.toLowerCase().trim()),
+  /** 이메일 또는 직원 ID 중 하나 이상 필요 */
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .transform((v) => (v && v.length > 0 ? v.toLowerCase() : null)),
   name: z.string().min(1).max(120),
   password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
+  /** 회사 내부 직원 ID. 이메일만 있으면 로컬파트로 자동 채움 */
+  externalEmployeeId: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .nullable()
+    .transform((v) => (v && v.length > 0 ? v : null)),
   departmentId: z.string().min(1).max(40).optional().nullable(),
   role: z.enum(COMPANY_ROLES).optional(),
 });
@@ -151,7 +174,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { email, name, password, departmentId } = parsed.data;
+  const { email, name, password, departmentId, externalEmployeeId } = parsed.data;
   if (!isStrongPassword(password)) {
     return NextResponse.json(
       { error: "WEAK_PASSWORD", message: WEAK_PASSWORD_MESSAGE },
@@ -169,53 +192,36 @@ export async function POST(req: Request) {
       { status: 403 }
     );
   }
-  const role = requestedRole;
 
   const company = await prisma.company.findUnique({ where: { id: companyId } });
   if (!company) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // 부서 ID가 들어오면 동일 회사 소속인지 확인 (다른 회사 부서 차단)
-  if (departmentId) {
-    const dep = await prisma.department.findUnique({
-      where: { id: departmentId },
-      select: { companyId: true },
-    });
-    if (!dep || dep.companyId !== companyId) {
-      return NextResponse.json({ error: "INVALID_DEPARTMENT" }, { status: 400 });
-    }
-  }
+  const result = await createCompanyEmployee(
+    {
+      companyId,
+      email,
+      name,
+      password,
+      departmentId: departmentId ?? null,
+      role: requestedRole,
+      externalEmployeeId,
+    },
+    { callerRole: session.user.role! }
+  );
 
-  const dup = await prisma.user.findUnique({ where: { email } });
-  if (dup) {
-    return NextResponse.json({ error: "이미 등록된 이메일입니다." }, { status: 409 });
-  }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          companyId,
-          email,
-          passwordHash,
-          role,
-          consentGivenAt: null,
-          consentVersion: null,
-        },
-      });
-      await tx.employee.create({
-        data: {
-          companyId,
-          userId: user.id,
-          name: name.trim(),
-          departmentId: departmentId ?? null,
-        },
-      });
-    });
-  } catch (e) {
-    console.error("[employees POST]", e);
-    return NextResponse.json({ error: "생성 실패" }, { status: 500 });
+  if (!result.ok) {
+    const status =
+      result.code === "EMAIL_TAKEN" || result.code === "EXTERNAL_ID_TAKEN"
+        ? 409
+        : result.code === "ROLE_NOT_ALLOWED"
+          ? 403
+          : result.code === "CREATE_FAILED"
+            ? 500
+            : 400;
+    return NextResponse.json(
+      { error: result.message, code: result.code, message: result.message },
+      { status }
+    );
   }
 
   return NextResponse.json({ ok: true });

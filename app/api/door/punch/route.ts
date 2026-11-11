@@ -13,8 +13,13 @@ import {
 } from "@/lib/doorAttendance";
 import { dedupeFaceProbes } from "@/lib/faceProbeDedupe";
 import { resolveDoorPunchTimeWindow, resolveDoorTerminalMode } from "@/lib/doorTerminalMode";
+import {
+  getEarlyCheckInRequestStatus,
+  hasApprovedEarlyCheckIn,
+} from "@/lib/earlyCheckInRequest";
 import { doorApiForbidden } from "@/lib/requireDoorRole";
 import { DEFAULT_COMPANY_TIMEZONE } from "@/lib/companyTimezones";
+import { calendarDayInTz } from "@/lib/attendancePunchRules";
 import { resolveEmployeeWorkSchedule } from "@/lib/employeeWorkSchedule";
 import { prisma } from "@/lib/prisma";
 import { subscriptionPunchForbiddenResponse } from "@/lib/requireActiveSubscriptionApi";
@@ -64,15 +69,7 @@ export async function POST(req: Request) {
     ? parseDoorFaceDescriptor(parsed.data.faceDescriptor)
     : null;
 
-  if (multiProbes.length >= 3) {
-    const unique = dedupeFaceProbes(multiProbes);
-    if (unique.length < 3) {
-      return NextResponse.json(
-        { error: "invalid_face", code: "INSUFFICIENT_FRAME_DIVERSITY" },
-        { status: 400 }
-      );
-    }
-  } else if (!singleProbe) {
+  if (multiProbes.length < 3 && !singleProbe) {
     return NextResponse.json({ error: "invalid_face" }, { status: 400 });
   }
 
@@ -126,6 +123,14 @@ export async function POST(req: Request) {
       workStartTime: true,
       workEndTime: true,
       workScheduleByDay: true,
+      department: {
+        select: {
+          workScheduleMode: true,
+          shiftCode: true,
+          workStartTime: true,
+          workEndTime: true,
+        },
+      },
     },
   });
   if (!employee) {
@@ -137,16 +142,30 @@ export async function POST(req: Request) {
   const timeWindow = resolveDoorPunchTimeWindow(now, tz, effectiveSchedule);
 
   if (type === "CHECK_IN" && now.getTime() < new Date(timeWindow.checkInOpenAt).getTime()) {
-    return NextResponse.json(
-      {
-        error: "checkin_too_early",
-        code: "CHECK_IN_TOO_EARLY",
-        employee: { id: employee.id, name: employee.name },
-        mode: type,
-        nextCheckInAt: timeWindow.checkInOpenAt,
-      },
-      { status: 409 }
-    );
+    const workDate = calendarDayInTz(now, tz);
+    const earlyApproved = await hasApprovedEarlyCheckIn({
+      companyId,
+      employeeId: employee.id,
+      workDate,
+    });
+    if (!earlyApproved) {
+      const earlyRequestStatus = await getEarlyCheckInRequestStatus({
+        companyId,
+        employeeId: employee.id,
+        workDate,
+      });
+      return NextResponse.json(
+        {
+          error: "checkin_too_early",
+          code: "CHECK_IN_TOO_EARLY",
+          employee: { id: employee.id, name: employee.name },
+          mode: type,
+          nextCheckInAt: timeWindow.checkInOpenAt,
+          earlyRequestStatus,
+        },
+        { status: 409 }
+      );
+    }
   }
   if (type === "CHECK_OUT" && now.getTime() < new Date(timeWindow.checkOutOpenAt).getTime()) {
     return NextResponse.json(

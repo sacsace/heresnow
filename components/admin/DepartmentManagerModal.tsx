@@ -1,7 +1,9 @@
 "use client";
 
+import { LocaleTimeInput } from "@/components/LocaleTimeInput";
 import { useI18n } from "@/components/LanguageProvider";
 import { useAppleConfirm } from "@/hooks/useAppleConfirm";
+import { SHIFT_CODES } from "@/lib/shiftPresets";
 import {
   btnDanger,
   btnGhost,
@@ -12,14 +14,22 @@ import {
   groupedCard,
   hint,
   input,
+  label,
+  select,
 } from "@/lib/uiStyles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+type WorkScheduleMode = "COMPANY" | "SHIFT" | "CUSTOM";
 
 export type Department = {
   id: string;
   name: string;
   employeeCount: number;
+  workScheduleMode?: string;
+  shiftCode?: string | null;
+  workStartTime?: string | null;
+  workEndTime?: string | null;
 };
 
 type Props = {
@@ -31,12 +41,24 @@ type Props = {
   onChanged?: () => void;
 };
 
+function scheduleHint(
+  d: Department,
+  t: (k: string) => string
+): string {
+  const mode = d.workScheduleMode ?? "COMPANY";
+  if (mode === "SHIFT" && d.shiftCode) {
+    return t("admin.departmentsScheduleShift").replace("{code}", d.shiftCode);
+  }
+  if (mode === "CUSTOM" && d.workStartTime && d.workEndTime) {
+    return t("admin.departmentsScheduleCustom")
+      .replace("{start}", d.workStartTime)
+      .replace("{end}", d.workEndTime);
+  }
+  return t("admin.departmentsScheduleCompany");
+}
+
 /**
- * 회사별 부서 CRUD 모달.
- * - role=COMPANY_ADMIN/HR_MANAGER 는 자기 회사
- * - role=SUPER_ADMIN 은 companyId prop 전달 필요
- *
- * 헤더의 backdrop-filter 가 fixed 의 containing block 을 만드므로 portal 사용.
+ * 회사별 부서 CRUD + 부서 근무시간 모달.
  */
 export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: Props) {
   const { t } = useI18n();
@@ -50,6 +72,11 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [scheduleEditId, setScheduleEditId] = useState<string | null>(null);
+  const [scheduleMode, setScheduleMode] = useState<WorkScheduleMode>("COMPANY");
+  const [shiftCode, setShiftCode] = useState<(typeof SHIFT_CODES)[number]>("A");
+  const [workStartTime, setWorkStartTime] = useState("09:00");
+  const [workEndTime, setWorkEndTime] = useState("18:00");
   const dirtyRef = useRef(false);
 
   const apiBase = "/api/admin/departments";
@@ -64,7 +91,6 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
       if (!r.ok) throw new Error(typeof j.error === "string" ? j.error : "load fail");
       setDepartments(Array.isArray(j.departments) ? j.departments : []);
       setCanEdit(Boolean(j.canEdit));
-      // 스키마가 아직 적용되지 않았을 때 안내
       if (j.schemaOutdated) {
         setError(t("admin.departmentsLoadFail"));
       }
@@ -86,11 +112,11 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
     setError(null);
     setEditingId(null);
     setEditingName("");
+    setScheduleEditId(null);
     setNewName("");
     void load();
   }, [open, load]);
 
-  // 모달 오픈 시 바디 스크롤 잠금 + ESC 닫기
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -141,8 +167,25 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
   }
 
   function startEdit(d: Department) {
+    setScheduleEditId(null);
     setEditingId(d.id);
     setEditingName(d.name);
+    setError(null);
+  }
+
+  function startScheduleEdit(d: Department) {
+    setEditingId(null);
+    setScheduleEditId(d.id);
+    const mode =
+      d.workScheduleMode === "SHIFT" || d.workScheduleMode === "CUSTOM"
+        ? d.workScheduleMode
+        : "COMPANY";
+    setScheduleMode(mode);
+    setShiftCode(
+      d.shiftCode === "B" || d.shiftCode === "C" ? d.shiftCode : "A"
+    );
+    setWorkStartTime(d.workStartTime ?? "09:00");
+    setWorkEndTime(d.workEndTime ?? "18:00");
     setError(null);
   }
 
@@ -169,6 +212,51 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
       }
       setEditingId(null);
       setEditingName("");
+      dirtyRef.current = true;
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSchedule() {
+    if (!scheduleEditId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        workScheduleMode: scheduleMode,
+      };
+      if (scheduleMode === "SHIFT") {
+        body.shiftCode = shiftCode;
+      } else if (scheduleMode === "CUSTOM") {
+        body.workStartTime = workStartTime;
+        body.workEndTime = workEndTime;
+      } else {
+        body.shiftCode = null;
+        body.workStartTime = null;
+        body.workEndTime = null;
+      }
+      const r = await fetch(
+        `${apiBase}/${encodeURIComponent(scheduleEditId)}${queryString}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(
+          typeof j.message === "string"
+            ? j.message
+            : typeof j.error === "string"
+              ? j.error
+              : t("admin.departmentsScheduleSaveFail")
+        );
+        return;
+      }
+      setScheduleEditId(null);
       dirtyRef.current = true;
       await load();
     } finally {
@@ -218,7 +306,7 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
         className="absolute inset-0 h-full w-full bg-black/40 backdrop-blur-sm"
       />
       <div
-        className="relative flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-[var(--background)] shadow-2xl ring-1 ring-black/[0.05] sm:rounded-2xl"
+        className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-[var(--background)] shadow-2xl ring-1 ring-black/[0.05] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--separator)] px-5 py-4 sm:px-6">
@@ -281,10 +369,11 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
             ) : (
               departments.map((d) => {
                 const isEditing = editingId === d.id;
+                const isScheduleEditing = scheduleEditId === d.id;
                 return (
-                  <li key={d.id} className="flex items-center gap-2 px-4 py-3 sm:px-5">
+                  <li key={d.id} className="px-4 py-3 sm:px-5">
                     {isEditing ? (
-                      <>
+                      <div className="flex items-center gap-2">
                         <input
                           className={input}
                           value={editingName}
@@ -312,36 +401,145 @@ export function DepartmentManagerModal({ open, onClose, companyId, onChanged }: 
                         >
                           {t("admin.departmentsCancelButton")}
                         </button>
-                      </>
+                      </div>
                     ) : (
                       <>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-[var(--foreground)]">{d.name}</p>
-                          <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-tertiary)]">
-                            {t("admin.departmentsEmployeeCount").replace(
-                              "{count}",
-                              String(d.employeeCount)
-                            )}
-                          </p>
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium text-[var(--foreground)]">
+                              {d.name}
+                            </p>
+                            <p className="mt-0.5 text-[0.75rem] text-[var(--apple-label-tertiary)]">
+                              {t("admin.departmentsEmployeeCount").replace(
+                                "{count}",
+                                String(d.employeeCount)
+                              )}
+                              {" · "}
+                              {scheduleHint(d, t)}
+                            </p>
+                          </div>
+                          {canEdit && (
+                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => startScheduleEdit(d)}
+                                className={btnGhost}
+                                disabled={busy}
+                              >
+                                {t("admin.departmentsScheduleButton")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => startEdit(d)}
+                                className={btnGhost}
+                                disabled={busy}
+                              >
+                                {t("admin.departmentsRenameButton")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void removeDepartment(d)}
+                                className={btnDanger}
+                                disabled={busy}
+                              >
+                                {t("admin.departmentsDeleteButton")}
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        {canEdit && (
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => startEdit(d)}
-                              className={btnGhost}
-                              disabled={busy}
-                            >
-                              {t("admin.departmentsRenameButton")}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void removeDepartment(d)}
-                              className={btnDanger}
-                              disabled={busy}
-                            >
-                              {t("admin.departmentsDeleteButton")}
-                            </button>
+
+                        {isScheduleEditing && (
+                          <div className="mt-3 space-y-3 rounded-xl bg-[var(--fill-tertiary)] p-3">
+                            <label className="block">
+                              <span className={label}>{t("admin.departmentsScheduleModeLabel")}</span>
+                              <select
+                                className={`${select} mt-1.5 bg-[var(--fill-secondary)]`}
+                                value={scheduleMode}
+                                onChange={(e) =>
+                                  setScheduleMode(e.target.value as WorkScheduleMode)
+                                }
+                                disabled={busy}
+                              >
+                                <option value="COMPANY">
+                                  {t("admin.departmentsScheduleCompany")}
+                                </option>
+                                <option value="SHIFT">
+                                  {t("admin.departmentsScheduleShiftOption")}
+                                </option>
+                                <option value="CUSTOM">
+                                  {t("admin.departmentsScheduleCustomOption")}
+                                </option>
+                              </select>
+                              <p className={`mt-1 ${hint}`}>
+                                {t("admin.departmentsScheduleModeHint")}
+                              </p>
+                            </label>
+
+                            {scheduleMode === "SHIFT" && (
+                              <label className="block">
+                                <span className={label}>{t("admin.siteShiftLabel")}</span>
+                                <select
+                                  className={`${select} mt-1.5 max-w-[12rem] bg-[var(--fill-secondary)]`}
+                                  value={shiftCode}
+                                  onChange={(e) =>
+                                    setShiftCode(
+                                      e.target.value as (typeof SHIFT_CODES)[number]
+                                    )
+                                  }
+                                  disabled={busy}
+                                >
+                                  {SHIFT_CODES.map((code) => (
+                                    <option key={code} value={code}>
+                                      {code}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            )}
+
+                            {scheduleMode === "CUSTOM" && (
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <label className="block">
+                                  <span className={label}>{t("admin.settingsWorkStart")}</span>
+                                  <LocaleTimeInput
+                                    value={workStartTime}
+                                    onChange={setWorkStartTime}
+                                    disabled={busy}
+                                    ariaLabel={t("admin.settingsWorkStart")}
+                                    className="mt-1.5"
+                                  />
+                                </label>
+                                <label className="block">
+                                  <span className={label}>{t("admin.settingsWorkEnd")}</span>
+                                  <LocaleTimeInput
+                                    value={workEndTime}
+                                    onChange={setWorkEndTime}
+                                    disabled={busy}
+                                    ariaLabel={t("admin.settingsWorkEnd")}
+                                    className="mt-1.5"
+                                  />
+                                </label>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void saveSchedule()}
+                                className={btnPrimary}
+                                disabled={busy}
+                              >
+                                {t("admin.departmentsScheduleSave")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setScheduleEditId(null)}
+                                className={btnSecondary}
+                                disabled={busy}
+                              >
+                                {t("admin.departmentsCancelButton")}
+                              </button>
+                            </div>
                           </div>
                         )}
                       </>

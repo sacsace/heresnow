@@ -1,6 +1,7 @@
 "use client";
 
 import { GooglePlaceAutocompleteInput } from "@/components/admin/GooglePlaceAutocompleteInput";
+import { SettingsDropdownSection } from "@/components/admin/SettingsDropdownSection";
 import { StaticMap } from "@/components/admin/StaticMap";
 import { LocaleTimeInput } from "@/components/LocaleTimeInput";
 import { useI18n } from "@/components/LanguageProvider";
@@ -15,11 +16,9 @@ import {
   btnPrimary,
   btnSecondary,
   errorText,
-  groupedCard,
   hint,
   input,
   label,
-  sectionLabel,
   select,
   successText,
 } from "@/lib/uiStyles";
@@ -389,20 +388,17 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
   const displayCoords = coords;
 
   return (
-    <section>
-      <p className={sectionLabel}>{t("admin.siteTitle")}</p>
-      <div className={groupedCard}>
-        <div className="px-5 py-4 sm:px-6 sm:py-5">
-          <p className="text-[0.9375rem] leading-relaxed text-[var(--apple-label-secondary)]">
-            {t("admin.siteLead")}
-          </p>
-
+    <>
+      <SettingsDropdownSection
+        title={t("admin.siteTitle")}
+        description={t("admin.siteLead")}
+      >
           {loading ? (
-            <p className={`mt-4 text-[0.875rem] ${hint}`}>{t("common.loading")}</p>
+            <p className={`text-[0.875rem] ${hint}`}>{t("common.loading")}</p>
           ) : (
             <>
               {sites.length > 0 && (
-                <p className="mt-3 text-[0.8125rem] text-[var(--apple-label-secondary)]">
+                <p className="text-[0.8125rem] text-[var(--apple-label-secondary)]">
                   {t("admin.siteCount").replace("{count}", String(sites.length))}
                   {" · "}
                   {t("admin.siteNearestHint")}
@@ -727,9 +723,8 @@ export function AdminCompanySiteRegistration({ companyId }: Props = {}) {
               {saved && <p className={`mt-3 text-[0.875rem] ${successText}`}>{t("admin.siteSaved")}</p>}
             </>
           )}
-        </div>
-      </div>
+      </SettingsDropdownSection>
       {confirmDialog}
-    </section>
+    </>
   );
 }

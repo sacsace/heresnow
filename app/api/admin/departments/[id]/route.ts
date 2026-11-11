@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { isShiftCode } from "@/lib/employeeWorkSchedule";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
@@ -24,8 +25,53 @@ function resolveCompanyId(
 }
 
 const patchSchema = z.object({
-  name: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(80).optional(),
+  workScheduleMode: z.enum(["COMPANY", "SHIFT", "CUSTOM"]).optional(),
+  shiftCode: z.enum(["A", "B", "C"]).nullable().optional(),
+  workStartTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .nullable()
+    .optional(),
+  workEndTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .nullable()
+    .optional(),
 });
+
+const departmentSelect = {
+  id: true,
+  name: true,
+  workScheduleMode: true,
+  shiftCode: true,
+  workStartTime: true,
+  workEndTime: true,
+  createdAt: true,
+  _count: { select: { employees: true } },
+} as const;
+
+function mapDepartment(dep: {
+  id: string;
+  name: string;
+  workScheduleMode: string;
+  shiftCode: string | null;
+  workStartTime: string | null;
+  workEndTime: string | null;
+  createdAt: Date;
+  _count: { employees: number };
+}) {
+  return {
+    id: dep.id,
+    name: dep.name,
+    workScheduleMode: dep.workScheduleMode,
+    shiftCode: dep.shiftCode,
+    workStartTime: dep.workStartTime,
+    workEndTime: dep.workEndTime,
+    createdAt: dep.createdAt,
+    employeeCount: dep._count.employees,
+  };
+}
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -51,31 +97,77 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // 회사 격리: 같은 회사 소속이 아니면 거부
-  const existing = await prisma.department.findUnique({ where: { id }, select: { companyId: true } });
+  if (
+    parsed.data.name === undefined &&
+    parsed.data.workScheduleMode === undefined &&
+    parsed.data.shiftCode === undefined &&
+    parsed.data.workStartTime === undefined &&
+    parsed.data.workEndTime === undefined
+  ) {
+    return NextResponse.json({ error: "No changes" }, { status: 400 });
+  }
+
+  const existing = await prisma.department.findUnique({
+    where: { id },
+    select: {
+      companyId: true,
+      workScheduleMode: true,
+      shiftCode: true,
+      workStartTime: true,
+      workEndTime: true,
+    },
+  });
   if (!existing || existing.companyId !== resolved.companyId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const nextMode = parsed.data.workScheduleMode ?? existing.workScheduleMode;
+  const data: Prisma.DepartmentUpdateInput = {};
+
+  if (parsed.data.name !== undefined) data.name = parsed.data.name;
+
+  if (parsed.data.workScheduleMode !== undefined || parsed.data.shiftCode !== undefined) {
+    if (nextMode === "COMPANY") {
+      data.workScheduleMode = "COMPANY";
+      data.shiftCode = null;
+      data.workStartTime = null;
+      data.workEndTime = null;
+    } else if (nextMode === "SHIFT") {
+      const code = parsed.data.shiftCode ?? existing.shiftCode;
+      if (!isShiftCode(code)) {
+        return NextResponse.json({ error: "SHIFT_CODE_REQUIRED" }, { status: 400 });
+      }
+      data.workScheduleMode = "SHIFT";
+      data.shiftCode = code;
+      data.workStartTime = null;
+      data.workEndTime = null;
+    } else if (nextMode === "CUSTOM") {
+      const start =
+        parsed.data.workStartTime !== undefined
+          ? parsed.data.workStartTime
+          : existing.workStartTime;
+      const end =
+        parsed.data.workEndTime !== undefined ? parsed.data.workEndTime : existing.workEndTime;
+      if (!start || !end) {
+        return NextResponse.json({ error: "CUSTOM_TIMES_REQUIRED" }, { status: 400 });
+      }
+      data.workScheduleMode = "CUSTOM";
+      data.shiftCode = null;
+      data.workStartTime = start;
+      data.workEndTime = end;
+    }
+  } else if (nextMode === "CUSTOM") {
+    if (parsed.data.workStartTime !== undefined) data.workStartTime = parsed.data.workStartTime;
+    if (parsed.data.workEndTime !== undefined) data.workEndTime = parsed.data.workEndTime;
   }
 
   try {
     const dep = await prisma.department.update({
       where: { id },
-      data: { name: parsed.data.name },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-        _count: { select: { employees: true } },
-      },
+      data,
+      select: departmentSelect,
     });
-    return NextResponse.json({
-      department: {
-        id: dep.id,
-        name: dep.name,
-        createdAt: dep.createdAt,
-        employeeCount: dep._count.employees,
-      },
-    });
+    return NextResponse.json({ department: mapDepartment(dep) });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json({ error: "DUPLICATE_NAME" }, { status: 409 });
@@ -104,7 +196,6 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
   }
 
   try {
-    // onDelete: SetNull — 직원의 departmentId 는 자동으로 null
     await prisma.department.delete({ where: { id } });
   } catch (e) {
     console.error("[departments DELETE]", e);

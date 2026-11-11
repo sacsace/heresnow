@@ -154,7 +154,7 @@ export function MonthlyAttendanceOverview({ companyId, hideViewAllLink }: Props 
           </button>
         </div>
       </div>
-      <div className={`${groupedCard} p-4 sm:p-5`}>
+      <div className={`${groupedCard} !border-black p-4 sm:p-5`}>
 
       {data && (
         <div className="mt-4 flex flex-wrap gap-3 text-xs text-[var(--apple-label-secondary)]">

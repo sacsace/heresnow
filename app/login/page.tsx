@@ -54,10 +54,13 @@ function LoginForm() {
   /** SSR·하이드레이션과 맞추기 위해 마운트 후에만 true — useMemo+window는 모바일에서 불일치 오류 유발 */
   const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
+  /** 비밀번호 관리자 확장(shark-icon-container 등)이 input 옆에 노드를 넣어도 SSR 불일치가 나지 않게 */
+  const [passwordFormReady, setPasswordFormReady] = useState(false);
 
   useEffect(() => {
     setIsMobileOrTablet(isMobileOrTabletClient());
     setPasskeySupported(typeof window.PublicKeyCredential !== "undefined");
+    setPasswordFormReady(true);
   }, []);
 
   useEffect(() => {
@@ -350,57 +353,61 @@ function LoginForm() {
         </div>
 
         {mode === "password" ? (
-          <form onSubmit={onSubmit} className={authFormLogin}>
-            <div className={authFieldGroup}>
-              <label className={authLabel}>{t("login.email")}</label>
-              <input
-                type="text"
-                inputMode="email"
-                autoComplete="username webauthn"
-                className={authInput}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                /** 비밀번호 관리자 확장(data-sharkid 등)이 속성을 주입해도 hydration 경고가 뜨지 않게 */
-                suppressHydrationWarning
-              />
+          passwordFormReady ? (
+            <form onSubmit={onSubmit} className={authFormLogin}>
+              <div className={authFieldGroup} suppressHydrationWarning>
+                <label className={authLabel}>{t("login.email")}</label>
+                <input
+                  type="text"
+                  autoComplete="username webauthn"
+                  className={authInput}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  suppressHydrationWarning
+                />
+              </div>
+              <div className={authFieldGroup} suppressHydrationWarning>
+                <label className={authLabel}>{t("login.password")}</label>
+                <PasswordInput
+                  autoComplete="current-password"
+                  inputClassName={authInput}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  required
+                />
+                <p className="mt-1 text-[0.75rem] text-[var(--apple-label-secondary)]">
+                  {t("login.passwordHint")}
+                </p>
+              </div>
+              {error && <p className={authError}>{error}</p>}
+              <button type="submit" disabled={formLoading} className={authButtonPrimary}>
+                {formLoading ? t("login.submitting") : t("login.submit")}
+              </button>
+              {isMobileOrTablet ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={formLoading || passkeyLoading || !passkeySupported}
+                    className="w-full rounded-[0.625rem] border border-[var(--separator)] bg-[var(--fill-secondary)] py-2 text-[0.875rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] disabled:opacity-50 sm:text-[0.9375rem]"
+                    onClick={() => void onPasskeyLogin()}
+                  >
+                    {passkeyLoading ? t("login.passkeyChecking") : t("login.passkeySubmit")}
+                  </button>
+                  {!passkeySupported ? (
+                    <p className="text-center text-[0.75rem] text-[var(--apple-label-secondary)]">
+                      {t("login.passkeyNoSupport")}
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+            </form>
+          ) : (
+            <div className={`${authFormLogin} text-[0.8125rem] text-[var(--apple-label-secondary)]`}>
+              {t("common.loading")}
             </div>
-            <div className={authFieldGroup}>
-              <label className={authLabel}>{t("login.password")}</label>
-              <PasswordInput
-                autoComplete="current-password"
-                inputClassName={authInput}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={MIN_PASSWORD_LENGTH}
-                required
-              />
-              <p className="mt-1 text-[0.75rem] text-[var(--apple-label-secondary)]">
-                {t("login.passwordHint")}
-              </p>
-            </div>
-            {error && <p className={authError}>{error}</p>}
-            <button type="submit" disabled={formLoading} className={authButtonPrimary}>
-              {formLoading ? t("login.submitting") : t("login.submit")}
-            </button>
-            {isMobileOrTablet ? (
-              <>
-                <button
-                  type="button"
-                  disabled={formLoading || passkeyLoading || !passkeySupported}
-                  className="w-full rounded-[0.625rem] border border-[var(--separator)] bg-[var(--fill-secondary)] py-2 text-[0.875rem] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--fill-secondary-hover)] disabled:opacity-50 sm:text-[0.9375rem]"
-                  onClick={() => void onPasskeyLogin()}
-                >
-                  {passkeyLoading ? t("login.passkeyChecking") : t("login.passkeySubmit")}
-                </button>
-                {!passkeySupported ? (
-                  <p className="text-center text-[0.75rem] text-[var(--apple-label-secondary)]">
-                    {t("login.passkeyNoSupport")}
-                  </p>
-                ) : null}
-              </>
-            ) : null}
-          </form>
+          )
         ) : (
           <div className={authFormLogin}>
             <FaceLoginSection
