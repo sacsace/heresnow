@@ -49,7 +49,7 @@ type RowUser = {
   role: string;
   consentGivenAt: string | null;
   createdAt: string;
-  employee: { id: string; name: string } | null;
+  employee: { id: string; name: string; externalEmployeeId?: string | null } | null;
 };
 
 type CompanyDetail = {
@@ -469,11 +469,12 @@ export default function SuperCompanyUsersPage() {
           <table className={tableLgCompact}>
             <thead className={tableHeadLg}>
               <tr>
-                <th className={`${thCompactLg} w-[32%]`}>{t("super.listEmail")}</th>
-                <th className={`${thCompactLg} w-[20%]`}>{t("super.listName")}</th>
-                <th className={`${thCompactLg} w-[18%]`}>{t("super.listRole")}</th>
-                <th className={`${thCompactLg} w-[14%]`}>{t("super.listConsent")}</th>
-                <th className={`${thCompactLg} w-[16%] text-right`}>
+                <th className={`${thCompactLg} w-[26%]`}>{t("super.listEmail")}</th>
+                <th className={`${thCompactLg} w-[14%]`}>{t("super.addExternalId")}</th>
+                <th className={`${thCompactLg} w-[18%]`}>{t("super.listName")}</th>
+                <th className={`${thCompactLg} w-[16%]`}>{t("super.listRole")}</th>
+                <th className={`${thCompactLg} w-[12%]`}>{t("super.listConsent")}</th>
+                <th className={`${thCompactLg} w-[14%] text-right`}>
                   {t("super.listActions")}
                 </th>
               </tr>
@@ -481,7 +482,7 @@ export default function SuperCompanyUsersPage() {
             <tbody>
               {users.length === 0 ? (
                 <tr className={tableRow}>
-                  <td colSpan={5} className={emptyStateLg}>
+                  <td colSpan={6} className={emptyStateLg}>
                     {t("common.noData")}
                   </td>
                 </tr>
@@ -496,6 +497,11 @@ export default function SuperCompanyUsersPage() {
                       >
                         {u.email}
                       </Link>
+                    </td>
+                    <td className={`${tdStatusCompactLg} font-mono text-[0.8125rem]`}>
+                      {u.employee?.externalEmployeeId?.trim()
+                        ? u.employee.externalEmployeeId
+                        : "—"}
                     </td>
                     <td className={tdNameCompactLg}>
                       {u.employee ? (
