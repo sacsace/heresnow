@@ -3,6 +3,7 @@
 import type { Department } from "@/components/admin/DepartmentManagerModal";
 import { useI18n } from "@/components/LanguageProvider";
 import { displayEmployeeEmail } from "@/lib/employeeIdentity";
+import { formatPersonDisplayName } from "@/lib/formatPersonDisplayName";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { canAssignRole, canDeleteEmployee } from "@/lib/roleHierarchy";
 import { emptyStateCompact, tableHead, trDivider } from "@/lib/uiStyles";
@@ -468,17 +469,21 @@ export function EmployeeListTable({
                   {canEditProfile ? (
                     <input
                       className={`${rowInput} font-medium`}
-                      defaultValue={e.name}
+                      defaultValue={formatPersonDisplayName(e.name)}
                       key={`name-${e.id}-${e.name}`}
                       disabled={isBusy}
                       aria-label={t("admin.employeesNameLabel")}
-                      onBlur={(ev) => onSaveName(e, ev.target.value)}
+                      onBlur={(ev) =>
+                        onSaveName(e, formatPersonDisplayName(ev.target.value))
+                      }
                       onKeyDown={(ev) => {
                         if (ev.key === "Enter") ev.currentTarget.blur();
                       }}
                     />
                   ) : (
-                    <p className={`${rowControlStatic} truncate font-medium`}>{e.name}</p>
+                    <p className={`${rowControlStatic} truncate font-medium`}>
+                      {formatPersonDisplayName(e.name)}
+                    </p>
                   )}
                 </td>
                 <td className={empTd}>

@@ -11,6 +11,7 @@ import { AppleConfirmDialog } from "@/components/ui/AppleConfirmDialog";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/LanguageProvider";
 import { emailLocalPart } from "@/lib/employeeIdentity";
+import { formatPersonDisplayName } from "@/lib/formatPersonDisplayName";
 import { isStrongPassword } from "@/lib/passwordPolicy";
 import {
   btnDestructive,
@@ -118,7 +119,7 @@ export default function SuperCompanyUsersPage() {
   useEffect(() => {
     const m: Record<string, string> = {};
     for (const u of users) {
-      m[u.id] = u.employee?.name ?? "";
+      m[u.id] = formatPersonDisplayName(u.employee?.name ?? "");
     }
     setNameDraft(m);
   }, [users]);
@@ -158,7 +159,7 @@ export default function SuperCompanyUsersPage() {
       body: JSON.stringify({
         email: email.trim() || null,
         externalEmployeeId: externalEmployeeId.trim() || null,
-        name,
+        name: formatPersonDisplayName(name),
         password,
         role,
       }),
@@ -190,10 +191,17 @@ export default function SuperCompanyUsersPage() {
 
   async function saveDisplayName(u: RowUser) {
     if (!u.employee) return;
-    const next = nameDraft[u.id]?.trim() ?? "";
+    const next = formatPersonDisplayName(nameDraft[u.id]?.trim() ?? "");
     const current = u.employee.name;
-    if (!next || next === current) {
-      setNameDraft((prev) => ({ ...prev, [u.id]: current }));
+    if (!next) {
+      setNameDraft((prev) => ({
+        ...prev,
+        [u.id]: formatPersonDisplayName(current),
+      }));
+      return;
+    }
+    if (next === current) {
+      setNameDraft((prev) => ({ ...prev, [u.id]: next }));
       return;
     }
 
@@ -208,14 +216,19 @@ export default function SuperCompanyUsersPage() {
     setSavingNameId(null);
     if (!r.ok) {
       setNameError(typeof j.error === "string" ? j.error : t("super.saveNameFail"));
-      setNameDraft((prev) => ({ ...prev, [u.id]: current }));
+      setNameDraft((prev) => ({
+        ...prev,
+        [u.id]: formatPersonDisplayName(current),
+      }));
       return;
     }
+    const saved = formatPersonDisplayName(j.employee?.name ?? next);
     setUsers((prev) =>
       prev.map((row) =>
-        row.id === u.id ? { ...row, employee: { ...row.employee!, name: j.employee?.name ?? next } } : row
+        row.id === u.id ? { ...row, employee: { ...row.employee!, name: saved } } : row
       )
     );
+    setNameDraft((prev) => ({ ...prev, [u.id]: saved }));
   }
 
   async function changeRole(u: RowUser, nextRole: (typeof ADD_ROLES)[number]) {
@@ -521,7 +534,7 @@ export default function SuperCompanyUsersPage() {
                             if (e.key === "Escape") {
                               setNameDraft((prev) => ({
                                 ...prev,
-                                [u.id]: u.employee?.name ?? "",
+                                [u.id]: formatPersonDisplayName(u.employee?.name ?? ""),
                               }));
                               e.currentTarget.blur();
                             }
