@@ -929,7 +929,7 @@ export const ko = {
     settingsReadOnly: "설정 변경은 회사 관리자·HR만 가능합니다.",
     settingsSaved: "저장되었습니다.",
     settingsWorkTypeTitle: "근무 형태",
-    settingsWorkHoursCardTitle: "근무 시간",
+    settingsWorkHoursCardTitle: "자유 출퇴근",
     settingsWorkTitle: "근무 시간·요일",
     settingsWorkLead: "회사 타임존 기준으로 지각·조퇴·초과근무·휴일근무를 자동 판정합니다.",
     settingsFreePunch: "자유 출퇴근",
@@ -2430,7 +2430,7 @@ export const en = {
     settingsReadOnly: "Only company admin or HR can change these settings.",
     settingsSaved: "Saved.",
     settingsWorkTypeTitle: "Attendance Rules",
-    settingsWorkHoursCardTitle: "Working Hours",
+    settingsWorkHoursCardTitle: "Flexible Punch",
     settingsWorkTitle: "Work hours & days",
     settingsWorkLead:
       "Late arrivals, early departures, overtime, and holiday work are determined using the company time zone.",
